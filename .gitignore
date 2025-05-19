@@ -46,3 +46,6 @@ coverage/
 # Misc
 *.tgz
 *.lock
+
+# Firebase service account
+serviceAccountKey.json
