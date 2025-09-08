@@ -24,6 +24,9 @@ exports.createItem = async (req, res, newItemId) => {
       return res.status(500).json(ApiResponse(null, "SubCategory not found", false, 500));
     }
 
+    // Generate unique productId
+    const productId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     // Parse and format filters if they exist
     let formattedFilters = [];
     if (filters) {
@@ -44,6 +47,7 @@ exports.createItem = async (req, res, newItemId) => {
 
     const newItem = new Item({
       _id: newItemId,
+      productId,
       name,
       description,
       price: Number(price), // Convert to number
@@ -253,6 +257,7 @@ exports.getItemsByFilter = async (req, res) => {
  * Get all items (with pagination)
  */
 exports.getAllItems = async (req, res) => {
+  console.log("qqqqqqqqqqqqqq")
   try {
     const { page = 1, limit = 100 } = req.query;
     const items = await Item.find()

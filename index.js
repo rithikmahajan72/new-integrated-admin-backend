@@ -25,17 +25,39 @@ const filterRoutes = require("./src/routes/FilterRoutes"); // Handles filter-rel
 const bulkUploadRoutes = require("./src/routes/BulkUploadRoutes"); // Handles filter-related routes
 const ReviewRoutes = require("./src/routes/ReviewRoutes");
 const PromoCodeRoutes = require("./src/routes/PromoCodeRoutes");
+const morgan = require("morgan");
 
-// Initialize the Express application
 const app = express();
+// Initialize the Express application
 
 // Apply middleware
+app.use(morgan('dev')); // Use Morgan for HTTP request logging
 app.use(cors()); // Enable CORS for all routes to allow cross-origin requests
 app.use(express.json()); // Parse incoming JSON requests
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data with extended option for complex objects
 
 // Connect to the database (e.g., MongoDB, MySQL) using the connectToDB function
 connectToDB();
+
+// Health check endpoint
+app.get('/', (req, res) => {
+    res.json({
+        status: 'success',
+        message: 'Yoraa Backend API is running',
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        memory: process.memoryUsage()
+    });
+});
 
 // Define API routes and mount the corresponding routers
 app.use("/api/auth", authRouter); // Authentication routes (e.g., login, signup)
@@ -50,7 +72,7 @@ app.use("/api/address", addressRoutes); // User address management routes
 app.use("/api/razorpay", razorpayRoutes); // Payment processing routes using Razorpay
 app.use("/api/userProfile", userProfileRoutes); // User profile management routes
 app.use("/api/orders", orderRoutes); // Order management routes
-app.use("/api privacyPolicy", privacyPolicyRoutes); // Privacy policy routes
+app.use("/api/privacyPolicy", privacyPolicyRoutes); // Privacy policy routes
 app.use("/api", notificationRoutes); // Notification-related routes (Note: Consider specifying a more specific path like /api/notifications)
 app.use("/api/filters", filterRoutes); // Routes for filtering items (e.g., by category, price)
 app.use("/api/bulkUpload",bulkUploadRoutes );
@@ -59,6 +81,9 @@ app.use("/api/promoCode", PromoCodeRoutes); // Mount promo code routes
 
 
 // Start the server and listen on port 8080
-app.listen(8080, () => {
-    console.log(`Server is running on http://localhost:8080`);
+const PORT = process.env.PORT || 8080;
+const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+
+app.listen(PORT, HOST, () => {
+    console.log(`Server is running on http://${HOST}:${PORT}`);
 });

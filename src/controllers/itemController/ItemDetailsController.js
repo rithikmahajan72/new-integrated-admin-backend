@@ -129,6 +129,7 @@ exports.createItemDetails = async (req, res) => {
       sizeChartCm,
       sizeMeasurement,
       items: itemId,
+      productId: itemExists.productId,
     });
 
     console.log("[Server] newItemDetails before save:", newItemDetails);
@@ -240,6 +241,7 @@ exports.updateItemDetails = async (req, res) => {
         sizeChartCm,
         sizeMeasurement,
         items: itemId,
+        productId: itemExists.productId,
       },
       { new: true, runValidators: true }
     ).populate("items");

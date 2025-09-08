@@ -8,6 +8,7 @@ const {
   sendVerificationEmail,
   verifyEmail,
   verifyFirebaseOtp,
+  verifyOtp,
   signupFirebase,
   loginFirebase,
   logout,
@@ -38,6 +39,10 @@ authRouter
   // POST /api/auth/generate-otp
   // Generates and sends an OTP (likely via SMS or email, e.g., using 2Factor.in)
   .post("/generate-otp", generateOtp)
+
+  // POST /api/auth/verifyOtp
+  // Verifies an OTP for user authentication/verification
+  .post("/verifyOtp", verifyOtp)
 
   // POST /api/auth/resend-otp (Commented out)
   // Resends an OTP (e.g., if the user didn't receive the first one)

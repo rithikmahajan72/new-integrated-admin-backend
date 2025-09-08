@@ -12,7 +12,7 @@ const { ApiResponse } = require("../utils/ApiResponse");
 
 // Import middleware for authentication and role-based access
 const { verifyToken } = require("../middleware/VerifyToken");
-const checkAdminRole = require("../middleware/checkAdminRole");
+const checkAdminRole = require("../middleware/CheckAdminRole");
 
 // Initialize a new router for subcategory-related routes
 const SubCategoryRouter = express.Router();

@@ -10,14 +10,14 @@ const {
 const mime = require("mime-types");
 require("dotenv").config();
 
-// Initialize DigitalOcean Spaces S3-compatible client
+// Initialize Contabo S3-compatible client
 const s3 = new S3Client({
-  region: process.env.DO_SPACES_REGION || "us-east-1",
-  endpoint: process.env.DO_SPACES_ENDPOINT, // https://blr1.digitaloceanspaces.com
-  forcePathStyle: false, // Use virtual-hosted-style URLs
+  region: process.env.AWS_REGION || "us-central-1",
+  endpoint: process.env.S3_ENDPOINT, // https://usc1.contabostorage.com
+  forcePathStyle: true, // Use path-style URLs for Contabo
   credentials: {
-    accessKeyId: process.env.DO_SPACES_KEY,
-    secretAccessKey: process.env.DO_SPACES_SECRET,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
 
@@ -32,7 +32,7 @@ const uploadMultipart = async (file, folder, entityId) => {
   if (fileSize < 5 * 1024 * 1024) {
     console.log("File size is less than 5MB, uploading directly...");
     const uploadCommand = new PutObjectCommand({
-      Bucket: process.env.DO_SPACES_BUCKET,
+      Bucket: process.env.AWS_BUCKET_NAME,
       Key: fileName,
       Body: file.buffer,
       ContentType: contentType,
@@ -43,7 +43,7 @@ const uploadMultipart = async (file, folder, entityId) => {
       await s3.send(uploadCommand);
       const endTime = Date.now();
       console.log(`File uploaded directly in ${(endTime - startTime) / 1000} seconds.`);
-      return `https://${process.env.DO_SPACES_BUCKET}.blr1.digitaloceanspaces.com/${fileName}`;
+      return `${process.env.S3_ENDPOINT}/${process.env.AWS_BUCKET_NAME}/${fileName}`;
     } catch (error) {
       console.error("Direct upload error:", error);
       throw new Error("Direct upload failed.");
@@ -55,7 +55,7 @@ const uploadMultipart = async (file, folder, entityId) => {
   const totalParts = Math.ceil(fileSize / partSize);
 
   const createUpload = new CreateMultipartUploadCommand({
-    Bucket: process.env.DO_SPACES_BUCKET,
+    Bucket: process.env.AWS_BUCKET_NAME,
     Key: fileName,
     ContentType: contentType,
     ACL: "public-read",
@@ -74,7 +74,7 @@ const uploadMultipart = async (file, folder, entityId) => {
       const chunk = file.buffer.slice(start, end);
 
       const uploadPartCommand = new UploadPartCommand({
-        Bucket: process.env.DO_SPACES_BUCKET,
+        Bucket: process.env.AWS_BUCKET_NAME,
         Key: fileName,
         UploadId: uploadId,
         PartNumber: partNumber,
@@ -93,7 +93,7 @@ const uploadMultipart = async (file, folder, entityId) => {
     const uploadedParts = await Promise.all(uploadPromises);
 
     const completeUpload = new CompleteMultipartUploadCommand({
-      Bucket: process.env.DO_SPACES_BUCKET,
+      Bucket: process.env.AWS_BUCKET_NAME,
       Key: fileName,
       UploadId: uploadId,
       MultipartUpload: { Parts: uploadedParts },
@@ -102,14 +102,14 @@ const uploadMultipart = async (file, folder, entityId) => {
     await s3.send(completeUpload);
     const endTime = Date.now();
     console.log(`Multipart upload completed in ${(endTime - startTime) / 1000} seconds.`);
-    return `https://${process.env.DO_SPACES_BUCKET}.blr1.digitaloceanspaces.com/${fileName}`;
+    return `${process.env.S3_ENDPOINT}/${process.env.AWS_BUCKET_NAME}/${fileName}`;
   } catch (error) {
     console.error("Multipart Upload Error:", error);
     if (uploadId) {
       try {
         await s3.send(
           new AbortMultipartUploadCommand({
-            Bucket: process.env.DO_SPACES_BUCKET,
+            Bucket: process.env.AWS_BUCKET_NAME,
             Key: fileName,
             UploadId: uploadId,
           })
@@ -130,7 +130,7 @@ const deleteFileFromS3 = async (fileUrl) => {
     const key = urlParts.pathname.substring(1);
 
     const deleteCommand = new DeleteObjectCommand({
-      Bucket: process.env.DO_SPACES_BUCKET,
+      Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
     });
 

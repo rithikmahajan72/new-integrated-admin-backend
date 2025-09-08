@@ -3,7 +3,6 @@ node_modules/
 
 # Build outputs
 dist/
-build/
 
 # Logs
 logs/
@@ -48,4 +47,5 @@ coverage/
 *.lock
 
 # Firebase service account
+serviceAccountKey.json
 serviceAccountKey.json

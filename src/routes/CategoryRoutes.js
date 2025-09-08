@@ -104,11 +104,13 @@ CategoryRouter.put(
   upload.single("image"), // Handle single file upload (field name: "image")
   async (req, res) => {
     try {
-      console.log("req.params.id", req.params.id); // Log category ID for debugging
+      console.log("UPDATE REQUEST - req.params.id:", req.params.id); // Log category ID for debugging
+      console.log("UPDATE REQUEST - req.body:", req.body); // Log request body
+      console.log("UPDATE REQUEST - req.file:", req.file); // Log uploaded file
 
       // Check if the category exists
       const existingCategory = await Category.findById(req.params.id);
-      console.log("existingCategory", existingCategory); // Log existing category for debugging
+      console.log("UPDATE REQUEST - existingCategory:", existingCategory); // Log existing category for debugging
       if (!existingCategory) {
         return res
           .status(404)
@@ -127,10 +129,7 @@ CategoryRouter.put(
       }
 
       // Call the controller to update the category
-      const updatedCategory = await categoryController.updateCategory(req, res);
-
-      // Send success response with the updated category
-      res.status(200).json(updatedCategory);
+      await categoryController.updateCategory(req, res);
     } catch (error) {
       // Send error response if update fails
       res

@@ -1,0 +1,295 @@
+{
+  "info": {
+    "_postman_id": "create-item-details-test",
+    "name": "Create Item Details - Fixed API Test",
+    "description": "Test collection for the fixed createItemDetails API endpoint",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Item Details - Fixed",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Set base URL if not already set",
+              "if (!pm.environment.get('baseUrl')) {",
+              "    pm.environment.set('baseUrl', 'http://localhost:8080');",
+              "}",
+              "",
+              "// Set a valid itemId for testing (you can change this)",
+              "pm.environment.set('testItemId', '68bec058cdfe1f2525fb41cf');"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('Response has required fields', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('_id');",
+              "    pm.expect(jsonData).to.have.property('productId');",
+              "    pm.expect(jsonData).to.have.property('descriptionAndReturns');",
+              "    pm.expect(jsonData).to.have.property('manufacturerDetails');",
+              "    pm.expect(jsonData).to.have.property('colors');",
+              "});",
+              "",
+              "pm.test('ProductId is set correctly', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.productId).to.not.be.empty;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "multipart/form-data",
+            "type": "text",
+            "disabled": true
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "data",
+              "value": "{\"descriptionAndReturns\":\"High quality cotton fabric. 30-day return policy. Machine washable and comfortable for daily wear.\",\"fitDetails\":[\"Slim fit\",\"True to size\",\"Comfortable for all-day wear\"],\"careInstructions\":\"Machine wash cold, tumble dry low, iron on medium heat\",\"size\":{\"modelHeight\":\"6'0\\\"\",\"modelMeasurements\":\"Chest: 38\\\", Waist: 32\\\"\",\"modelWearingSize\":\"Medium\"},\"manufacturerDetails\":{\"name\":\"ABC Textiles Ltd\",\"address\":\"123 Industrial Area, Mumbai, Maharashtra 400001, India\",\"countryOfOrigin\":\"India\",\"contactDetails\":{\"phone\":\"+91-9876543210\",\"email\":\"contact@abctextiles.com\"}},\"shippingAndReturns\":{\"shippingDetails\":[\"Free shipping on orders above ₹999\",\"Standard delivery in 3-5 business days\",\"Express delivery available\"],\"returnPolicy\":[\"30-day return policy\",\"Items must be unworn and with tags\",\"Free returns and exchanges\"]},\"dimensions\":{\"length\":28,\"breadth\":20,\"height\":1,\"width\":20,\"weight\":250}}",
+              "description": "JSON object containing all item details data",
+              "type": "text"
+            },
+            {
+              "key": "colors",
+              "value": "[\"Red\",\"Blue\",\"Black\"]",
+              "description": "JSON array of color names for image uploads",
+              "type": "text"
+            },
+            {
+              "key": "images",
+              "description": "Upload product images (optional, max 25 files)",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "videos",
+              "description": "Upload product videos (optional, max 25 files)",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "sizeChartInch",
+              "description": "Size chart in inches Excel file (optional)",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "sizeChartCm",
+              "description": "Size chart in cm Excel file (optional)",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "sizeMeasurement",
+              "description": "Size measurement Excel file (optional)",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/itemDetails/{{testItemId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "itemDetails",
+            "{{testItemId}}"
+          ]
+        },
+        "description": "Creates item details for a specific item using the fixed API endpoint. This test uses a valid itemId and includes all required fields."
+      },
+      "response": [
+        {
+          "name": "Success Response Example",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "data",
+                  "value": "{\"descriptionAndReturns\":\"High quality cotton fabric. 30-day return policy.\",\"manufacturerDetails\":{\"name\":\"ABC Textiles Ltd\",\"address\":\"123 Industrial Area, Mumbai\",\"countryOfOrigin\":\"India\",\"contactDetails\":{\"phone\":\"+91-9876543210\",\"email\":\"contact@abctextiles.com\"}}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/itemDetails/68bec058cdfe1f2525fb41cf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "itemDetails",
+                "68bec058cdfe1f2525fb41cf"
+              ]
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"descriptionAndReturns\": \"High quality cotton fabric. 30-day return policy.\",\n    \"fitDetails\": [\"Slim fit\", \"True to size\"],\n    \"careInstructions\": \"Machine wash cold, tumble dry low\",\n    \"size\": {\n        \"modelHeight\": \"6'0\\\"\",\n        \"modelMeasurements\": \"Chest: 38\\\", Waist: 32\\\"\",\n        \"modelWearingSize\": \"Medium\"\n    },\n    \"colors\": [],\n    \"manufacturerDetails\": {\n        \"name\": \"ABC Textiles Ltd\",\n        \"address\": \"123 Industrial Area, Mumbai\",\n        \"countryOfOrigin\": \"India\",\n        \"contactDetails\": {\n            \"phone\": \"+91-9876543210\",\n            \"email\": \"contact@abctextiles.com\"\n        }\n    },\n    \"shippingAndReturns\": {\n        \"shippingDetails\": [],\n        \"returnPolicy\": []\n    },\n    \"sizeChartInch\": [],\n    \"sizeChartCm\": [],\n    \"sizeMeasurement\": null,\n    \"items\": \"68bec058cdfe1f2525fb41cf\",\n    \"productId\": \"ITEM_1757331549757_3gbeqeamv\",\n    \"averageRating\": 0,\n    \"isReviewDisplayEnabled\": true,\n    \"isReviewSubmissionEnabled\": true,\n    \"_id\": \"68bec3e45e7ffcae3d1b13be\",\n    \"reviews\": [],\n    \"__v\": 0\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get Item Details by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains item details', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('_id');",
+              "    pm.expect(jsonData).to.have.property('productId');",
+              "    pm.expect(jsonData).to.have.property('items');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/itemDetails/{{testItemId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "itemDetails",
+            "{{testItemId}}"
+          ]
+        },
+        "description": "Retrieves item details for the test item to verify creation was successful."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Item Details - Minimal Required Fields",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// This test uses only the minimum required fields",
+              "pm.environment.set('testItemId2', '68bd73a12532b6d9a5f7174a'); // Another valid item ID"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "data",
+              "value": "{\"descriptionAndReturns\":\"Basic product description with return policy.\",\"manufacturerDetails\":{\"name\":\"Test Manufacturer\",\"address\":\"Test Address, City\",\"countryOfOrigin\":\"India\",\"contactDetails\":{\"phone\":\"+91-1234567890\",\"email\":\"test@manufacturer.com\"}}}",
+              "description": "Minimal required data for item details",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/itemDetails/{{testItemId2}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "itemDetails",
+            "{{testItemId2}}"
+          ]
+        },
+        "description": "Creates item details with only the minimum required fields to test the basic functionality."
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('Running Create Item Details API Tests...');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test('Response time is less than 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "testItemId",
+      "value": "68bec058cdfe1f2525fb41cf",
+      "type": "string"
+    },
+    {
+      "key": "testItemId2",
+      "value": "68bd73a12532b6d9a5f7174a",
+      "type": "string"
+    }
+  ]
+}

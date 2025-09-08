@@ -56,9 +56,13 @@ exports.getCategoryById = async (req, res) => {
 // ✅ Update a category
 exports.updateCategory = async (req, res) => {
   try {
+    console.log("CONTROLLER - Updating category with ID:", req.params.id);
+    console.log("CONTROLLER - Request body:", req.body);
+    
     // Find the category to update
     const category = await Category.findById(req.params.id);
     if (!category) {
+      console.log("CONTROLLER - Category not found");
       return res.status(404).json(ApiResponse(null, "Category not found", false, 404));
     }
 
@@ -67,11 +71,14 @@ exports.updateCategory = async (req, res) => {
     category.description = req.body.description || category.description;
     category.imageUrl = req.body.imageUrl || category.imageUrl;
 
+    console.log("CONTROLLER - Saving updated category:", category);
     await category.save();
+    console.log("CONTROLLER - Category updated successfully");
+    
     res.status(200).json(ApiResponse(category, "Category updated successfully", true, 200));
   } catch (err) {
-    console.error(err);
-    res.status(500).json(ApiResponse(null, err.message, false, 500));
+    console.error("CONTROLLER - Update error:", err);
+    res.status(500).json(ApiResponse(null, `Category update failed: ${err.message}`, false, 500));
   }
 };
 

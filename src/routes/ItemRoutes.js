@@ -91,8 +91,9 @@ itemRouter.post(
       );
       console.log("File uploaded to:", fileUrl); // Log S3 URL for debugging
 
-      // Attach the image URL to the request body for use in the controller
+      // Attach the image URL and categoryId to the request body for use in the controller
       req.body.imageUrl = fileUrl;
+      req.body.categoryId = categoryId;
 
       // Call the controller to create the item
       const item = await itemController.createItem(req, res, newItemId);
