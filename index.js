@@ -25,6 +25,7 @@ const filterRoutes = require("./src/routes/FilterRoutes"); // Handles filter-rel
 const bulkUploadRoutes = require("./src/routes/BulkUploadRoutes"); // Handles filter-related routes
 const ReviewRoutes = require("./src/routes/ReviewRoutes");
 const PromoCodeRoutes = require("./src/routes/PromoCodeRoutes");
+const ImageRoutes = require("./src/routes/ImageRoutes"); // Handles image URL refresh routes
 const morgan = require("morgan");
 
 const app = express();
@@ -78,6 +79,7 @@ app.use("/api/filters", filterRoutes); // Routes for filtering items (e.g., by c
 app.use("/api/bulkUpload",bulkUploadRoutes );
 app.use('/api/reviews', ReviewRoutes); // Updated to distinct review path
 app.use("/api/promoCode", PromoCodeRoutes); // Mount promo code routes
+app.use("/api/images", ImageRoutes); // Mount image URL refresh routes
 
 
 // Start the server and listen on port 8080

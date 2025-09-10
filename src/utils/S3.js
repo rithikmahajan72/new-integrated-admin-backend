@@ -6,7 +6,10 @@ const {
   AbortMultipartUploadCommand,
   PutObjectCommand,
   DeleteObjectCommand,
+  PutObjectAclCommand,
+  GetObjectCommand,
 } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const mime = require("mime-types");
 require("dotenv").config();
 
@@ -14,12 +17,54 @@ require("dotenv").config();
 const s3 = new S3Client({
   region: process.env.AWS_REGION || "us-central-1",
   endpoint: process.env.S3_ENDPOINT, // https://usc1.contabostorage.com
-  forcePathStyle: true, // Use path-style URLs for Contabo
+  forcePathStyle: true, // Contabo uses path-style URLs
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+
+// Helper function to construct proper public URL for Contabo
+const getPublicUrl = (fileName) => {
+  // Contabo path-style URL construction
+  return `${process.env.S3_ENDPOINT}/${process.env.AWS_BUCKET_NAME}/${fileName}`;
+};
+
+// Generate signed URL for secure access
+const generateSignedUrl = async (fileName, expiresIn = 24 * 60 * 60) => { // 24 hours default
+  try {
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: fileName,
+    });
+    
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn });
+    console.log(`✅ Generated signed URL for: ${fileName}`);
+    return signedUrl;
+  } catch (error) {
+    console.error(`❌ Failed to generate signed URL for ${fileName}:`, error.message);
+    // Fallback to direct URL if signed URL generation fails
+    return getPublicUrl(fileName);
+  }
+};
+
+// Set object ACL after upload (fallback option)
+const setObjectPublicACL = async (fileName) => {
+  try {
+    const aclCommand = new PutObjectAclCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: fileName,
+      ACL: "public-read",
+    });
+    
+    await s3.send(aclCommand);
+    console.log(`✅ ACL set to public-read for: ${fileName}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to set ACL for ${fileName}:`, error.message);
+    return false;
+  }
+};
 
 // Upload a file (direct or multipart based on size)
 const uploadMultipart = async (file, folder, entityId) => {
@@ -36,14 +81,22 @@ const uploadMultipart = async (file, folder, entityId) => {
       Key: fileName,
       Body: file.buffer,
       ContentType: contentType,
-      ACL: "public-read",
+      ACL: "public-read", // Re-enable ACL for Contabo
     });
 
     try {
       await s3.send(uploadCommand);
+      
+      // Try setting ACL post-upload as fallback
+      await setObjectPublicACL(fileName);
+      
       const endTime = Date.now();
       console.log(`File uploaded directly in ${(endTime - startTime) / 1000} seconds.`);
-      return `${process.env.S3_ENDPOINT}/${process.env.AWS_BUCKET_NAME}/${fileName}`;
+      
+      // Generate signed URL instead of direct URL
+      const signedUrl = await generateSignedUrl(fileName);
+      console.log(`Generated signed URL: ${signedUrl}`);
+      return signedUrl;
     } catch (error) {
       console.error("Direct upload error:", error);
       throw new Error("Direct upload failed.");
@@ -58,7 +111,7 @@ const uploadMultipart = async (file, folder, entityId) => {
     Bucket: process.env.AWS_BUCKET_NAME,
     Key: fileName,
     ContentType: contentType,
-    ACL: "public-read",
+    ACL: "public-read", // Re-enable ACL for multipart uploads
   });
 
   let uploadId;
@@ -100,9 +153,17 @@ const uploadMultipart = async (file, folder, entityId) => {
     });
 
     await s3.send(completeUpload);
+    
+    // Try setting ACL post-upload as fallback
+    await setObjectPublicACL(fileName);
+    
     const endTime = Date.now();
     console.log(`Multipart upload completed in ${(endTime - startTime) / 1000} seconds.`);
-    return `${process.env.S3_ENDPOINT}/${process.env.AWS_BUCKET_NAME}/${fileName}`;
+    
+    // Generate signed URL instead of direct URL
+    const signedUrl = await generateSignedUrl(fileName);
+    console.log(`Generated signed URL: ${signedUrl}`);
+    return signedUrl;
   } catch (error) {
     console.error("Multipart Upload Error:", error);
     if (uploadId) {
@@ -221,4 +282,7 @@ module.exports = {
   bulkUploadFilesToS3,
   parseImageFilename,
   cleanupFailedUploads,
+  setObjectPublicACL,
+  getPublicUrl,
+  generateSignedUrl,
 };

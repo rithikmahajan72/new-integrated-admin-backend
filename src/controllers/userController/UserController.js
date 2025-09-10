@@ -1,5 +1,6 @@
 const User = require("../../models/User");
 const UserProfile = require("../../models/UserProfile");
+const mongoose = require("mongoose");
 
 // ✅ Get the logged-in user's details
 exports.getById = async (req, res) => {
@@ -7,10 +8,22 @@ exports.getById = async (req, res) => {
         const id = req.user._id;
         console.log("Fetching user by ID:", id);
 
-        // Get user and convert to plain object
-        const result = (await User.findById(id)).toObject();
+        // Validate if the ID is a valid MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            console.log("Invalid ObjectId format:", id);
+            return res.status(400).json({ message: 'Invalid user ID format' });
+        }
 
-        // Remove sensitive data
+        // Get user first, then check if it exists
+        const user = await User.findById(id);
+        
+        if (!user) {
+            console.log("User not found with ID:", id);
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Convert to plain object and remove sensitive data
+        const result = user.toObject();
         delete result.password;
 
         res.status(200).json(result);
@@ -26,10 +39,18 @@ exports.updateById = async (req, res) => {
         const { id } = req.params;
 
         // Update user with new data and return the updated object
-        const updated = (await User.findByIdAndUpdate(id, req.body, { new: true })).toObject();
-        delete updated.password;
+        const updated = await User.findByIdAndUpdate(id, req.body, { new: true });
+        
+        if (!updated) {
+            console.log("User not found for update with ID:", id);
+            return res.status(404).json({ message: 'User not found' });
+        }
 
-        res.status(200).json(updated);
+        // Convert to plain object and remove sensitive data
+        const result = updated.toObject();
+        delete result.password;
+
+        res.status(200).json(result);
     } catch (error) {
         console.error("Error updating user:", error);
         res.status(500).json({ message: 'Error updating user details, please try again later' });
