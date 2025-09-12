@@ -28,6 +28,7 @@ export const itemAPI = {
   getItemById: (itemId) => API.get(`/api/items/${itemId}`),
   getItemsByCategory: (categoryId) => API.get(`/api/items/category/${categoryId}`),
   getItemsBySubCategory: (subCategoryId) => API.get(`/api/items/subcategory/${subCategoryId}`),
+  getItemStatistics: () => API.get('/api/items/statistics'),
   
   // Item management (admin)
   createItem: (itemData) => API.post('/api/products', itemData), // Updated to use products endpoint
@@ -150,7 +151,18 @@ export const imageAPI = {
   getSignedUrl: (fileName) => API.post('/api/images/signed-url', { fileName }),
 };
 
-// Privacy Policy API endpoints
+// Product API endpoints (for managing products saved from SingleProductUpload)
+export const productAPI = {
+  getAllProducts: (params = {}) => API.get('/api/products', { params }),
+  getProductById: (productId) => API.get(`/api/products/${productId}`),
+  createProduct: (productData) => API.post('/api/products', productData),
+  updateProduct: (productId, productData) => API.patch(`/api/products/${productId}`, productData),
+  deleteProduct: (productId) => API.delete(`/api/products/${productId}`),
+  // Additional methods for lifecycle management
+  publishProduct: (productId) => API.patch(`/api/products/publish/${productId}`),
+  scheduleProduct: (productId, scheduleData) => API.patch(`/api/products/schedule/${productId}`, scheduleData),
+  cancelSchedule: (productId) => API.patch(`/api/products/cancel-schedule/${productId}`),
+};// Privacy Policy API endpoints
 export const privacyAPI = {
   getPrivacyPolicy: () => API.get('/api/privacy-policy'),
   updatePrivacyPolicy: (policyData) => API.put('/api/privacy-policy', policyData),

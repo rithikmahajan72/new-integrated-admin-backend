@@ -166,6 +166,24 @@ const productSchema= new Schema({
         default: 'draft'
     },
     
+    // Scheduling fields
+    scheduledDate: {
+        type: String, // Store as string for date in YYYY-MM-DD format
+        required: false
+    },
+    scheduledTime: {
+        type: String, // Store as string for time in HH:MM format
+        required: false
+    },
+    scheduledAt: {
+        type: Date, // Combined date-time when the product was scheduled
+        required: false
+    },
+    publishAt: {
+        type: Date, // Exact date-time when the product should go live
+        required: false
+    },
+    
     // Additional fields
     tags: [{ type: String }],
     

@@ -550,3 +550,29 @@ exports.getTotalItemCount = async (req, res) => {
     res.status(500).json(ApiResponse(null, "Error fetching total item count", false, 500, err.message));
   }
 };
+
+/**
+ * Get item statistics by status
+ */
+exports.getItemStatistics = async (req, res) => {
+  try {
+    // Get counts for each status
+    const draftsCount = await Item.countDocuments({ status: 'draft' });
+    const publishedCount = await Item.countDocuments({ status: 'published' });
+    const scheduledCount = await Item.countDocuments({ status: 'scheduled' });
+    const totalCount = await Item.countDocuments();
+
+    const statistics = {
+      drafts: draftsCount,
+      live: publishedCount, // Mapping 'published' to 'live' for frontend compatibility
+      published: publishedCount,
+      scheduled: scheduledCount,
+      total: totalCount
+    };
+
+    res.status(200).json(ApiResponse(statistics, "Item statistics fetched successfully", true, 200));
+  } catch (err) {
+    console.error("Error fetching item statistics:", err);
+    res.status(500).json(ApiResponse(null, "Error fetching item statistics", false, 500, err.message));
+  }
+};

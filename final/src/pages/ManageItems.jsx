@@ -7,123 +7,12 @@ import {
   Plus,
   X,
   Filter,
+  RefreshCw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { itemAPI, productAPI, categoryAPI, subCategoryAPI } from "../api/endpoints";
 
-// Constants moved outside to prevent recreation on every render
-const SAMPLE_ITEMS = [
-  {
-    id: 1,
-    image: "/api/placeholder/120/116",
-    productName: "Insomniac T shirt",
-    category: "men",
-    subCategories: "T shirt",
-    hsn: "44000000",
-    size: ["small", "medium", "large"],
-    quantity: 5,
-    price: 4566,
-    salePrice: 4566,
-    platforms: {
-      myntra: { enabled: true, price: 4566 },
-      amazon: { enabled: true, price: 4566 },
-      flipkart: { enabled: true, price: 4566 },
-      nykaa: { enabled: true, price: 4566 },
-    },
-    skus: {
-      small: "blk/s/inso123",
-      medium: "blk/m/inso123",
-      large: "blk/l/inso123",
-    },
-    barcodeNo: "44000000000000",
-    status: "draft",
-    metaTitle: "tshirt white",
-    metaDescription: "tshirt white trending",
-    slugUrl: "tu.beee/hhhhhh/hahahha.com",
-    moveToSale: false,
-    keepCopyAndMove: false,
-    moveToEyx: false,
-  },
-  {
-    id: 2,
-    image: "/api/placeholder/120/116",
-    productName: "Insomniac T shirt",
-    category: "men",
-    subCategories: "T shirt",
-    hsn: "44000000",
-    size: ["small", "medium", "large"],
-    quantity: 10,
-    price: 4566,
-    salePrice: 4566,
-    platforms: {
-      myntra: { enabled: true, price: 4566 },
-      amazon: { enabled: true, price: 4566 },
-      flipkart: { enabled: true, price: 4566 },
-      nykaa: { enabled: true, price: 4566 },
-    },
-    skus: {
-      small: "blk/s/inso124",
-      medium: "blk/m/inso124",
-      large: "blk/l/inso124",
-    },
-    barcodeNo: "44000000000000",
-    status: "live",
-    metaTitle: "tshirt white",
-    metaDescription: "tshirt white trending",
-    slugUrl: "tu.beee/hhhhhh/hahahha.com",
-    moveToSale: false,
-    keepCopyAndMove: false,
-    moveToEyx: false,
-  },
-  {
-    id: 3,
-    image: "/api/placeholder/120/116",
-    productName: "Insomniac T shirt",
-    category: "men",
-    subCategories: "T shirt",
-    hsn: "44000000",
-    size: ["small", "medium", "large"],
-    quantity: 8,
-    price: 4566,
-    salePrice: 4566,
-    platforms: {
-      myntra: { enabled: false, price: 4566 },
-      amazon: { enabled: true, price: 4566 },
-      flipkart: { enabled: false, price: 4566 },
-      nykaa: { enabled: true, price: 4566 },
-    },
-    skus: {
-      small: "blk/s/inso125",
-      medium: "blk/m/inso125",
-      large: "blk/l/inso125",
-    },
-    barcodeNo: "44000000000000",
-    status: "scheduled",
-    scheduledDate: "2025-08-15",
-    scheduledTime: "14:30",
-    metaTitle: "tshirt white",
-    metaDescription: "tshirt white trending",
-    slugUrl: "tu.beee/hhhhhh/hahahha.com",
-    moveToSale: false,
-    keepCopyAndMove: false,
-    moveToEyx: false,
-  },
-];
-
-const CATEGORY_OPTIONS = [
-  "All categories",
-  "men",
-  "women",
-  "T shirt",
-  "Clothing",
-  "Accessories",
-];
-
-const SUB_CATEGORY_OPTIONS = [
-  "All subcategories",
-  "T shirt",
-  "Casual wear",
-  "Formal wear",
-];
+// All data is now loaded dynamically from the API
 
 const STATUS_STYLES = {
   live: "text-[#00b69b]",
@@ -138,6 +27,7 @@ const useManageItemsState = () => {
   const [selectedCategory, setSelectedCategory] = useState("All categories");
   const [selectedSubCategory, setSelectedSubCategory] =
     useState("All subcategories");
+  const [selectedItem, setSelectedItem] = useState("Items");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
   const [showLiveOnly, setShowLiveOnly] = useState(false);
@@ -146,7 +36,21 @@ const useManageItemsState = () => {
   // Items data
   const [draftItems, setDraftItems] = useState([]);
   const [publishedItems, setPublishedItems] = useState([]);
+  const [allItems, setAllItems] = useState([]);
+  const [statistics, setStatistics] = useState({
+    drafts: 0,
+    live: 0,
+    scheduled: 0,
+    total: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
+  // Dynamic dropdown data
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
+  const [isSubCategoriesLoading, setIsSubCategoriesLoading] = useState(true);
 
   return {
     searchTerm,
@@ -155,6 +59,8 @@ const useManageItemsState = () => {
     setSelectedCategory,
     selectedSubCategory,
     setSelectedSubCategory,
+    selectedItem,
+    setSelectedItem,
     statusFilter,
     setStatusFilter,
     showDraftsOnly,
@@ -167,8 +73,22 @@ const useManageItemsState = () => {
     setDraftItems,
     publishedItems,
     setPublishedItems,
+    allItems,
+    setAllItems,
+    statistics,
+    setStatistics,
+    isLoading,
+    setIsLoading,
     isFilterDropdownOpen,
     setIsFilterDropdownOpen,
+    categories,
+    setCategories,
+    subCategories,
+    setSubCategories,
+    isCategoriesLoading,
+    setIsCategoriesLoading,
+    isSubCategoriesLoading,
+    setIsSubCategoriesLoading,
   };
 };
 
@@ -287,13 +207,132 @@ const ManageItems = memo(() => {
   const state = useManageItemsState();
   const modalState = useModalState();
 
-  // Use SAMPLE_ITEMS directly instead of state to avoid unnecessary re-renders
-  const sampleItems = useMemo(() => SAMPLE_ITEMS, []);
+  // All data comes from API - no static fallbacks
 
-  // Data loading effect - optimized with reduced dependencies
+  // Remove the problematic useCallback functions since we're doing direct API calls now
+
+  // Data loading effect - fetch real-time data on component mount
   useEffect(() => {
-    const loadSavedData = () => {
+    console.log("ManageItems: Initial data load triggered");
+    const loadData = async () => {
       try {
+        state.setIsLoading(true);
+        
+        // Load data from API
+        const [itemsResponse, statsResponse, categoriesResponse, subCategoriesResponse] = await Promise.all([
+          productAPI.getAllProducts(),
+          itemAPI.getItemStatistics(),
+          categoryAPI.getAllCategories(),
+          subCategoryAPI.getAllSubCategories()
+        ]);
+        
+        console.log("ManageItems: Received API responses", { 
+          itemsCount: Array.isArray(itemsResponse?.data) ? itemsResponse.data.length : 0,
+          statistics: statsResponse?.data?.data 
+        });
+        
+        // Handle products response  
+        if (itemsResponse.data) {
+          // Products API returns array directly, not wrapped in .items
+          const productsArray = Array.isArray(itemsResponse.data) ? itemsResponse.data : [itemsResponse.data];
+          const mappedItems = productsArray.map(item => ({
+            id: item._id || item.id,
+            image: item.thumbnail || item.variants?.[0]?.images?.[0] || item.images?.[0] || "/api/placeholder/120/116",
+            productName: item.productName || item.title,
+            title: item.title || item.productName,
+            category: item.category?.name || item.category || "Unknown",
+            subCategory: item.subCategory?.name || item.subCategory || "Unknown",
+            subCategories: item.subCategory?.name || item.subCategory || "Unknown", // Legacy field name for table display
+            hsn: item.sizes?.[0]?.hsnCode || "N/A",
+            size: item.sizes?.map(s => s.size) || [],
+            quantity: item.stockQuantity || item.sizes?.reduce((total, size) => total + (size.quantity || 0), 0) || 0,
+            price: item.regularPrice || item.price || 0,
+            salePrice: item.salePrice || item.regularPrice || item.price || 0,
+            regularPrice: item.regularPrice || item.price || 0,
+            status: item.status === 'published' ? 'live' : item.status,
+            metaTitle: item.metaTitle || "",
+            metaDescription: item.metaDescription || "",
+            slugUrl: item.slugUrl || "",
+            description: item.description || "",
+            manufacturingDetails: item.manufacturingDetails || "",
+            shippingReturns: item.shippingAndReturns || "",
+            returnable: item.returnable ? 'yes' : 'no',
+            variants: item.variants || [],
+            sizes: item.sizes || [],
+            stockSizeOption: item.stockSizeOption || 'sizes',
+            sizeChart: item.sizeChart || {},
+            commonSizeChart: item.commonSizeChart || {},
+            alsoShowInOptions: item.alsoShowInOptions || {},
+            filters: item.filters || [],
+            tags: item.tags || [],
+            platformPricing: item.platformPricing || {},
+            platforms: {
+              myntra: { 
+                enabled: item.platformPricing?.myntra?.enabled || false, 
+                price: item.platformPricing?.myntra?.price || item.regularPrice || 0 
+              },
+              amazon: { 
+                enabled: item.platformPricing?.amazon?.enabled || false, 
+                price: item.platformPricing?.amazon?.price || item.regularPrice || 0 
+              },
+              flipkart: { 
+                enabled: item.platformPricing?.flipkart?.enabled || false, 
+                price: item.platformPricing?.flipkart?.price || item.regularPrice || 0 
+              },
+              nykaa: { 
+                enabled: item.platformPricing?.nykaa?.enabled || false, 
+                price: item.platformPricing?.nykaa?.price || item.regularPrice || 0 
+              },
+            },
+            skus: item.sizes?.reduce((acc, sizeItem) => {
+              acc[sizeItem.size] = sizeItem.sku;
+              return acc;
+            }, {}) || {},
+            barcodeNo: item.sizes?.[0]?.barcode || "N/A",
+            // Legacy support for existing functionality
+            moveToSale: false,
+            keepCopyAndMove: false,
+            moveToEyx: false,
+          }));
+          state.setAllItems(mappedItems);
+          console.log("ManageItems: Updated items list with", mappedItems.length, "items");
+        }
+        
+        // Handle statistics response
+        if (statsResponse.data && statsResponse.data.data) {
+          state.setStatistics(statsResponse.data.data);
+          console.log("ManageItems: Updated statistics", statsResponse.data.data);
+        }
+
+        // Handle categories response
+        console.log("ManageItems: Raw categories response", categoriesResponse);
+        if (categoriesResponse.data && categoriesResponse.data.data) {
+          const categories = Array.isArray(categoriesResponse.data.data) ? categoriesResponse.data.data : [];
+          console.log("ManageItems: Processed categories array", categories);
+          const categoryNames = categories.map(category => category.name || category.categoryName || category);
+          state.setCategories(categoryNames);
+          state.setIsCategoriesLoading(false);
+          console.log("ManageItems: Updated categories", categoryNames);
+        } else {
+          console.log("ManageItems: No categories data received");
+          state.setIsCategoriesLoading(false);
+        }
+
+        // Handle subcategories response
+        console.log("ManageItems: Raw subcategories response", subCategoriesResponse);
+        if (subCategoriesResponse.data && subCategoriesResponse.data.data) {
+          const subCategories = Array.isArray(subCategoriesResponse.data.data) ? subCategoriesResponse.data.data : [];
+          console.log("ManageItems: Processed subcategories array", subCategories);
+          const subCategoryNames = subCategories.map(subCategory => subCategory.name || subCategory.subCategoryName || subCategory);
+          state.setSubCategories(subCategoryNames);
+          state.setIsSubCategoriesLoading(false);
+          console.log("ManageItems: Updated subcategories", subCategoryNames);
+        } else {
+          console.log("ManageItems: No subcategories data received");
+          state.setIsSubCategoriesLoading(false);
+        }
+        
+        // Also load any saved local data
         const savedDrafts = localStorage.getItem("yoraa_draft_items");
         if (savedDrafts) {
           state.setDraftItems(JSON.parse(savedDrafts));
@@ -303,13 +342,82 @@ const ManageItems = memo(() => {
         if (savedPublished) {
           state.setPublishedItems(JSON.parse(savedPublished));
         }
+        
       } catch (error) {
-        console.error("Error loading saved data:", error);
+        console.error("Error loading data:", error);
+        console.error("Error details:", error.response?.data || error.message);
+        
+        // Set empty arrays on error - no static fallbacks
+        state.setAllItems([]);
+        state.setStatistics({ drafts: 0, live: 0, scheduled: 0, total: 0 });
+
+        // Set categories and subcategories loading to false even on error
+        state.setIsCategoriesLoading(false);
+        state.setIsSubCategoriesLoading(false);
+      } finally {
+        state.setIsLoading(false);
       }
     };
 
-    loadSavedData();
-  }, []); // Removed state dependency for better performance
+    loadData();
+  }, []); // Empty dependency array - run only once on mount
+
+  // Refresh data when component becomes visible (e.g., when navigating back from SingleProductUpload)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !state.isLoading) {
+        console.log("ManageItems: Page became visible, refreshing data...");
+        const loadData = async () => {
+          try {
+            state.setIsLoading(true);
+            
+            const [itemsResponse, statsResponse] = await Promise.all([
+              productAPI.getAllProducts(),
+              itemAPI.getItemStatistics()
+            ]);
+            
+            console.log("ManageItems: Visibility refresh - received responses", {
+              itemsCount: Array.isArray(itemsResponse?.data) ? itemsResponse.data.length : 0,
+              statistics: statsResponse?.data?.data
+            });
+            
+            if (itemsResponse.data) {
+              const productsArray = Array.isArray(itemsResponse.data) ? itemsResponse.data : [itemsResponse.data];
+              const mappedItems = productsArray.map(item => ({
+                ...item,
+                status: item.status === 'published' ? 'live' : item.status
+              }));
+              state.setAllItems(mappedItems);
+            }
+            
+            if (statsResponse.data && statsResponse.data.data) {
+              state.setStatistics(statsResponse.data.data);
+            }
+          } catch (error) {
+            console.error("ManageItems: Error refreshing data:", error);
+          } finally {
+            state.setIsLoading(false);
+          }
+        };
+        loadData();
+      }
+    };
+
+    const handleFocus = () => {
+      if (!state.isLoading) {
+        console.log("Window focused, refreshing data...");
+        handleVisibilityChange();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [state.isLoading]);
 
   // Optimized filter handlers with useCallback
   const filterHandlers = useMemo(() => {
@@ -441,30 +549,33 @@ const ManageItems = memo(() => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [filterHandlers]);
 
-  // Combined items computation
+  // Combined items computation - only use API data
   const allItems = useMemo(() => {
-    return [...sampleItems, ...state.draftItems, ...state.publishedItems];
-  }, [sampleItems, state.draftItems, state.publishedItems]);
+    // Only use real API data - no static fallbacks
+    return [...(state.allItems || []), ...(state.draftItems || []), ...(state.publishedItems || [])];
+  }, [state.allItems, state.draftItems, state.publishedItems]);
 
   // Filtered items computation
   const filteredItems = useMemo(() => {
     return allItems.filter((item) => {
       const matchesSearch =
-        item.productName
+        (item.productName || item.title || '')
           .toLowerCase()
           .includes(state.searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-        item.subCategories
+        (item.category || '')
+          .toLowerCase()
+          .includes(state.searchTerm.toLowerCase()) ||
+        (item.subCategories || item.subCategory || '')
           .toLowerCase()
           .includes(state.searchTerm.toLowerCase());
 
       const matchesCategory =
         state.selectedCategory === "All categories" ||
-        item.category === state.selectedCategory;
+        (item.category || '') === state.selectedCategory;
 
       const matchesSubCategory =
         state.selectedSubCategory === "All subcategories" ||
-        item.subCategories === state.selectedSubCategory;
+        (item.subCategories || item.subCategory || '') === state.selectedSubCategory;
 
       // Status filtering
       let matchesStatusFilter = true;
@@ -498,7 +609,7 @@ const ManageItems = memo(() => {
     const getSizeDisplay = (sizes) => sizes.join(", ");
 
     const getSkuDisplay = (skus, sizes) =>
-      sizes.map((size) => skus[size]).join(", ");
+      (sizes || []).map((size) => skus?.[size] || 'N/A').join(", ");
 
     const getStatusStyle = (status) => {
       return STATUS_STYLES[status.toLowerCase()] || STATUS_STYLES.draft;
@@ -544,6 +655,39 @@ const ManageItems = memo(() => {
       navigate("/single-product-upload");
     };
 
+    const handleRefreshData = async () => {
+      console.log("Refreshing data...");
+      try {
+        state.setIsLoading(true);
+        
+        // Direct API calls without dependencies
+        const [itemsResponse, statsResponse] = await Promise.all([
+          productAPI.getAllProducts(),
+          itemAPI.getItemStatistics()
+        ]);
+        
+        // Handle products response
+        if (itemsResponse.data) {
+          const productsArray = Array.isArray(itemsResponse.data) ? itemsResponse.data : [itemsResponse.data];
+          const mappedItems = productsArray.map(item => ({
+            ...item,
+            status: item.status === 'published' ? 'live' : item.status
+          }));
+          state.setAllItems(mappedItems);
+        }
+        
+        // Handle statistics response
+        if (statsResponse.data && statsResponse.data.data) {
+          state.setStatistics(statsResponse.data.data);
+        }
+        
+      } catch (error) {
+        console.error("Error refreshing data:", error);
+      } finally {
+        state.setIsLoading(false);
+      }
+    };
+
     const handleEdit = (itemId) => {
       const itemToEdit = allItems.find((item) => item.id === itemId);
       modalState.setEditingItem(itemToEdit);
@@ -577,47 +721,96 @@ const ManageItems = memo(() => {
     return {
       handleBulkUpload,
       handleUploadSingleProduct,
+      handleRefreshData,
       handleEdit,
       handleSaveEdit,
       handleCloseEdit,
       handleCloseSuccess,
     };
-  }, [navigate, allItems]);
+  }, [navigate, allItems]); // Removed the problematic function dependencies
 
   // Optimized delete handlers
   const deleteHandlers = useMemo(() => {
     const handleDelete = (itemId) => {
       const itemToDeleteObj = allItems.find((item) => item.id === itemId);
+      if (!itemToDeleteObj) {
+        console.error("Item not found for deletion:", itemId);
+        alert("Item not found. Please refresh the page and try again.");
+        return;
+      }
       modalState.setItemToDelete(itemToDeleteObj);
       modalState.setIsDeleteConfirmModalOpen(true);
     };
 
-    const handleConfirmDelete = () => {
-      console.log("Deleting item:", modalState.itemToDelete.id);
+    const handleConfirmDelete = async () => {
+      try {
+        if (!modalState.itemToDelete) {
+          console.error("No item to delete");
+          return;
+        }
 
-      if (modalState.itemToDelete.status === "draft") {
-        const updatedDrafts = state.draftItems.filter(
+        console.log("Deleting item:", modalState.itemToDelete.id);
+
+        // Call the API to delete the product
+        await productAPI.deleteProduct(modalState.itemToDelete.id);
+
+        // Update local state based on item status
+        if (modalState.itemToDelete.status === "draft") {
+          const updatedDrafts = (state.draftItems || []).filter(
+            (item) => item.id !== modalState.itemToDelete.id
+          );
+          state.setDraftItems(updatedDrafts);
+          localStorage.setItem(
+            "yoraa_draft_items",
+            JSON.stringify(updatedDrafts)
+          );
+        } else if (modalState.itemToDelete.status === "live") {
+          const updatedPublished = (state.publishedItems || []).filter(
+            (item) => item.id !== modalState.itemToDelete.id
+          );
+          state.setPublishedItems(updatedPublished);
+          localStorage.setItem(
+            "yoraa_published_items",
+            JSON.stringify(updatedPublished)
+          );
+        } else if (modalState.itemToDelete.status === "scheduled") {
+          const updatedScheduled = (state.scheduledItems || []).filter(
+            (item) => item.id !== modalState.itemToDelete.id
+          );
+          state.setScheduledItems(updatedScheduled);
+          localStorage.setItem(
+            "yoraa_scheduled_items",
+            JSON.stringify(updatedScheduled)
+          );
+        }
+
+        // Update allItems as well
+        const updatedAllItems = (state.allItems || []).filter(
           (item) => item.id !== modalState.itemToDelete.id
         );
-        state.setDraftItems(updatedDrafts);
-        localStorage.setItem(
-          "yoraa_draft_items",
-          JSON.stringify(updatedDrafts)
-        );
-      } else if (modalState.itemToDelete.status === "live") {
-        const updatedPublished = state.publishedItems.filter(
-          (item) => item.id !== modalState.itemToDelete.id
-        );
-        state.setPublishedItems(updatedPublished);
-        localStorage.setItem(
-          "yoraa_published_items",
-          JSON.stringify(updatedPublished)
-        );
+        state.setAllItems(updatedAllItems);
+
+        // Update statistics
+        const currentStats = state.statistics || { total: 0, draft: 0, live: 0, scheduled: 0 };
+        const updatedStats = {
+          ...currentStats,
+          total: Math.max(0, (currentStats.total || 0) - 1),
+          [modalState.itemToDelete.status]: Math.max(0, (currentStats[modalState.itemToDelete.status] || 0) - 1)
+        };
+        state.setStatistics(updatedStats);
+
+        modalState.setIsDeleteConfirmModalOpen(false);
+        modalState.setItemToDelete(null);
+        modalState.setIsDeleteSuccessModalOpen(true);
+        
+        console.log("Item deleted successfully");
+      } catch (error) {
+        console.error("Error deleting item:", error);
+        alert("Failed to delete item. Please try again.");
+        // Reset modal states even on error
+        modalState.setIsDeleteConfirmModalOpen(false);
+        modalState.setItemToDelete(null);
       }
-
-      modalState.setIsDeleteConfirmModalOpen(false);
-      modalState.setItemToDelete(null);
-      modalState.setIsDeleteSuccessModalOpen(true);
     };
 
     const handleCancelDelete = () => {
@@ -706,16 +899,15 @@ const ManageItems = memo(() => {
   // Optimized item action handlers
   const handleItemAction = useCallback(
     (itemId, action, value) => {
-      console.log(`${action} for item ${itemId}:`, value);
+      const actionMessages = {
+        moveToSale: value ? 'Moving item to sale' : 'Removing item from sale',
+        keepCopyAndMove: value ? 'Creating copy and moving to sale' : 'Cancelling copy and move action',
+        moveToEyx: value ? 'Moving item to Eyx platform' : 'Removing item from Eyx platform'
+      };
+      
+      console.log(`${actionMessages[action] || action} for item ${itemId}:`, value);
 
-      // Check if it's a sample item (ids 1, 2, 3) - these are read-only
-      const sampleItemIndex = sampleItems.findIndex(
-        (item) => item.id === itemId
-      );
-      if (sampleItemIndex !== -1) {
-        console.log("Cannot update sample items as they are read-only");
-        return;
-      }
+      // All items are now editable - no read-only static items
 
       // Update draft items
       const draftItemIndex = state.draftItems.findIndex(
@@ -753,9 +945,30 @@ const ManageItems = memo(() => {
         return;
       }
 
+      // Update allItems if the item exists there
+      const allItemIndex = state.allItems.findIndex(
+        (item) => item.id === itemId
+      );
+      if (allItemIndex !== -1) {
+        const updatedAllItems = [...state.allItems];
+        updatedAllItems[allItemIndex] = {
+          ...updatedAllItems[allItemIndex],
+          [action]: value,
+        };
+        state.setAllItems(updatedAllItems);
+        
+        // Also save to API if needed - you can implement API call here
+        console.log(`Updated ${action} for item ${itemId} in allItems`);
+        
+        // Show success message in console for now
+        console.log(`✓ ${actionMessages[action] || `${action} updated`}`);
+        
+        return;
+      }
+
       console.log("Item not found in any collection");
     },
-    [sampleItems, state.draftItems, state.publishedItems, state.setDraftItems, state.setPublishedItems]
+    [state.draftItems, state.publishedItems, state.allItems, state.setDraftItems, state.setPublishedItems, state.setAllItems]
   );
 
   // Optimized item lifecycle handlers with focused dependencies
@@ -766,38 +979,56 @@ const ManageItems = memo(() => {
       modalState.setIsMakeLiveConfirmModalOpen(true);
     };
 
-    const handleConfirmMakeLive = () => {
+    const handleConfirmMakeLive = async () => {
       if (modalState.itemToMakeLive) {
-        const updatedItem = {
-          ...modalState.itemToMakeLive,
-          status: "live",
-          publishedAt: new Date().toISOString(),
-          id: `pub_${Date.now()}`,
-        };
+        try {
+          // Update product status in database
+          await productAPI.publishProduct(modalState.itemToMakeLive._id || modalState.itemToMakeLive.id);
+          
+          // Update local state - move item from draft to published
+          const updatedItem = {
+            ...modalState.itemToMakeLive,
+            status: "published", // Changed from "live" to "published" to match backend
+            publishedAt: new Date().toISOString(),
+          };
 
-        // Remove from drafts
-        const updatedDrafts = state.draftItems.filter(
-          (item) => item.id !== modalState.itemToMakeLive.id
-        );
-        state.setDraftItems(updatedDrafts);
-        localStorage.setItem(
-          "yoraa_draft_items",
-          JSON.stringify(updatedDrafts)
-        );
+          // Update in allItems array
+          const updatedAllItems = state.allItems.map(item => 
+            (item._id || item.id) === (modalState.itemToMakeLive._id || modalState.itemToMakeLive.id)
+              ? updatedItem
+              : item
+          );
+          state.setAllItems(updatedAllItems);
 
-        // Add to published items
-        const updatedPublished = [...state.publishedItems, updatedItem];
-        state.setPublishedItems(updatedPublished);
-        localStorage.setItem(
-          "yoraa_published_items",
-          JSON.stringify(updatedPublished)
-        );
+          // Remove from drafts if it exists there
+          const updatedDrafts = state.draftItems.filter(
+            (item) => (item._id || item.id) !== (modalState.itemToMakeLive._id || modalState.itemToMakeLive.id)
+          );
+          state.setDraftItems(updatedDrafts);
+          localStorage.setItem("yoraa_draft_items", JSON.stringify(updatedDrafts));
 
-        console.log("Making item live:", modalState.itemToMakeLive.id);
+          // Add to published items if not already there
+          const existsInPublished = state.publishedItems.some(
+            item => (item._id || item.id) === (modalState.itemToMakeLive._id || modalState.itemToMakeLive.id)
+          );
+          if (!existsInPublished) {
+            const updatedPublished = [...state.publishedItems, updatedItem];
+            state.setPublishedItems(updatedPublished);
+            localStorage.setItem("yoraa_published_items", JSON.stringify(updatedPublished));
+          }
+
+          console.log("✓ Item successfully published:", modalState.itemToMakeLive.productName);
+          
+          modalState.setIsMakeLiveConfirmModalOpen(false);
+          modalState.setItemToMakeLive(null);
+          modalState.setIsMakeLiveSuccessModalOpen(true);
+        } catch (error) {
+          console.error("Error publishing item:", error);
+          // You could add error notification here
+          modalState.setIsMakeLiveConfirmModalOpen(false);
+          modalState.setItemToMakeLive(null);
+        }
       }
-      modalState.setIsMakeLiveConfirmModalOpen(false);
-      modalState.setItemToMakeLive(null);
-      modalState.setIsMakeLiveSuccessModalOpen(true);
     };
 
     const handleCancelMakeLive = () => {
@@ -817,42 +1048,71 @@ const ManageItems = memo(() => {
       modalState.setIsScheduleModalOpen(true);
     };
 
-    const handleConfirmSchedule = () => {
+    const handleConfirmSchedule = async () => {
       if (
         modalState.itemToSchedule &&
         modalState.scheduleDate &&
         modalState.scheduleTime
       ) {
-        const updatedDrafts = state.draftItems.map((item) =>
-          item.id === modalState.itemToSchedule.id
-            ? {
-                ...item,
-                status: "scheduled",
-                scheduledDate: modalState.scheduleDate,
-                scheduledTime: modalState.scheduleTime,
-              }
-            : item
-        );
-        state.setDraftItems(updatedDrafts);
-        localStorage.setItem(
-          "yoraa_draft_items",
-          JSON.stringify(updatedDrafts)
-        );
+        try {
+          // Update product scheduling in database
+          await productAPI.scheduleProduct(
+            modalState.itemToSchedule._id || modalState.itemToSchedule.id,
+            {
+              date: modalState.scheduleDate,
+              time: modalState.scheduleTime
+            }
+          );
 
-        console.log(
-          "Scheduling item:",
-          modalState.itemToSchedule.id,
-          "for",
-          modalState.scheduleDate,
-          "at",
-          modalState.scheduleTime
-        );
+          // Update local state
+          const updatedItem = {
+            ...modalState.itemToSchedule,
+            status: "scheduled",
+            scheduledDate: modalState.scheduleDate,
+            scheduledTime: modalState.scheduleTime,
+            scheduledAt: new Date().toISOString(),
+          };
+
+          // Update in allItems array
+          const updatedAllItems = state.allItems.map(item => 
+            (item._id || item.id) === (modalState.itemToSchedule._id || modalState.itemToSchedule.id)
+              ? updatedItem
+              : item
+          );
+          state.setAllItems(updatedAllItems);
+
+          // Update drafts if item exists there
+          const updatedDrafts = state.draftItems.map((item) =>
+            (item._id || item.id) === (modalState.itemToSchedule._id || modalState.itemToSchedule.id)
+              ? updatedItem
+              : item
+          );
+          state.setDraftItems(updatedDrafts);
+          localStorage.setItem("yoraa_draft_items", JSON.stringify(updatedDrafts));
+
+          console.log(
+            "✓ Item scheduled successfully:",
+            modalState.itemToSchedule.productName,
+            "for",
+            modalState.scheduleDate,
+            "at",
+            modalState.scheduleTime
+          );
+          
+          modalState.setIsScheduleModalOpen(false);
+          modalState.setItemToSchedule(null);
+          modalState.setScheduleDate("");
+          modalState.setScheduleTime("");
+          modalState.setIsScheduleSuccessModalOpen(true);
+        } catch (error) {
+          console.error("Error scheduling item:", error);
+          // You could add error notification here
+          modalState.setIsScheduleModalOpen(false);
+          modalState.setItemToSchedule(null);
+          modalState.setScheduleDate("");
+          modalState.setScheduleTime("");
+        }
       }
-      modalState.setIsScheduleModalOpen(false);
-      modalState.setItemToSchedule(null);
-      modalState.setScheduleDate("");
-      modalState.setScheduleTime("");
-      modalState.setIsScheduleSuccessModalOpen(true);
     };
 
     const handleCancelSchedule = () => {
@@ -872,32 +1132,52 @@ const ManageItems = memo(() => {
       modalState.setIsCancelScheduleConfirmModalOpen(true);
     };
 
-    const handleConfirmCancelSchedule = () => {
+    const handleConfirmCancelSchedule = async () => {
       if (modalState.itemToCancelSchedule) {
-        const updatedDrafts = state.draftItems.map((item) =>
-          item.id === modalState.itemToCancelSchedule.id
-            ? {
-                ...item,
-                status: "draft",
-                scheduledDate: undefined,
-                scheduledTime: undefined,
-              }
-            : item
-        );
-        state.setDraftItems(updatedDrafts);
-        localStorage.setItem(
-          "yoraa_draft_items",
-          JSON.stringify(updatedDrafts)
-        );
+        try {
+          // Make API call to cancel schedule
+          const response = await productAPI.cancelSchedule(modalState.itemToCancelSchedule._id);
+          console.log('Cancel schedule API response:', response.data);
 
-        console.log(
-          "Cancelling schedule for item:",
-          modalState.itemToCancelSchedule.id
-        );
+          // Update the item in all relevant arrays
+          const updatedItem = {
+            ...modalState.itemToCancelSchedule,
+            status: "draft",
+            scheduledDate: null,
+            scheduledTime: null,
+            publishAt: null
+          };
+
+          // Update allItems array
+          state.setAllItems(prev => 
+            prev.map(item => 
+              item._id === modalState.itemToCancelSchedule._id ? updatedItem : item
+            )
+          );
+
+          // Update draftItems array
+          state.setDraftItems(prev => 
+            prev.map(item => 
+              item._id === modalState.itemToCancelSchedule._id ? updatedItem : item
+            )
+          );
+
+          // Update scheduledItems array (remove from scheduled)
+          state.setScheduledItems(prev => 
+            prev.filter(item => item._id !== modalState.itemToCancelSchedule._id)
+          );
+
+          console.log('Successfully cancelled schedule for item:', modalState.itemToCancelSchedule._id);
+          
+          // Show success modal
+          modalState.setIsCancelScheduleSuccessModalOpen(true);
+        } catch (error) {
+          console.error('Error cancelling schedule:', error);
+          // You can add error handling UI here if needed
+        }
       }
       modalState.setIsCancelScheduleConfirmModalOpen(false);
       modalState.setItemToCancelSchedule(null);
-      modalState.setIsCancelScheduleSuccessModalOpen(true);
     };
 
     const handleCancelCancelSchedule = () => {
@@ -944,6 +1224,15 @@ const ManageItems = memo(() => {
           </h1>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
+              onClick={actionHandlers.handleRefreshData}
+              disabled={state.isLoading}
+              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-['Montserrat'] font-medium py-2.5 px-4 rounded-lg transition-all duration-200 ease-in-out shadow-md text-[14px] hover:shadow-lg"
+              title="Refresh data"
+            >
+              <RefreshCw className={`h-5 w-5 ${state.isLoading ? 'animate-spin' : ''}`} />
+              <span className="leading-[20px]">Refresh</span>
+            </button>
+            <button
               onClick={actionHandlers.handleBulkUpload}
               className="flex items-center gap-2 bg-[#000aff] hover:bg-blue-700 text-white font-['Montserrat'] font-medium py-2.5 px-5 rounded-lg transition-all duration-200 ease-in-out shadow-md border border-[#7280ff] text-[14px] hover:shadow-lg"
             >
@@ -985,11 +1274,16 @@ const ManageItems = memo(() => {
                 onChange={(e) => state.setSelectedCategory(e.target.value)}
                 className="appearance-none bg-white border-2 border-black rounded-xl px-4 py-3 pr-8 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[153px] h-[47px] font-['Montserrat'] text-[14px] text-center leading-[16px] hover:border-blue-400 transition-all"
               >
-                {CATEGORY_OPTIONS.map((option, index) => (
-                  <option key={index} value={option}>
-                    {option}
-                  </option>
-                ))}
+                <option value="All categories">All categories</option>
+                {state.isCategoriesLoading ? (
+                  <option disabled>Loading categories...</option>
+                ) : (
+                  state.categories.map((category, index) => (
+                    <option key={index} value={category}>
+                      {category}
+                    </option>
+                  ))
+                )}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                 <ChevronDown className="h-4 w-4 text-black" />
@@ -1003,11 +1297,16 @@ const ManageItems = memo(() => {
                 onChange={(e) => state.setSelectedSubCategory(e.target.value)}
                 className="appearance-none bg-white border-2 border-black rounded-xl px-4 py-3 pr-8 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[153px] h-[47px] font-['Montserrat'] text-[14px] text-center leading-[16px] hover:border-blue-400 transition-all"
               >
-                {SUB_CATEGORY_OPTIONS.map((option, index) => (
-                  <option key={index} value={option}>
-                    {option}
-                  </option>
-                ))}
+                <option value="All subcategories">All subcategories</option>
+                {state.isSubCategoriesLoading ? (
+                  <option disabled>Loading subcategories...</option>
+                ) : (
+                  state.subCategories.map((subCategory, index) => (
+                    <option key={index} value={subCategory}>
+                      {subCategory}
+                    </option>
+                  ))
+                )}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                 <ChevronDown className="h-4 w-4 text-black" />
@@ -1016,8 +1315,21 @@ const ManageItems = memo(() => {
 
             {/* Items Dropdown */}
             <div className="relative">
-              <select className="appearance-none bg-white border-2 border-black rounded-xl px-4 py-3 pr-8 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[153px] h-[47px] font-['Montserrat'] text-[14px] text-center leading-[16px] hover:border-blue-400 transition-all">
-                <option>Items</option>
+              <select 
+                value={state.selectedItem}
+                onChange={(e) => state.setSelectedItem(e.target.value)}
+                className="appearance-none bg-white border-2 border-black rounded-xl px-4 py-3 pr-8 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[153px] h-[47px] font-['Montserrat'] text-[14px] text-center leading-[16px] hover:border-blue-400 transition-all"
+              >
+                <option value="Items">Items</option>
+                {state.isLoading ? (
+                  <option disabled>Loading items...</option>
+                ) : (
+                  state.allItems.map((item, index) => (
+                    <option key={item.id || index} value={item.productName || item.title}>
+                      {item.productName || item.title}
+                    </option>
+                  ))
+                )}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                 <ChevronDown className="h-4 w-4 text-black" />
@@ -1120,8 +1432,19 @@ const ManageItems = memo(() => {
     ]
   );
 
-  // Memoized statistics calculations
-  const statistics = useMemo(() => {
+  // Memoized statistics calculations - use API data when available
+  const currentStatistics = useMemo(() => {
+    // Use API statistics if available, otherwise calculate from current items
+    if (!state.isLoading && state.statistics.total > 0) {
+      return {
+        draftsCount: state.statistics.drafts,
+        liveCount: state.statistics.live,
+        scheduledCount: state.statistics.scheduled,
+        totalCount: state.statistics.total
+      };
+    }
+    
+    // Fallback to calculating from current items
     const draftsCount = allItems.filter(
       (item) => item.status === "draft"
     ).length;
@@ -1132,7 +1455,7 @@ const ManageItems = memo(() => {
     const totalCount = allItems.length;
 
     return { draftsCount, liveCount, scheduledCount, totalCount };
-  }, []);
+  }, [state.isLoading, state.statistics, allItems]);
 
   const renderFilterSummary = useCallback(
     () => (
@@ -1184,42 +1507,51 @@ const ManageItems = memo(() => {
 
         {/* Summary Statistics */}
         <div className="flex items-center gap-6 text-sm font-['Montserrat'] flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 bg-[#ef3826] rounded-full shadow-sm"></span>
-            <span className="text-[#666666]">
-              Drafts:{" "}
-              <span className="font-medium text-[#111111]">
-                {statistics.draftsCount}
-              </span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 bg-[#22c55e] rounded-full shadow-sm"></span>
-            <span className="text-[#666666]">
-              Live:{" "}
-              <span className="font-medium text-[#111111]">
-                {statistics.liveCount}
-              </span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 bg-[#eab308] rounded-full shadow-sm"></span>
-            <span className="text-[#666666]">
-              Scheduled:{" "}
-              <span className="font-medium text-[#111111]">
-                {statistics.scheduledCount}
-              </span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 bg-[#6b7280] rounded-full shadow-sm"></span>
-            <span className="text-[#666666]">
-              Total:{" "}
-              <span className="font-medium text-[#111111]">
-                {statistics.totalCount}
-              </span>
-            </span>
-          </div>
+          {state.isLoading ? (
+            <div className="flex items-center gap-2 text-[#666666]">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>Loading statistics...</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#ef3826] rounded-full shadow-sm"></span>
+                <span className="text-[#666666]">
+                  Drafts:{" "}
+                  <span className="font-medium text-[#111111]">
+                    {currentStatistics.draftsCount}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#22c55e] rounded-full shadow-sm"></span>
+                <span className="text-[#666666]">
+                  Live:{" "}
+                  <span className="font-medium text-[#111111]">
+                    {currentStatistics.liveCount}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#eab308] rounded-full shadow-sm"></span>
+                <span className="text-[#666666]">
+                  Scheduled:{" "}
+                  <span className="font-medium text-[#111111]">
+                    {currentStatistics.scheduledCount}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#6b7280] rounded-full shadow-sm"></span>
+                <span className="text-[#666666]">
+                  Total:{" "}
+                  <span className="font-medium text-[#111111]">
+                    {currentStatistics.totalCount}
+                  </span>
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     ),
@@ -1228,8 +1560,16 @@ const ManageItems = memo(() => {
       state.showDraftsOnly,
       state.showLiveOnly,
       state.showScheduledOnly,
+      state.isLoading,
+      currentStatistics,
+      filterHandlers.clearAllFilters
     ]
   );
+
+  // Item action handlers object
+  const itemActionHandlers = useMemo(() => ({
+    handleItemAction
+  }), [handleItemAction]);
 
   // Memoized item row component for better performance
   const ItemRow = memo(({ item, index }) => (
@@ -1240,9 +1580,12 @@ const ManageItems = memo(() => {
           <div className="flex justify-center">
             <div className="w-[120px] h-[116px] bg-gray-200 rounded-md overflow-hidden shadow-inner hover:scale-105 transition-transform duration-200">
               <img
-                src={item.image}
-                alt={item.productName}
+                src={item.image || '/placeholder-image.jpg'}
+                alt={item.productName || item.title || 'Product Image'}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjExNiIgdmlld0JveD0iMCAwIDEyMCAxMTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTE2IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik00MCA0MEg4MFY3Nkg0MFY0MFoiIGZpbGw9IiNEMUQ1REIiLz4KPHN2Zz4K';
+                }}
               />
             </div>
           </div>
@@ -1251,21 +1594,21 @@ const ManageItems = memo(() => {
         {/* Product Name */}
         <td className="px-4 py-3 text-center">
           <div className="text-gray-800 text-[14px] font-semibold font-['Montserrat'] tracking-wide">
-            {item.productName}
+            {item.productName || item.title || 'Unknown Product'}
           </div>
         </td>
 
         {/* Category */}
         <td className="px-4 py-3 text-center">
           <div className="text-gray-800 text-[14px] font-medium font-['Montserrat'] tracking-wide">
-            {item.category}
+            {item.category || 'Unknown Category'}
           </div>
         </td>
 
         {/* Sub Categories */}
         <td className="px-4 py-3 text-center">
           <div className="text-gray-800 text-[14px] font-medium font-['Montserrat'] tracking-wide">
-            {item.subCategories}
+            {item.subCategories || item.subCategory || 'Unknown Subcategory'}
           </div>
         </td>
 
@@ -1279,9 +1622,10 @@ const ManageItems = memo(() => {
         {/* Size */}
         <td className="px-4 py-3 text-center">
           <div className="flex flex-col gap-1 text-[12px] font-medium text-gray-700 font-['Montserrat']">
-            {item.size.map((size, idx) => (
-              <div key={idx}>{size}</div>
+            {(item.size || item.sizes || []).map((size, idx) => (
+              <div key={idx}>{typeof size === 'string' ? size : size?.size || 'N/A'}</div>
             ))}
+            {(!item.size && !item.sizes) && <div>N/A</div>}
           </div>
         </td>
 
@@ -1310,22 +1654,22 @@ const ManageItems = memo(() => {
         <td className="px-4 py-3 text-center">
           <div className="grid grid-cols-4 gap-3 text-center text-[10px] font-medium font-['Montserrat']">
             <div>
-              {item.platforms.myntra.enabled
+              {item.platforms?.myntra?.enabled
                 ? item.platforms.myntra.price
                 : "-"}
             </div>
             <div>
-              {item.platforms.amazon.enabled
+              {item.platforms?.amazon?.enabled
                 ? item.platforms.amazon.price
                 : "-"}
             </div>
             <div>
-              {item.platforms.flipkart.enabled
+              {item.platforms?.flipkart?.enabled
                 ? item.platforms.flipkart.price
                 : "-"}
             </div>
             <div>
-              {item.platforms.nykaa.enabled ? item.platforms.nykaa.price : "-"}
+              {item.platforms?.nykaa?.enabled ? item.platforms.nykaa.price : "-"}
             </div>
           </div>
         </td>
@@ -1334,9 +1678,9 @@ const ManageItems = memo(() => {
         <td className="px-4 py-3 text-center">
           <div className="text-gray-700 text-[12px] font-medium font-['Montserrat']">
             <div className="flex flex-col gap-1">
-              {item.size.map((size, idx) => (
+              {(item.size || item.sizes || []).map((size, idx) => (
                 <div key={idx} className="text-[10px]">
-                  {item.skus[size]}
+                  {item.skus?.[typeof size === 'string' ? size : size?.size] || 'N/A'}
                 </div>
               ))}
             </div>
@@ -1383,7 +1727,7 @@ const ManageItems = memo(() => {
 
         {/* Action */}
         <td className="px-4 py-3 text-center">
-          <div className="flex justify-center gap-2">
+          <div className="flex justify-center gap-2 flex-wrap">
             {item.status === "draft" ? (
               <>
                 <button
@@ -1398,6 +1742,13 @@ const ManageItems = memo(() => {
                 >
                   Schedule
                 </button>
+                <button
+                  onClick={() => deleteHandlers.handleDelete(item.id)}
+                  className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </>
             ) : item.status === "scheduled" ? (
               <>
@@ -1411,9 +1762,16 @@ const ManageItems = memo(() => {
                   onClick={() =>
                     lifecycleHandlers.handleCancelScheduleItem(item)
                   }
-                  className="px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-md hover:bg-red-600 transition-colors"
+                  className="px-2 py-1 bg-yellow-500 text-white text-xs font-medium rounded-md hover:bg-yellow-600 transition-colors"
                 >
                   Cancel Schedule
+                </button>
+                <button
+                  onClick={() => deleteHandlers.handleDelete(item.id)}
+                  className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </>
             ) : (
@@ -1641,7 +1999,11 @@ const ManageItems = memo(() => {
               {/* Table Body */}
               <tbody className="divide-y divide-gray-100">
                 {filteredItems.map((item, index) => (
-                  <ItemRow key={item.id} item={item} index={index} />
+                  <ItemRow 
+                    key={item.id || item._id || item.productId || `item-${index}`} 
+                    item={item} 
+                    index={index} 
+                  />
                 ))}
               </tbody>
             </table>
@@ -1711,7 +2073,7 @@ const ManageItems = memo(() => {
                       <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden border">
                         <img
                           src={modalState.editingItem.image}
-                          alt={modalState.editingItem.productName}
+                          alt={modalState.editingItem.productName || modalState.editingItem.title || 'Product Image'}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -1726,7 +2088,7 @@ const ManageItems = memo(() => {
                       </div>
                       <input
                         type="text"
-                        defaultValue={modalState.editingItem.productName}
+                        defaultValue={modalState.editingItem.productName || modalState.editingItem.title || ''}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-['Montserrat'] focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
@@ -1858,17 +2220,24 @@ const ManageItems = memo(() => {
               {/* Modal Content */}
               <div className="p-8 text-center relative">
                 {/* Confirmation Message */}
-                <h2 className="text-[18px] font-bold text-black mb-8 leading-[22px] font-['Montserrat'] tracking-[-0.41px] px-4">
-                  Are you sure you want to delete this item
+                <h2 className="text-[18px] font-bold text-black mb-4 leading-[22px] font-['Montserrat'] tracking-[-0.41px] px-4">
+                  Are you sure you want to delete this item?
                 </h2>
+                {modalState.itemToDelete && (
+                  <p className="text-[14px] text-gray-600 mb-8 font-['Montserrat'] px-4">
+                    <strong>{modalState.itemToDelete.productName || modalState.itemToDelete.title}</strong>
+                    <br />
+                    <span className="text-sm">This action cannot be undone.</span>
+                  </p>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-4 justify-center">
                   <button
                     onClick={deleteHandlers.handleConfirmDelete}
-                    className="bg-black hover:bg-gray-800 text-white font-['Montserrat'] font-semibold py-3 px-8 rounded-3xl transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 w-[149px] h-12 text-[16px] leading-[1.406]"
+                    className="bg-red-600 hover:bg-red-700 text-white font-['Montserrat'] font-semibold py-3 px-8 rounded-3xl transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 w-[149px] h-12 text-[16px] leading-[1.406]"
                   >
-                    yes
+                    Delete
                   </button>
                   <button
                     onClick={deleteHandlers.handleCancelDelete}
@@ -1896,25 +2265,49 @@ const ManageItems = memo(() => {
                 {/* Form Fields */}
                 <div className="space-y-6 mb-8">
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 font-['Montserrat']">
+                      Select Date
+                    </label>
                     <input
                       type="date"
                       value={modalState.scheduleDate}
+                      min={new Date().toISOString().split('T')[0]} // Prevent past dates
                       onChange={(e) =>
                         modalState.setScheduleDate(e.target.value)
                       }
-                      className="w-full h-[50px] px-4 py-3 border border-gray-300 rounded-lg font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full h-[50px] px-4 py-3 border border-gray-300 rounded-lg font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      required
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 font-['Montserrat']">
+                      Select Time
+                    </label>
                     <input
                       type="time"
                       value={modalState.scheduleTime}
                       onChange={(e) =>
                         modalState.setScheduleTime(e.target.value)
                       }
-                      className="w-full h-[50px] px-4 py-3 border border-gray-300 rounded-lg font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full h-[50px] px-4 py-3 border border-gray-300 rounded-lg font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      required
                     />
                   </div>
+                  {modalState.scheduleDate && modalState.scheduleTime && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800 font-['Montserrat']">
+                        <strong>Publish Date & Time:</strong><br />
+                        {new Date(`${modalState.scheduleDate}T${modalState.scheduleTime}`).toLocaleString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -1922,19 +2315,104 @@ const ManageItems = memo(() => {
                   <button
                     onClick={lifecycleHandlers.handleConfirmSchedule}
                     disabled={
-                      !modalState.scheduleDate || !modalState.scheduleTime
+                      !modalState.scheduleDate || !modalState.scheduleTime ||
+                      new Date(`${modalState.scheduleDate}T${modalState.scheduleTime}`) <= new Date()
                     }
-                    className="bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-[16px] leading-[1.2]"
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-[16px] leading-[1.2] min-w-[140px]"
                   >
-                    schedule now
+                    {!modalState.scheduleDate || !modalState.scheduleTime 
+                      ? 'Select Date & Time' 
+                      : new Date(`${modalState.scheduleDate}T${modalState.scheduleTime}`) <= new Date()
+                      ? 'Past Time Selected'
+                      : 'Schedule Now'
+                    }
                   </button>
                   <button
                     onClick={lifecycleHandlers.handleCancelSchedule}
-                    className="bg-white hover:bg-gray-50 text-black font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 text-[16px] leading-[1.2] border border-[#e4e4e4]"
+                    className="bg-white hover:bg-gray-50 text-black font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 text-[16px] leading-[1.2] border border-[#e4e4e4] min-w-[140px]"
                   >
                     Cancel
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cancel Schedule Confirmation Modal */}
+        {modalState.isCancelScheduleConfirmModalOpen && modalState.itemToCancelSchedule && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] max-w-md w-full mx-4 relative">
+              {/* Modal Content */}
+              <div className="p-8 relative">
+                {/* Header */}
+                <h2 className="text-[24px] font-bold text-black mb-6 leading-[29px] font-['Montserrat'] text-center">
+                  Cancel Schedule
+                </h2>
+
+                {/* Content */}
+                <div className="text-center mb-8">
+                  <p className="text-[16px] text-gray-600 font-['Montserrat'] leading-[24px]">
+                    Are you sure you want to cancel the scheduled publication for{' '}
+                    <strong className="text-black">
+                      "{modalState.itemToCancelSchedule.productName || modalState.itemToCancelSchedule.title}"
+                    </strong>?
+                  </p>
+                  <p className="text-[14px] text-gray-500 font-['Montserrat'] leading-[20px] mt-4">
+                    This item will be moved back to draft status.
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={lifecycleHandlers.handleConfirmCancelSchedule}
+                    className="bg-red-600 hover:bg-red-700 text-white font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 text-[16px] leading-[1.2] min-w-[140px]"
+                  >
+                    Yes, Cancel Schedule
+                  </button>
+                  <button
+                    onClick={lifecycleHandlers.handleCancelCancelSchedule}
+                    className="bg-white hover:bg-gray-50 text-black font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 text-[16px] leading-[1.2] border border-[#e4e4e4] min-w-[140px]"
+                  >
+                    Keep Scheduled
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cancel Schedule Success Modal */}
+        {modalState.isCancelScheduleSuccessModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] max-w-md w-full mx-4 relative">
+              {/* Modal Content */}
+              <div className="p-8 relative text-center">
+                {/* Success Icon */}
+                <div className="mx-auto mb-6 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                </div>
+
+                {/* Header */}
+                <h2 className="text-[24px] font-bold text-black mb-4 leading-[29px] font-['Montserrat']">
+                  Schedule Cancelled
+                </h2>
+
+                {/* Content */}
+                <p className="text-[16px] text-gray-600 font-['Montserrat'] leading-[24px] mb-8">
+                  The scheduled publication has been cancelled and the item has been moved back to draft status.
+                </p>
+
+                {/* Action Button */}
+                <button
+                  onClick={() => modalState.setIsCancelScheduleSuccessModalOpen(false)}
+                  className="bg-black hover:bg-gray-800 text-white font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-[16px] leading-[1.2] min-w-[140px]"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

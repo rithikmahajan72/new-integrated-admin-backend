@@ -8,7 +8,7 @@ const { ApiResponse } = require("../utils/ApiResponse"); // Utility to standardi
 const { verifyToken } = require("../middleware/VerifyToken"); // Middleware to verify JWT tokens
 const Item = require("../models/Item"); // Mongoose model for Item collection
 const SubCategory = require("../models/SubCategory"); // Mongoose model for SubCategory collection
-const checkAdminRole = require("../middleware/CheckAdminRole"); // Middleware to restrict access to admins
+const checkAdminRole = require("../middleware/checkAdminRole"); // Middleware to restrict access to admins
 
 // Initialize an Express router instance
 const itemRouter = express.Router();
@@ -124,6 +124,14 @@ itemRouter.get(
   "/totalItemCount",
   verifyToken,
   itemController.getTotalItemCount
+);
+
+// GET /api/items/statistics
+// Retrieves item statistics by status (authenticated users only)
+itemRouter.get(
+  "/statistics",
+  verifyToken,
+  itemController.getItemStatistics
 );
 
 // GET /api/items/

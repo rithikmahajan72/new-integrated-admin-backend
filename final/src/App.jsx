@@ -26,6 +26,7 @@ import BlockUser from "./pages/BlockUser";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import ManageItems from "./pages/ManageItems";
+import ManageItemsSimple from "./pages/ManageItemsSimple";
 import Products from "./pages/Products";
 import UploadCategory from "./pages/UploadCategory";
 import UploadCategorySimple from "./pages/UploadCategorySimple";

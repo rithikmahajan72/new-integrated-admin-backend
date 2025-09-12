@@ -9,6 +9,9 @@ ProductRouter
 	.get("/", verifyToken, productController.getAll)
 	.get("/:id", verifyToken, productController.getById)
 	.patch("/:id", verifyToken, checkAdminRole, productController.updateById)
+	.patch("/publish/:id", verifyToken, checkAdminRole, productController.publishProduct)
+	.patch("/schedule/:id", verifyToken, checkAdminRole, productController.scheduleProduct)
+	.patch("/cancel-schedule/:id", verifyToken, checkAdminRole, productController.cancelSchedule)
 	.patch("/undelete/:id", verifyToken, checkAdminRole, productController.undeleteById)
 	.delete("/:id", verifyToken, checkAdminRole, productController.deleteById);
 	

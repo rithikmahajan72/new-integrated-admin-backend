@@ -303,4 +303,130 @@ exports.deleteById=async(req,res)=>{
     }
 }
 
+// Make a product live (publish from draft)
+exports.publishProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const product = await Product.findById(id);
+        
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        
+        if (product.status === 'published') {
+            return res.status(400).json({ message: 'Product is already published' });
+        }
+        
+        const updatedProduct = await Product.findByIdAndUpdate(
+            id,
+            {
+                status: 'published',
+                scheduledDate: null,
+                scheduledTime: null,
+                scheduledAt: null,
+                publishAt: null
+            },
+            { new: true }
+        ).populate('categoryId subCategoryId');
+        
+        res.status(200).json({
+            message: 'Product published successfully',
+            product: updatedProduct
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error publishing product, please try again later' });
+    }
+}
+
+// Schedule a product for later publishing
+exports.scheduleProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { scheduledDate, scheduledTime, date, time } = req.body;
+        
+        // Support both formats (scheduledDate/scheduledTime and date/time)
+        const scheduleDate = scheduledDate || date;
+        const scheduleTime = scheduledTime || time;
+        
+        if (!scheduleDate || !scheduleTime) {
+            return res.status(400).json({ 
+                message: 'Schedule date and time are required' 
+            });
+        }
+        
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        
+        // Create the publishAt datetime
+        const publishAtDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+        
+        // Validate that the scheduled time is in the future
+        if (publishAtDateTime <= new Date()) {
+            return res.status(400).json({ 
+                message: 'Schedule time must be in the future' 
+            });
+        }
+        
+        const updatedProduct = await Product.findByIdAndUpdate(
+            id,
+            {
+                status: 'scheduled',
+                scheduledDate: scheduleDate,
+                scheduledTime: scheduleTime,
+                scheduledAt: new Date(),
+                publishAt: publishAtDateTime
+            },
+            { new: true }
+        ).populate('categoryId subCategoryId');
+        
+        res.status(200).json({
+            message: 'Product scheduled successfully',
+            product: updatedProduct,
+            publishAt: publishAtDateTime
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error scheduling product, please try again later' });
+    }
+}
+
+// Cancel a scheduled product and move it back to draft
+exports.cancelSchedule = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const product = await Product.findById(id);
+        
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        
+        if (product.status !== 'scheduled') {
+            return res.status(400).json({ message: 'Product is not scheduled' });
+        }
+        
+        const updatedProduct = await Product.findByIdAndUpdate(
+            id,
+            {
+                status: 'draft',
+                scheduledDate: null,
+                scheduledTime: null,
+                scheduledAt: null,
+                publishAt: null
+            },
+            { new: true }
+        ).populate('categoryId subCategoryId');
+        
+        res.status(200).json({
+            message: 'Schedule cancelled successfully',
+            product: updatedProduct
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error cancelling schedule, please try again later' });
+    }
+}
+
 
