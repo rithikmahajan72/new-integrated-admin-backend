@@ -121,8 +121,43 @@ export const promoCodeAPI = {
 
 // Filter API endpoints
 export const filterAPI = {
-  getFilters: () => API.get('/api/filters'),
-  applyFilters: (filterData) => API.post('/api/filters/apply', filterData),
+  // Get all available filters
+  getAllFilters: () => API.get('/api/filters'),
+  getFilterById: (filterId) => API.get(`/api/filters/${filterId}`),
+  getFiltersByKey: (key) => API.get(`/api/filters/key/${key}`),
+  
+  // Filter CRUD operations (admin)
+  createFilter: (filterData) => API.post('/api/filters', filterData),
+  updateFilter: (filterId, filterData) => API.put(`/api/filters/${filterId}`, filterData),
+  deleteFilter: (filterId) => API.delete(`/api/filters/${filterId}`),
+  updateFilterPriority: (filterId, priority) => API.patch(`/api/filters/${filterId}/priority`, { priority }),
+  
+  // Filter application and search
+  applyFilters: (filterCriteria) => API.post('/api/filters/apply', filterCriteria),
+  searchWithFilters: (searchParams) => API.post('/api/filters/search', searchParams),
+  
+  // Filter analytics and suggestions
+  getFilterAnalytics: () => API.get('/api/filters/analytics'),
+  getPopularFilters: () => API.get('/api/filters/popular'),
+  getSuggestedFilters: (productId) => API.get(`/api/filters/suggestions/${productId}`),
+  
+  // Filter presets and management
+  saveFilterPreset: (presetData) => API.post('/api/filters/presets', presetData),
+  getFilterPresets: () => API.get('/api/filters/presets'),
+  deleteFilterPreset: (presetId) => API.delete(`/api/filters/presets/${presetId}`),
+  
+  // Price range and dynamic filters
+  getPriceRange: (categoryId) => API.get(`/api/filters/price-range/${categoryId || 'all'}`),
+  getAvailableSizes: (categoryId) => API.get(`/api/filters/sizes/${categoryId || 'all'}`),
+  getAvailableColors: (categoryId) => API.get(`/api/filters/colors/${categoryId || 'all'}`),
+  getBrands: (categoryId) => API.get(`/api/filters/brands/${categoryId || 'all'}`),
+  
+  // Filter validation and compatibility
+  validateFilters: (filterData) => API.post('/api/filters/validate', filterData),
+  getCompatibleFilters: (selectedFilters) => API.post('/api/filters/compatible', selectedFilters),
+  
+  // Legacy compatibility
+  getFilters: () => API.get('/api/filters'), // Backward compatibility
 };
 
 // Notification API endpoints

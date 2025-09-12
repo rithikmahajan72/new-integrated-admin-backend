@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Search,
   Edit2,
@@ -8,9 +9,20 @@ import {
   X,
   Filter,
   RefreshCw,
+  Tag,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { itemAPI, productAPI, categoryAPI, subCategoryAPI } from "../api/endpoints";
+import { itemAPI, productAPI, categoryAPI, subCategoryAPI, filterAPI } from "../api/endpoints";
+import {
+  fetchFilters,
+  selectAvailableFilters,
+  selectAppliedFilters,
+  selectFilterLoading,
+  setColorFilter,
+  setSizeFilter,
+  setBrandFilter,
+  clearAllFilters
+} from "../store/slices/filtersSlice";
 
 // All data is now loaded dynamically from the API
 
@@ -98,6 +110,40 @@ const useModalState = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [newDetails, setNewDetails] = useState("");
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  
+  // Edit form data
+  const [editFormData, setEditFormData] = useState({
+    productName: "",
+    title: "",
+    description: "",
+    manufacturingDetails: "",
+    shippingReturns: "",
+    returnable: "yes",
+    category: "",
+    subCategory: "",
+    hsn: "",
+    regularPrice: 0,
+    salePrice: 0,
+    sizes: [
+      { size: "small", quantity: 0, price: 0, salePrice: 0, alternatePrice: 0, sku: "", barcode: "" },
+      { size: "medium", quantity: 0, price: 0, salePrice: 0, alternatePrice: 0, sku: "", barcode: "" },
+      { size: "large", quantity: 0, price: 0, salePrice: 0, alternatePrice: 0, sku: "", barcode: "" }
+    ],
+    metaTitle: "",
+    metaDescription: "",
+    slugUrl: "",
+    platforms: {
+      myntra: false,
+      amazon: false,
+      flipkart: false,
+      nykaa: false
+    },
+    actions: {
+      moveToSale: false,
+      keepCopyAndMove: false,
+      moveToEyx: false
+    }
+  });
 
   // Meta data modal
   const [isMetaDataModalOpen, setIsMetaDataModalOpen] = useState(false);
@@ -153,6 +199,8 @@ const useModalState = () => {
     setNewDetails,
     isSuccessModalOpen,
     setIsSuccessModalOpen,
+    editFormData,
+    setEditFormData,
 
     // Meta data modal
     isMetaDataModalOpen,
@@ -204,8 +252,14 @@ const useModalState = () => {
 
 const ManageItems = memo(() => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const state = useManageItemsState();
   const modalState = useModalState();
+
+  // Filter Redux state
+  const availableFilters = useSelector(selectAvailableFilters);
+  const appliedFilters = useSelector(selectAppliedFilters);
+  const filterLoading = useSelector(selectFilterLoading);
 
   // All data comes from API - no static fallbacks
 
@@ -218,13 +272,16 @@ const ManageItems = memo(() => {
       try {
         state.setIsLoading(true);
         
-        // Load data from API
+        // Load data from API including filters
         const [itemsResponse, statsResponse, categoriesResponse, subCategoriesResponse] = await Promise.all([
           productAPI.getAllProducts(),
           itemAPI.getItemStatistics(),
           categoryAPI.getAllCategories(),
           subCategoryAPI.getAllSubCategories()
         ]);
+
+        // Also fetch filters
+        dispatch(fetchFilters());
         
         console.log("ManageItems: Received API responses", { 
           itemsCount: Array.isArray(itemsResponse?.data) ? itemsResponse.data.length : 0,
@@ -692,26 +749,233 @@ const ManageItems = memo(() => {
       const itemToEdit = allItems.find((item) => item.id === itemId);
       modalState.setEditingItem(itemToEdit);
       modalState.setNewDetails("");
+      
+      // Initialize form data with existing product data
+      modalState.setEditFormData({
+        productName: itemToEdit?.productName || itemToEdit?.title || "",
+        title: itemToEdit?.title || itemToEdit?.productName || "",
+        description: itemToEdit?.description || "",
+        manufacturingDetails: itemToEdit?.manufacturingDetails || "",
+        shippingReturns: itemToEdit?.shippingReturns || "",
+        returnable: itemToEdit?.returnable || "yes",
+        category: itemToEdit?.category || "",
+        subCategory: itemToEdit?.subCategory || itemToEdit?.subCategories || "",
+        hsn: itemToEdit?.hsn || "",
+        regularPrice: itemToEdit?.price || itemToEdit?.regularPrice || 0,
+        salePrice: itemToEdit?.salePrice || 0,
+        sizes: [
+          {
+            size: "small",
+            quantity: itemToEdit?.sizes?.find(s => s.size === "small")?.quantity || 0,
+            price: itemToEdit?.price || itemToEdit?.regularPrice || 0,
+            salePrice: itemToEdit?.salePrice || 0,
+            alternatePrice: itemToEdit?.alternatePrice || 0,
+            sku: itemToEdit?.skus?.small || itemToEdit?.sizes?.find(s => s.size === "small")?.sku || "",
+            barcode: itemToEdit?.sizes?.find(s => s.size === "small")?.barcode || itemToEdit?.barcodeNo || ""
+          },
+          {
+            size: "medium",
+            quantity: itemToEdit?.sizes?.find(s => s.size === "medium")?.quantity || 0,
+            price: itemToEdit?.price || itemToEdit?.regularPrice || 0,
+            salePrice: itemToEdit?.salePrice || 0,
+            alternatePrice: itemToEdit?.alternatePrice || 0,
+            sku: itemToEdit?.skus?.medium || itemToEdit?.sizes?.find(s => s.size === "medium")?.sku || "",
+            barcode: itemToEdit?.sizes?.find(s => s.size === "medium")?.barcode || itemToEdit?.barcodeNo || ""
+          },
+          {
+            size: "large",
+            quantity: itemToEdit?.sizes?.find(s => s.size === "large")?.quantity || 0,
+            price: itemToEdit?.price || itemToEdit?.regularPrice || 0,
+            salePrice: itemToEdit?.salePrice || 0,
+            alternatePrice: itemToEdit?.alternatePrice || 0,
+            sku: itemToEdit?.skus?.large || itemToEdit?.sizes?.find(s => s.size === "large")?.sku || "",
+            barcode: itemToEdit?.sizes?.find(s => s.size === "large")?.barcode || itemToEdit?.barcodeNo || ""
+          }
+        ],
+        metaTitle: itemToEdit?.metaTitle || "",
+        metaDescription: itemToEdit?.metaDescription || "",
+        slugUrl: itemToEdit?.slugUrl || "",
+        platforms: {
+          myntra: itemToEdit?.platforms?.myntra?.enabled || false,
+          amazon: itemToEdit?.platforms?.amazon?.enabled || false,
+          flipkart: itemToEdit?.platforms?.flipkart?.enabled || false,
+          nykaa: itemToEdit?.platforms?.nykaa?.enabled || false
+        },
+        actions: {
+          moveToSale: itemToEdit?.moveToSale || false,
+          keepCopyAndMove: itemToEdit?.keepCopyAndMove || false,
+          moveToEyx: itemToEdit?.moveToEyx || false
+        }
+      });
+      
       modalState.setIsEditModalOpen(true);
     };
 
-    const handleSaveEdit = () => {
-      console.log(
-        "Saving edit for item:",
-        modalState.editingItem.id,
-        "New details:",
-        modalState.newDetails
-      );
-      modalState.setIsEditModalOpen(false);
-      modalState.setEditingItem(null);
-      modalState.setNewDetails("");
-      modalState.setIsSuccessModalOpen(true);
+    const handleSaveEdit = async () => {
+      try {
+        const formData = modalState.editFormData;
+        const itemId = modalState.editingItem.id || modalState.editingItem._id;
+        
+        // Prepare the updated data structure
+        const updatedData = {
+          productName: formData.productName,
+          title: formData.title,
+          description: formData.description,
+          manufacturingDetails: formData.manufacturingDetails,
+          shippingReturns: formData.shippingReturns,
+          returnable: formData.returnable,
+          category: formData.category,
+          subCategory: formData.subCategory,
+          hsn: formData.hsn,
+          regularPrice: parseInt(formData.regularPrice) || 0,
+          salePrice: parseInt(formData.salePrice) || 0,
+          metaTitle: formData.metaTitle,
+          metaDescription: formData.metaDescription,
+          slugUrl: formData.slugUrl,
+          
+          // Update sizes array with new data
+          sizes: formData.sizes.map(sizeData => ({
+            size: sizeData.size,
+            quantity: parseInt(sizeData.quantity) || 0,
+            sku: sizeData.sku,
+            barcode: sizeData.barcode,
+            hsnCode: formData.hsn
+          })),
+          
+          // Update pricing
+          price: parseInt(formData.regularPrice) || parseInt(formData.sizes[0]?.price) || modalState.editingItem.price || 0,
+          
+          // Update platform settings
+          platformPricing: {
+            myntra: { 
+              enabled: formData.platforms.myntra, 
+              price: formData.sizes[0]?.price || modalState.editingItem.price || 0 
+            },
+            amazon: { 
+              enabled: formData.platforms.amazon, 
+              price: formData.sizes[0]?.price || modalState.editingItem.price || 0 
+            },
+            flipkart: { 
+              enabled: formData.platforms.flipkart, 
+              price: formData.sizes[0]?.price || modalState.editingItem.price || 0 
+            },
+            nykaa: { 
+              enabled: formData.platforms.nykaa, 
+              price: formData.sizes[0]?.price || modalState.editingItem.price || 0 
+            }
+          },
+          
+          // Update action flags
+          moveToSale: formData.actions.moveToSale,
+          keepCopyAndMove: formData.actions.keepCopyAndMove,
+          moveToEyx: formData.actions.moveToEyx,
+          
+          // Keep existing fields that shouldn't be changed
+          status: modalState.editingItem.status,
+          image: modalState.editingItem.image,
+          thumbnail: modalState.editingItem.thumbnail,
+          variants: modalState.editingItem.variants || [],
+          description: modalState.editingItem.description || "",
+          manufacturingDetails: modalState.editingItem.manufacturingDetails || "",
+          shippingReturns: modalState.editingItem.shippingReturns || "",
+          returnable: modalState.editingItem.returnable || false,
+          filters: modalState.editingItem.filters || [],
+          tags: modalState.editingItem.tags || []
+        };
+
+        console.log("Saving edit for item:", itemId, updatedData);
+
+        // Call the productAPI updateProduct method
+        const response = await productAPI.updateProduct(itemId, updatedData);
+
+        if (response && (response.success || response.data)) {
+          // Update the local state to reflect the changes
+          const updatedItem = { 
+            ...modalState.editingItem, 
+            ...updatedData,
+            id: itemId,
+            _id: itemId
+          };
+          
+          // Update allItems array
+          state.setAllItems(prevItems => 
+            prevItems.map(item => 
+              (item.id === itemId || item._id === itemId)
+                ? updatedItem
+                : item
+            )
+          );
+          
+          // Update other relevant arrays if needed
+          if (modalState.editingItem.status === 'draft') {
+            state.setDraftItems(prevItems => 
+              prevItems.map(item => 
+                (item.id === itemId || item._id === itemId)
+                  ? updatedItem
+                  : item
+              )
+            );
+          } else if (modalState.editingItem.status === 'live' || modalState.editingItem.status === 'published') {
+            state.setPublishedItems(prevItems => 
+              prevItems.map(item => 
+                (item.id === itemId || item._id === itemId)
+                  ? updatedItem
+                  : item
+              )
+            );
+          }
+
+          modalState.setIsEditModalOpen(false);
+          modalState.setEditingItem(null);
+          modalState.setNewDetails("");
+          modalState.setIsSuccessModalOpen(true);
+          
+          console.log("Product updated successfully:", response);
+        } else {
+          console.error("Failed to update product:", response);
+          alert("Failed to update product. Please try again.");
+        }
+      } catch (error) {
+        console.error("Error updating product:", error);
+        alert("Error updating product: " + (error.message || "Unknown error"));
+      }
     };
 
     const handleCloseEdit = () => {
       modalState.setIsEditModalOpen(false);
       modalState.setEditingItem(null);
       modalState.setNewDetails("");
+    };
+
+    // Helper functions for form input changes
+    const handleFormFieldChange = (field, value) => {
+      modalState.setEditFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    };
+
+    const handleSizeFieldChange = (sizeIndex, field, value) => {
+      modalState.setEditFormData(prev => ({
+        ...prev,
+        sizes: prev.sizes.map((size, index) => 
+          index === sizeIndex ? { ...size, [field]: value } : size
+        )
+      }));
+    };
+
+    const handlePlatformChange = (platform, enabled) => {
+      modalState.setEditFormData(prev => ({
+        ...prev,
+        platforms: { ...prev.platforms, [platform]: enabled }
+      }));
+    };
+
+    const handleActionChange = (action, enabled) => {
+      modalState.setEditFormData(prev => ({
+        ...prev,
+        actions: { ...prev.actions, [action]: enabled }
+      }));
     };
 
     const handleCloseSuccess = () => {
@@ -726,6 +990,10 @@ const ManageItems = memo(() => {
       handleSaveEdit,
       handleCloseEdit,
       handleCloseSuccess,
+      handleFormFieldChange,
+      handleSizeFieldChange,
+      handlePlatformChange,
+      handleActionChange,
     };
   }, [navigate, allItems]); // Removed the problematic function dependencies
 
@@ -866,21 +1134,54 @@ const ManageItems = memo(() => {
       });
     };
 
-    const handleSaveMetaData = () => {
-      console.log(
-        "Saving meta data for item:",
-        modalState.selectedItemForMeta.id,
-        "Data:",
-        modalState.metaFormData
-      );
-      modalState.setIsMetaDataModalOpen(false);
-      modalState.setSelectedItemForMeta(null);
-      modalState.setMetaFormData({
-        metaTitle: "",
-        metaDescription: "",
-        slugUrl: "",
-      });
-      modalState.setIsMetaDataSuccessModalOpen(true);
+    const handleSaveMetaData = async () => {
+      try {
+        const itemId = modalState.selectedItemForMeta.id || modalState.selectedItemForMeta._id;
+        const updatedMetaData = {
+          metaTitle: modalState.metaFormData.metaTitle,
+          metaDescription: modalState.metaFormData.metaDescription,
+          slugUrl: modalState.metaFormData.slugUrl,
+        };
+
+        console.log(
+          "Saving meta data for item:",
+          itemId,
+          "Data:",
+          updatedMetaData
+        );
+
+        // Call the productAPI updateProduct method to save metadata
+        const response = await productAPI.updateProduct(itemId, updatedMetaData);
+
+        if (response && response.success) {
+          // Update the local state to reflect the changes
+          setManageItemsState(prevState => ({
+            ...prevState,
+            items: prevState.items.map(item => 
+              (item.id === itemId || item._id === itemId)
+                ? { ...item, ...updatedMetaData }
+                : item
+            )
+          }));
+
+          modalState.setIsMetaDataModalOpen(false);
+          modalState.setSelectedItemForMeta(null);
+          modalState.setMetaFormData({
+            metaTitle: "",
+            metaDescription: "",
+            slugUrl: "",
+          });
+          modalState.setIsMetaDataSuccessModalOpen(true);
+          
+          console.log("Metadata saved successfully");
+        } else {
+          console.error("Failed to save metadata:", response);
+          alert("Failed to save metadata. Please try again.");
+        }
+      } catch (error) {
+        console.error("Error saving metadata:", error);
+        alert("Error saving metadata: " + (error.message || "Unknown error"));
+      }
     };
 
     const handleCloseMetaDataSuccess = () => {
@@ -1612,6 +1913,28 @@ const ManageItems = memo(() => {
           </div>
         </td>
 
+        {/* Filters */}
+        <td className="px-4 py-3 text-center">
+          <div className="flex flex-wrap gap-1 justify-center max-w-[150px]">
+            {item.filters && item.filters.length > 0 ? (
+              item.filters.map((filter, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                  title={`${filter.key}: ${filter.values?.map(v => v.name).join(', ')}`}
+                >
+                  <Tag size={10} className="mr-1" />
+                  {filter.key}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-400 text-xs font-['Montserrat']">
+                No filters
+              </span>
+            )}
+          </div>
+        </td>
+
         {/* HSN */}
         <td className="px-4 py-3 text-center">
           <div className="text-gray-700 text-[12px] font-medium font-['Montserrat']">
@@ -1926,6 +2249,9 @@ const ManageItems = memo(() => {
                   <th className="px-4 py-3 text-[14px] font-semibold text-gray-800 font-['Montserrat'] text-center tracking-wide min-w-[120px]">
                     Subcategory
                   </th>
+                  <th className="px-4 py-3 text-[14px] font-semibold text-gray-800 font-['Montserrat'] text-center tracking-wide min-w-[150px]">
+                    Filters
+                  </th>
                   <th className="px-4 py-3 text-[14px] font-semibold text-gray-800 font-['Montserrat'] text-center tracking-wide min-w-[80px]">
                     HSN
                   </th>
@@ -1962,6 +2288,7 @@ const ManageItems = memo(() => {
                 </tr>
                 {/* Platform Headers Row */}
                 <tr className="bg-white border-b border-gray-200">
+                  <td></td>
                   <td></td>
                   <td></td>
                   <td></td>
@@ -2034,84 +2361,435 @@ const ManageItems = memo(() => {
   function renderModals() {
     return (
       <>
-        {/* Edit Item Modal */}
+        {/* Edit Item Modal - Enhanced Comprehensive Design */}
         {modalState.isEditModalOpen && modalState.editingItem && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-7xl w-full mx-4 overflow-hidden max-h-screen overflow-y-auto">
-              {/* Modal Header */}
-              <div className="relative px-8 py-6 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900 font-['Montserrat'] text-center">
+            <div className="bg-white overflow-hidden relative rounded-[12px] shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] w-full max-w-[1920px] h-[90vh] max-h-[800px]">
+              {/* Close Button */}
+              <button
+                onClick={actionHandlers.handleCloseEdit}
+                className="absolute right-9 top-9 w-6 h-6 z-10 hover:bg-gray-100 rounded-full p-1 transition-colors"
+              >
+                <svg className="block w-full h-full" fill="none" preserveAspectRatio="none" viewBox="0 0 16 16">
+                  <path d="M15.4238 13.8329C15.6352 14.0442 15.7539 14.3309 15.7539 14.6298C15.7539 14.9286 15.6352 15.2153 15.4238 15.4266C15.2125 15.638 14.9258 15.7567 14.627 15.7567C14.3281 15.7567 14.0414 15.638 13.8301 15.4266L7.87789 9.47258L1.92383 15.4248C1.71248 15.6361 1.42584 15.7548 1.12695 15.7548C0.828065 15.7548 0.541421 15.6361 0.330077 15.4248C0.118732 15.2134 4.45375e-09 14.9268 0 14.6279C-4.45375e-09 14.329 0.118732 14.0424 0.330077 13.831L6.28414 7.87883L0.331951 1.92476C0.120607 1.71342 0.00187504 1.42678 0.00187504 1.12789C0.00187505 0.829003 0.120607 0.542358 0.331951 0.331014C0.543296 0.11967 0.82994 0.000937346 1.12883 0.000937343C1.42771 0.000937339 1.71436 0.11967 1.9257 0.331014L7.87789 6.28508L13.832 0.330076C14.0433 0.118732 14.3299 -4.97944e-09 14.6288 0C14.9277 4.97944e-09 15.2144 0.118732 15.4257 0.330076C15.637 0.541421 15.7558 0.828065 15.7558 1.12695C15.7558 1.42584 15.637 1.71248 15.4257 1.92383L9.47164 7.87883L15.4238 13.8329Z" fill="#1A1A1A" />
+                </svg>
+              </button>
+
+              {/* Header Section */}
+              <div className="text-center pt-6 pb-4">
+                <h2 className="font-['Montserrat'] font-normal text-[24px] text-black leading-[16.9px]">
                   Edit Item
                 </h2>
-                <button
-                  onClick={actionHandlers.handleCloseEdit}
-                  className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-8">
-                {/* Header Section */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-bold text-gray-900 font-['Montserrat']">
-                    Type new details
-                  </h3>
-                </div>
+              {/* Type new details heading */}
+              <div className="px-8 mb-6">
+                <h3 className="font-['Montserrat'] font-bold text-[24px] text-[#111111] leading-[24px]">
+                  Type new details
+                </h3>
+              </div>
 
-                {/* Main Form Row */}
+              {/* Main Content in a Scrollable Container */}
+              <div className="px-8 pb-20 max-h-[600px] overflow-y-auto">
+                
+                {/* Product Information Section */}
                 <div className="mb-8">
-                  <div className="flex items-start gap-6">
-                    {/* Product Image */}
-                    <div className="flex-shrink-0">
-                      <div className="text-center mb-2">
-                        <span className="text-sm font-medium text-gray-700 font-['Montserrat']">
-                          Image
-                        </span>
-                      </div>
-                      <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden border">
-                        <img
-                          src={modalState.editingItem.image}
-                          alt={modalState.editingItem.productName || modalState.editingItem.title || 'Product Image'}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Product Name */}
-                    <div className="flex-shrink-0 w-40">
-                      <div className="text-center mb-2">
-                        <span className="text-sm font-medium text-gray-700 font-['Montserrat']">
-                          Product Name
-                        </span>
-                      </div>
+                  <h4 className="font-['Montserrat'] font-bold text-[18px] text-[#111111] mb-4">
+                    Product Information
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Product Name
+                      </label>
                       <input
                         type="text"
-                        defaultValue={modalState.editingItem.productName || modalState.editingItem.title || ''}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-['Montserrat'] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={modalState.editFormData.productName}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('productName', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter product name"
                       />
                     </div>
 
-                    {/* Other form fields would continue here - shortened for brevity */}
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        value={modalState.editFormData.title}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('title', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter title"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Category
+                      </label>
+                      <input
+                        type="text"
+                        value={modalState.editFormData.category}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('category', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter category"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Sub Category
+                      </label>
+                      <input
+                        type="text"
+                        value={modalState.editFormData.subCategory}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('subCategory', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter sub category"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      value={modalState.editFormData.description}
+                      onChange={(e) => actionHandlers.handleFormFieldChange('description', e.target.value)}
+                      className="w-full h-20 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      placeholder="Enter product description"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Manufacturing Details
+                      </label>
+                      <textarea
+                        value={modalState.editFormData.manufacturingDetails}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('manufacturingDetails', e.target.value)}
+                        className="w-full h-16 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        placeholder="Enter manufacturing details"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Shipping & Returns
+                      </label>
+                      <textarea
+                        value={modalState.editFormData.shippingReturns}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('shippingReturns', e.target.value)}
+                        className="w-full h-16 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        placeholder="Enter shipping & returns info"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        HSN Code
+                      </label>
+                      <input
+                        type="text"
+                        value={modalState.editFormData.hsn}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('hsn', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter HSN code"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Returnable
+                      </label>
+                      <select
+                        value={modalState.editFormData.returnable}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('returnable', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </div>
+
+                    <div></div>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-4 justify-center">
-                  <button
-                    onClick={actionHandlers.handleSaveEdit}
-                    className="bg-black hover:bg-gray-800 text-white font-['Montserrat'] font-medium py-3 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                  >
-                    save
-                  </button>
-                  <button
-                    onClick={actionHandlers.handleCloseEdit}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-['Montserrat'] font-medium py-3 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
-                  >
-                    go back
-                  </button>
+                {/* Pricing Section */}
+                <div className="mb-8">
+                  <h4 className="font-['Montserrat'] font-bold text-[18px] text-[#111111] mb-4">
+                    Pricing Information
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Regular Price
+                      </label>
+                      <input
+                        type="number"
+                        value={modalState.editFormData.regularPrice}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('regularPrice', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Sale Price
+                      </label>
+                      <input
+                        type="number"
+                        value={modalState.editFormData.salePrice}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('salePrice', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Size and Inventory Section */}
+                <div className="mb-8">
+                  <h4 className="font-['Montserrat'] font-bold text-[18px] text-[#111111] mb-4">
+                    Size & Inventory Details
+                  </h4>
+                  
+                  {/* Size Table Header */}
+                  <div className="grid grid-cols-8 gap-2 mb-2">
+                    <div className="font-['Montserrat'] font-medium text-[12px] text-[#111111] text-center">Size</div>
+                    <div className="font-['Montserrat'] font-medium text-[12px] text-[#111111] text-center">Quantity</div>
+                    <div className="font-['Montserrat'] font-medium text-[12px] text-[#111111] text-center">Price</div>
+                    <div className="font-['Montserrat'] font-medium text-[12px] text-[#111111] text-center">Sale Price</div>
+                    <div className="font-['Montserrat'] font-medium text-[12px] text-[#111111] text-center">Alt Price</div>
+                    <div className="font-['Montserrat'] font-medium text-[12px] text-[#111111] text-center">SKU</div>
+                    <div className="font-['Montserrat'] font-medium text-[12px] text-[#111111] text-center">Barcode</div>
+                    <div></div>
+                  </div>
+
+                  {/* Size Rows */}
+                  {modalState.editFormData.sizes.map((sizeData, index) => (
+                    <div key={index} className="grid grid-cols-8 gap-2 items-center mb-2 p-2 bg-gray-50 rounded-lg">
+                      <select
+                        value={sizeData.size}
+                        onChange={(e) => actionHandlers.handleSizeFieldChange(index, 'size', e.target.value)}
+                        className="h-8 px-2 border border-[#979797] rounded-[12px] text-[12px] font-['Montserrat'] font-medium text-black bg-white"
+                      >
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                        <option value="xl">XL</option>
+                        <option value="xxl">XXL</option>
+                      </select>
+
+                      <input
+                        type="number"
+                        value={sizeData.quantity}
+                        onChange={(e) => actionHandlers.handleSizeFieldChange(index, 'quantity', e.target.value)}
+                        className="h-8 px-2 border border-[#979797] rounded-[12px] text-[12px] font-['Montserrat'] font-medium text-black bg-white"
+                        placeholder="0"
+                      />
+
+                      <input
+                        type="number"
+                        value={sizeData.price}
+                        onChange={(e) => actionHandlers.handleSizeFieldChange(index, 'price', e.target.value)}
+                        className="h-8 px-2 border border-[#979797] rounded-[12px] text-[12px] font-['Montserrat'] font-medium text-[#111111] bg-white"
+                        placeholder="0"
+                      />
+
+                      <input
+                        type="number"
+                        value={sizeData.salePrice}
+                        onChange={(e) => actionHandlers.handleSizeFieldChange(index, 'salePrice', e.target.value)}
+                        className="h-8 px-2 border border-[#979797] rounded-[12px] text-[12px] font-['Montserrat'] font-medium text-[#111111] bg-white"
+                        placeholder="0"
+                      />
+
+                      <input
+                        type="number"
+                        value={sizeData.alternatePrice}
+                        onChange={(e) => actionHandlers.handleSizeFieldChange(index, 'alternatePrice', e.target.value)}
+                        className="h-8 px-2 border border-[#979797] rounded-[12px] text-[12px] font-['Montserrat'] font-medium text-[#111111] bg-white"
+                        placeholder="0"
+                      />
+
+                      <input
+                        type="text"
+                        value={sizeData.sku}
+                        onChange={(e) => actionHandlers.handleSizeFieldChange(index, 'sku', e.target.value)}
+                        className="h-8 px-2 border border-[#979797] rounded-[12px] text-[12px] font-['Montserrat'] font-medium text-[#111111] bg-white"
+                        placeholder="SKU"
+                      />
+
+                      <input
+                        type="text"
+                        value={sizeData.barcode}
+                        onChange={(e) => actionHandlers.handleSizeFieldChange(index, 'barcode', e.target.value)}
+                        className="h-8 px-2 border border-[#979797] rounded-[12px] text-[12px] font-['Montserrat'] font-medium text-[#111111] bg-white"
+                        placeholder="Barcode"
+                      />
+
+                      <div className="text-[12px] font-['Montserrat'] font-medium text-gray-600">
+                        {sizeData.size.charAt(0).toUpperCase() + sizeData.size.slice(1)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Meta Data Section */}
+                <div className="mb-8">
+                  <h4 className="font-['Montserrat'] font-bold text-[18px] text-[#111111] mb-4">
+                    SEO & Meta Data
+                  </h4>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Meta Title
+                      </label>
+                      <input
+                        type="text"
+                        value={modalState.editFormData.metaTitle}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('metaTitle', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Meta title"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Meta Description
+                      </label>
+                      <input
+                        type="text"
+                        value={modalState.editFormData.metaDescription}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('metaDescription', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Meta description"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-['Montserrat'] font-medium text-[15px] text-[#111111] mb-2">
+                        Slug URL
+                      </label>
+                      <input
+                        type="text"
+                        value={modalState.editFormData.slugUrl}
+                        onChange={(e) => actionHandlers.handleFormFieldChange('slugUrl', e.target.value)}
+                        className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-bold text-[#000aff] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Slug URL"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Platform Settings Section */}
+                <div className="mb-8">
+                  <h4 className="font-['Montserrat'] font-bold text-[18px] text-[#111111] mb-4">
+                    Platform Settings
+                  </h4>
+                  
+                  <div className="flex gap-6 mb-4">
+                    {['myntra', 'amazon', 'flipkart', 'nykaa'].map((platform) => (
+                      <div key={platform} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`platform-${platform}`}
+                          checked={modalState.editFormData.platforms[platform]}
+                          onChange={(e) => actionHandlers.handlePlatformChange(platform, e.target.checked)}
+                          className="w-4 h-4 border border-[#bcbcbc] rounded-[3px] text-[#111111] focus:ring-2 focus:ring-blue-500"
+                        />
+                        <label htmlFor={`platform-${platform}`} className="font-['Montserrat'] font-normal text-[12px] text-black capitalize cursor-pointer">
+                          {platform}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Settings Section */}
+                <div className="mb-8">
+                  <h4 className="font-['Montserrat'] font-bold text-[18px] text-[#111111] mb-4">
+                    Action Settings
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="moveToSale"
+                        checked={modalState.editFormData.actions.moveToSale}
+                        onChange={(e) => actionHandlers.handleActionChange('moveToSale', e.target.checked)}
+                        className="w-5 h-5 border border-[#bcbcbc] rounded-[3px] text-[#111111] focus:ring-2 focus:ring-blue-500"
+                      />
+                      <label htmlFor="moveToSale" className="font-['Montserrat'] font-normal text-[15px] text-black leading-[22px] cursor-pointer">
+                        Move to sale
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="keepCopyAndMove"
+                        checked={modalState.editFormData.actions.keepCopyAndMove}
+                        onChange={(e) => actionHandlers.handleActionChange('keepCopyAndMove', e.target.checked)}
+                        className="w-5 h-5 border border-[#bcbcbc] rounded-[3px] text-[#111111] focus:ring-2 focus:ring-blue-500"
+                      />
+                      <label htmlFor="keepCopyAndMove" className="font-['Montserrat'] font-normal text-[15px] text-black leading-[22px] cursor-pointer">
+                        Keep a copy and move
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="moveToEyx"
+                        checked={modalState.editFormData.actions.moveToEyx}
+                        onChange={(e) => actionHandlers.handleActionChange('moveToEyx', e.target.checked)}
+                        className="w-5 h-5 border border-[#bcbcbc] rounded-[3px] text-[#111111] focus:ring-2 focus:ring-blue-500"
+                      />
+                      <label htmlFor="moveToEyx" className="font-['Montserrat'] font-normal text-[15px] text-black leading-[16.9px] cursor-pointer">
+                        Move to EYX
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fixed Action Buttons at Bottom */}
+              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4">
+                <button
+                  onClick={actionHandlers.handleSaveEdit}
+                  className="bg-black hover:bg-gray-800 rounded-[100px] w-[284px] transition-colors"
+                >
+                  <div className="flex items-center justify-center px-[51px] py-4">
+                    <span className="font-['Montserrat'] font-medium text-[16px] text-white leading-[1.2]">
+                      save
+                    </span>
+                  </div>
+                </button>
+                <button
+                  onClick={actionHandlers.handleCloseEdit}
+                  className="bg-white hover:bg-gray-50 border border-[#e4e4e4] rounded-[100px] w-[284px] transition-colors"
+                >
+                  <div className="flex items-center justify-center px-[51px] py-4">
+                    <span className="font-['Montserrat'] font-medium text-[16px] text-black leading-[1.2]">
+                      go back
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -2193,8 +2871,50 @@ const ManageItems = memo(() => {
                   </div>
                 </div>
 
+                {/* Meta Description */}
+                <div className="mb-8">
+                  <label className="block font-['Montserrat'] font-bold text-[#111111] text-[20px] leading-[24px] mb-4">
+                    meta description
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={modalState.metaFormData.metaDescription}
+                      onChange={(e) =>
+                        metaDataHandlers.handleMetaInputChange(
+                          "metaDescription",
+                          e.target.value
+                        )
+                      }
+                      className="w-full h-[41px] px-4 py-2 border-2 border-black rounded-xl font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter meta description"
+                    />
+                  </div>
+                </div>
+
+                {/* Slug URL */}
+                <div className="mb-8">
+                  <label className="block font-['Montserrat'] font-bold text-[#111111] text-[20px] leading-[24px] mb-4">
+                    slug URL
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={modalState.metaFormData.slugUrl}
+                      onChange={(e) =>
+                        metaDataHandlers.handleMetaInputChange(
+                          "slugUrl",
+                          e.target.value
+                        )
+                      }
+                      className="w-full h-[41px] px-4 py-2 border-2 border-black rounded-xl font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter slug URL"
+                    />
+                  </div>
+                </div>
+
                 {/* Action Buttons */}
-                <div className="flex gap-4 justify-center">
+                <div className="flex gap-4 justify-center mt-8">
                   <button
                     onClick={metaDataHandlers.handleSaveMetaData}
                     className="bg-black hover:bg-gray-800 text-white font-['Montserrat'] font-medium py-4 px-[51px] rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 w-[284px] text-[16px] leading-[1.2]"

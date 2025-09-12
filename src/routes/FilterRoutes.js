@@ -9,9 +9,33 @@ router
   // Creates a new filter (e.g., for product attributes like size, color, or price range)
   .post("/", filterController.createFilter)
 
+  // POST /api/filters/apply
+  // Applies filter criteria to search/filter products
+  .post("/apply", filterController.applyFilters)
+
   // GET /api/filters/
   // Retrieves all filters
   .get("/", filterController.getAllFilters)
+
+  // GET /api/filters/key/:key
+  // Gets a specific filter by key name (e.g., color, size, brand)
+  .get("/key/:key", filterController.getFiltersByKey)
+
+  // GET /api/filters/price-range
+  // Gets available price range for products
+  .get("/price-range", filterController.getPriceRange)
+
+  // GET /api/filters/sizes
+  // Gets available sizes
+  .get("/sizes", filterController.getAvailableSizes)
+
+  // GET /api/filters/colors
+  // Gets available colors
+  .get("/colors", filterController.getAvailableColors)
+
+  // GET /api/filters/brands
+  // Gets available brands
+  .get("/brands", filterController.getBrands)
 
   // GET /api/filters/:id
   // Retrieves a specific filter by its ID

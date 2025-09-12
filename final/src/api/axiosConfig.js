@@ -1,8 +1,18 @@
 import axios from 'axios';
 
+// Debug environment variables
+console.log('Environment variables:', {
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  NODE_ENV: import.meta.env.NODE_ENV,
+  all: import.meta.env
+});
+
 // Create axios instance with base configuration
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+console.log('Using baseURL:', baseURL);
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+  baseURL: baseURL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -13,7 +23,7 @@ const API = axios.create({
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
     }
     

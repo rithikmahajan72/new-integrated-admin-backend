@@ -15,6 +15,7 @@ import userSlice from './slices/userSlice';
 import uiSlice from './slices/uiSlice';
 import checkoutSlice from './slices/checkoutSlice';
 import searchSlice from './slices/searchSlice';
+import filtersSlice from './slices/filtersSlice';
 
 // Persist configuration
 const persistConfig = {
@@ -51,6 +52,7 @@ const rootReducer = combineReducers({
   ui: uiSlice,
   checkout: checkoutSlice,
   search: searchSlice,
+  filters: filtersSlice,
 });
 
 // Create persisted reducer (temporarily disabled)

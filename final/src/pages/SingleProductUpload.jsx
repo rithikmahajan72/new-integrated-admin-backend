@@ -41,6 +41,18 @@ import {
   fetchSubCategories,
   fetchCategoriesForSubCategory,
 } from "../store/slices/subCategoriesSlice";
+import {
+  fetchFilters,
+  setColorFilter,
+  setSizeFilter,
+  setBrandFilter,
+  setCategoryFilter,
+  setSubcategoryFilter,
+  selectAvailableFilters,
+  selectAppliedFilters,
+  selectFilterLoading,
+  selectFilterError,
+} from "../store/slices/filtersSlice";
 
 // Constants for better maintainability
 const NOTIFICATION_TYPES = {
@@ -100,6 +112,12 @@ const SingleProductUpload = React.memo(() => {
   const subCategories = useSelector(state => state.subCategories.subCategories);
   const categoriesLoading = useSelector(state => state.categories.categoriesLoading);
   const subCategoriesLoading = useSelector(state => state.subCategories.subCategoriesLoading);
+  
+  // Filter Redux state
+  const availableFilters = useSelector(selectAvailableFilters);
+  const appliedFilters = useSelector(selectAppliedFilters);
+  const filterLoading = useSelector(selectFilterLoading);
+  const filterError = useSelector(selectFilterError);
 
   // Check authentication
   const { isAuthenticated, user } = useSelector(state => state.auth);
@@ -111,6 +129,28 @@ const SingleProductUpload = React.memo(() => {
   const [productData, setProductData] = useState(DEFAULT_PRODUCT_DATA);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubCategory, setSelectedSubCategory] = useState("");
+
+  // ==============================
+  // FILTER STATE MANAGEMENT
+  // ==============================
+  const [productFilters, setProductFilters] = useState({
+    color: [],
+    size: [],
+    brand: [],
+    material: [],
+    style: [],
+    gender: [],
+    season: []
+  });
+  const [selectedFilters, setSelectedFilters] = useState({
+    color: '',
+    size: '',
+    brand: '',
+    material: '',
+    style: '',
+    gender: '',
+    season: ''
+  });
 
   // ==============================
   // VARIANTS AND MEDIA STATE
@@ -231,6 +271,13 @@ const SingleProductUpload = React.memo(() => {
       dispatch(fetchSubCategories());
     }
   }, [selectedCategory, dispatch]);
+
+  // Fetch filters on component mount
+  useEffect(() => {
+    if (isAuthenticated && isAdmin) {
+      dispatch(fetchFilters());
+    }
+  }, [dispatch, isAuthenticated, isAdmin]);
 
   // Handle success messages
   useEffect(() => {
@@ -455,6 +502,66 @@ const SingleProductUpload = React.memo(() => {
         variant.id === variantId ? { ...variant, [field]: value } : variant
       )
     );
+  }, []);
+
+  // ==============================
+  // FILTER HANDLERS
+  // ==============================
+  const handleFilterSelect = useCallback((filterType, value) => {
+    setSelectedFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+
+    // Update product filters
+    setProductFilters(prev => {
+      const currentFilters = prev[filterType] || [];
+      const isSelected = currentFilters.includes(value);
+      
+      return {
+        ...prev,
+        [filterType]: isSelected 
+          ? currentFilters.filter(f => f !== value)
+          : [...currentFilters, value]
+      };
+    });
+
+    // Dispatch to Redux for global state
+    switch(filterType) {
+      case 'color':
+        dispatch(setColorFilter(value));
+        break;
+      case 'size':
+        dispatch(setSizeFilter(value));
+        break;
+      case 'brand':
+        dispatch(setBrandFilter(value));
+        break;
+      default:
+        break;
+    }
+  }, [dispatch]);
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedFilters({
+      color: '',
+      size: '',
+      brand: '',
+      material: '',
+      style: '',
+      gender: '',
+      season: ''
+    });
+    
+    setProductFilters({
+      color: [],
+      size: [],
+      brand: [],
+      material: [],
+      style: [],
+      gender: [],
+      season: []
+    });
   }, []);
 
   const addMoreVariants = useCallback(() => {
@@ -1512,6 +1619,15 @@ const SingleProductUpload = React.memo(() => {
 
   // Helper function to create product data for API
   const createProductDataForAPI = useCallback((status = 'draft') => {
+    // Debug logging
+    console.log('=== DEBUG PRODUCT DATA ===');
+    console.log('productData:', productData);
+    console.log('selectedCategory:', selectedCategory);
+    console.log('selectedSubCategory:', selectedSubCategory);
+    console.log('productName:', productData.productName);
+    console.log('categoryId:', selectedCategory);
+    console.log('subCategoryId:', selectedSubCategory);
+    
     // Create the base product data
     const baseProductData = {
       productName: productData.productName,
@@ -1596,11 +1712,24 @@ const SingleProductUpload = React.memo(() => {
       commonSizeChart: commonSizeChart,
       
       // Additional metadata
-      filters: [], // Will be populated from filter selections
+      filters: Object.keys(productFilters).reduce((acc, key) => {
+        if (productFilters[key] && productFilters[key].length > 0) {
+          acc.push({
+            key: key,
+            values: productFilters[key].map(value => ({ name: value, selected: true }))
+          });
+        }
+        return acc;
+      }, []),
       tags: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
+    // Debug log the final payload
+    console.log('=== FINAL PAYLOAD BEING SENT ===');
+    console.log(JSON.stringify(baseProductData, null, 2));
+    console.log('=== END DEBUG ===');
 
     return baseProductData;
   }, [
@@ -2662,49 +2791,125 @@ const SingleProductUpload = React.memo(() => {
 
 
 
-          {/* Filter Section for Variant 1 */}
+          {/* Dynamic Filter Section */}
           <div className="mt-12 py-6 border-t border-gray-200">
-            <h3 className="text-xl font-bold text-black mb-4 font-['Montserrat']">
-              Filter
-            </h3>
-            <h4 className="text-lg font-medium text-black mb-4 font-['Montserrat']">
-              assigned Filter
-            </h4>
-
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              {/* Color Filter */}
-              <div className="bg-white rounded-xl shadow-lg p-4">
-                <div className="text-sm font-medium text-gray-400 mb-2 font-['Montserrat']">
-                  showing colour data
-                </div>
-                <hr className="mb-2" />
-                <div className="text-black font-['Montserrat']">
-                  {productData.color || "red"}
-                </div>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-black mb-2 font-['Montserrat']">
+                  Product Filters
+                </h3>
+                <p className="text-sm text-gray-600 font-['Montserrat']">
+                  Assign filters to help customers find your product
+                </p>
               </div>
-
-              {/* Category Filter */}
-              <div className="bg-white rounded-xl shadow-lg p-4">
-                <div className="text-sm font-medium text-gray-400 mb-2 font-['Montserrat']">
-                  showing category data
-                </div>
-                <hr className="mb-2" />
-                <div className="text-black font-['Montserrat']">
-                  {selectedCategory || "men"}
-                </div>
-              </div>
-
-              {/* Subcategory Filter */}
-              <div className="bg-white rounded-xl shadow-lg p-4">
-                <div className="text-sm font-medium text-gray-400 mb-2 font-['Montserrat']">
-                  showing Subcategory
-                </div>
-                <hr className="mb-2" />
-                <div className="text-black font-['Montserrat']">
-                  {selectedSubCategory || "jacket"}
-                </div>
-              </div>
+              {Object.values(selectedFilters).some(v => v) && (
+                <button
+                  onClick={handleClearFilters}
+                  className="text-red-500 hover:text-red-700 text-sm font-medium"
+                >
+                  Clear All Filters
+                </button>
+              )}
             </div>
+
+            {filterLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Dynamic Filter Dropdowns */}
+                {availableFilters.map((filter) => {
+                  const filterKey = filter.key.toLowerCase();
+                  return (
+                    <div key={filter._id} className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3 font-['Montserrat'] capitalize">
+                        {filter.key}
+                      </label>
+                      <select
+                        value={selectedFilters[filterKey] || ''}
+                        onChange={(e) => handleFilterSelect(filterKey, e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-['Montserrat'] bg-gray-50"
+                      >
+                        <option value="">Select {filter.key}</option>
+                        {filter.values.map((value, index) => (
+                          <option key={index} value={value.name}>
+                            {value.name}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedFilters[filterKey] && (
+                        <div className="mt-3 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="text-xs text-blue-600 font-medium mb-1">Selected:</div>
+                          <div className="text-sm text-blue-800 font-['Montserrat']">
+                            {selectedFilters[filterKey]}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Category and Subcategory Display */}
+                <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3 font-['Montserrat']">
+                    Category
+                  </label>
+                  <div className="px-4 py-3 bg-gray-50 rounded-lg border">
+                    <div className="text-sm text-gray-800 font-['Montserrat']">
+                      {categories.find(cat => cat._id === selectedCategory)?.name || 'No category selected'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3 font-['Montserrat']">
+                    Subcategory
+                  </label>
+                  <div className="px-4 py-3 bg-gray-50 rounded-lg border">
+                    <div className="text-sm text-gray-800 font-['Montserrat']">
+                      {subCategories.find(sub => sub._id === selectedSubCategory)?.name || 'No subcategory selected'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Selected Filters Summary */}
+            {Object.values(selectedFilters).some(v => v) && (
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-semibold text-blue-800 mb-3 font-['Montserrat']">
+                  Applied Filters:
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(selectedFilters).map(([key, value]) => {
+                    if (!value) return null;
+                    return (
+                      <span
+                        key={key}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                      >
+                        {key}: {value}
+                        <button
+                          onClick={() => handleFilterSelect(key, '')}
+                          className="ml-2 hover:text-blue-600"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {filterError && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600 font-['Montserrat']">
+                  Error loading filters: {filterError}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Additional Variants Section */}
