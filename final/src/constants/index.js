@@ -118,7 +118,13 @@ export const DEFAULT_VARIANT = {
     otherAlsoBought: false
   },
   filters: {
-    color: false
+    color: '',
+    size: '',
+    brand: '',
+    material: '',
+    style: '',
+    gender: '',
+    season: ''
   }
 };
 

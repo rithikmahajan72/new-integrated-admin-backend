@@ -383,17 +383,51 @@ exports.getItemsByFilter = async (req, res) => {
  * Get all items (with pagination)
  */
 exports.getAllItems = async (req, res) => {
-  console.log("qqqqqqqqqqqqqq")
+  console.log("Fetching all items with populated data")
   try {
     const { page = 1, limit = 100 } = req.query;
+    
+    // Populate referenced fields to show actual data instead of ObjectIds
     const items = await Item.find()
+      .populate('categoryId', 'name _id')
+      .populate('subCategoryId', 'name _id')
       .skip((page - 1) * Number(limit))
-      .limit(Number(limit));
+      .limit(Number(limit))
+      .lean(); // Use lean() for better performance
 
     const totalItems = await Item.countDocuments();
 
+    // Transform data to match frontend expectations
+    const transformedItems = items.map(item => ({
+      ...item,
+      // Map populated data to expected field names
+      category: item.categoryId?.name || 'Unknown Category',
+      subCategory: item.subCategoryId?.name || 'Unknown Subcategory',
+      subCategories: item.subCategoryId?.name || 'Unknown Subcategory',
+      // Extract price information
+      price: item.regularPrice || item.price || 0,
+      salePrice: item.salePrice || item.discountPrice || 0,
+      // Map size information
+      size: item.sizes || [],
+      sizes: item.sizes || [],
+      // Calculate quantity from stock sizes
+      quantity: item.stockSizes?.reduce((total, size) => total + (size.stock || 0), 0) || item.stock || 0,
+      // Map HSN and barcode
+      hsn: item.hsn || 'N/A',
+      barcodeNo: item.barcode || 'N/A',
+      // Map SKU information
+      skus: item.stockSizes?.reduce((acc, size) => {
+        acc[size.size] = size.sku || 'N/A';
+        return acc;
+      }, {}) || {},
+      // Map platform pricing
+      platforms: item.platformPricing || {},
+      // Ensure filters are in the right format
+      filters: item.filters || []
+    }));
+
     res.status(200).json({
-      items,
+      items: transformedItems,
       totalPages: Math.ceil(totalItems / limit),
       currentPage: Number(page),
     });

@@ -12,6 +12,7 @@ const UploadProgressLoader = ({
   files = [], 
   uploadStatus = [], 
   onRemoveFile, 
+  onRetryUpload,
   type = 'images',
   maxDisplay = 5 
 }) => {
@@ -33,6 +34,12 @@ const UploadProgressLoader = ({
   const handleRemoveFile = (statusId) => {
     if (onRemoveFile) {
       onRemoveFile(statusId, type);
+    }
+  };
+
+  const handleRetryUpload = (statusId) => {
+    if (onRetryUpload) {
+      onRetryUpload(statusId, type);
     }
   };
 
@@ -114,6 +121,20 @@ const UploadProgressLoader = ({
                     </div>
                   )}
                   
+                  {/* Retry Button for Failed Uploads */}
+                  {isFailed && onRetryUpload && (
+                    <button
+                      onClick={() => handleRetryUpload(status.id)}
+                      className="w-8 h-8 bg-blue-50 hover:bg-blue-100 rounded-full flex items-center justify-center transition-colors group"
+                      aria-label="Retry upload"
+                      title="Retry upload"
+                    >
+                      <svg className="w-4 h-4 text-blue-600 group-hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                  )}
+                  
                   {/* Remove/Cancel Button */}
                   <button
                     onClick={() => handleRemoveFile(status.id)}
@@ -151,7 +172,7 @@ const UploadProgressLoader = ({
                 )}
                 {isFailed && (
                   <p className="text-xs text-red-600 font-medium">
-                    Upload failed
+                    Upload failed - Click retry to try again
                   </p>
                 )}
               </div>

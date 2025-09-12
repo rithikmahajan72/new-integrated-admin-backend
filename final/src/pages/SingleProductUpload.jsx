@@ -167,6 +167,15 @@ const SingleProductUpload = React.memo(() => {
         images: [], // Array of {id, status: 'uploading'|'success'|'failed', progress: 0-100}
         videos: [],
       },
+      filters: {
+        color: '',
+        size: '',
+        brand: '',
+        material: '',
+        style: '',
+        gender: '',
+        season: ''
+      },
     },
   ]);
   const [variantCount, setVariantCount] = useState(1);
@@ -234,6 +243,14 @@ const SingleProductUpload = React.memo(() => {
   const [selectedRecheckOption, setSelectedRecheckOption] =
     useState("All DETAILS");
   const [notification, setNotification] = useState(null);
+
+  // ==============================
+  // SCHEDULING MODAL STATE
+  // ==============================
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
   // ==============================
   // REFS
@@ -564,6 +581,44 @@ const SingleProductUpload = React.memo(() => {
     });
   }, []);
 
+  // Variant-specific filter handlers
+  const handleVariantFilterSelect = useCallback((variantId, filterType, value) => {
+    setVariants(prev => 
+      prev.map(variant =>
+        variant.id === variantId
+          ? {
+              ...variant,
+              filters: {
+                ...variant.filters,
+                [filterType]: value
+              }
+            }
+          : variant
+      )
+    );
+  }, []);
+
+  const handleVariantClearFilters = useCallback((variantId) => {
+    setVariants(prev => 
+      prev.map(variant =>
+        variant.id === variantId
+          ? {
+              ...variant,
+              filters: {
+                color: '',
+                size: '',
+                brand: '',
+                material: '',
+                style: '',
+                gender: '',
+                season: ''
+              }
+            }
+          : variant
+      )
+    );
+  }, []);
+
   const addMoreVariants = useCallback(() => {
     const newVariantCount = variantCount + 1;
     const newVariant = {
@@ -576,6 +631,15 @@ const SingleProductUpload = React.memo(() => {
       uploadStatus: {
         images: [],
         videos: [],
+      },
+      filters: {
+        color: '',
+        size: '',
+        brand: '',
+        material: '',
+        style: '',
+        gender: '',
+        season: ''
       },
     };
     setVariants((prev) => [...prev, newVariant]);
@@ -897,6 +961,95 @@ const SingleProductUpload = React.memo(() => {
           return {
             ...variant,
             [type]: updatedFiles,
+            uploadStatus: {
+              ...variant.uploadStatus,
+              [type]: updatedStatus,
+            },
+          };
+        }
+        return variant;
+      })
+    );
+  }, []);
+
+  // Retry failed upload
+  const retryUpload = useCallback((fileId, type = "images") => {
+    setVariants((prev) =>
+      prev.map((variant) => {
+        const failedFile = variant[type]?.find((f) => f.id === fileId);
+        const failedStatus = variant.uploadStatus[type]?.find((s) => s.id === fileId);
+        
+        if (failedFile && failedStatus && failedStatus.status === 'failed') {
+          // Reset the upload status to uploading
+          const updatedStatus = variant.uploadStatus[type].map((s) => {
+            if (s.id === fileId) {
+              return { ...s, status: "uploading", progress: 0 };
+            }
+            return s;
+          });
+
+          // Simulate retry upload progress
+          const interval = setInterval(() => {
+            setVariants((prev) =>
+              prev.map((variant) => {
+                const statusIndex = variant.uploadStatus[type]?.findIndex((s) => s.id === fileId);
+                if (statusIndex !== -1) {
+                  const updatedStatus = [...variant.uploadStatus[type]];
+                  const currentStatus = updatedStatus[statusIndex];
+                  
+                  if (currentStatus.progress < 100) {
+                    const newProgress = Math.min(
+                      currentStatus.progress + Math.random() * 20,
+                      100
+                    );
+                    updatedStatus[statusIndex] = {
+                      ...currentStatus,
+                      progress: newProgress,
+                      status: newProgress >= 100 ? "success" : "uploading",
+                    };
+
+                    return {
+                      ...variant,
+                      uploadStatus: {
+                        ...variant.uploadStatus,
+                        [type]: updatedStatus,
+                      },
+                    };
+                  }
+                }
+                return variant;
+              })
+            );
+          }, 200);
+
+          // Clear interval and potentially simulate failure again (lower chance)
+          setTimeout(() => {
+            clearInterval(interval);
+            // 5% chance of failure on retry (lower than initial 10%)
+            if (Math.random() < 0.05) {
+              setVariants((prev) =>
+                prev.map((variant) => {
+                  const updatedStatus = variant.uploadStatus[type]?.map((s) => {
+                    if (s.id === fileId) {
+                      return { ...s, status: "failed", progress: 0 };
+                    }
+                    return s;
+                  });
+
+                  return {
+                    ...variant,
+                    uploadStatus: {
+                      ...variant.uploadStatus,
+                      [type]: updatedStatus,
+                    },
+                  };
+                })
+              );
+            }
+          }, 2500);
+
+          return {
+            ...variant,
             uploadStatus: {
               ...variant.uploadStatus,
               [type]: updatedStatus,
@@ -1628,12 +1781,17 @@ const SingleProductUpload = React.memo(() => {
     console.log('categoryId:', selectedCategory);
     console.log('subCategoryId:', selectedSubCategory);
     
+    // Generate unique product ID
+    const productId = `PRD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Create the base product data
     const baseProductData = {
-      productName: productData.productName,
-      title: productData.title,
-      description: productData.description,
-      manufacturingDetails: productData.manufacturingDetails,
+      productId: productId,
+      productName: productData.productName || '',
+      title: productData.title || productData.productName || '',
+      name: productData.productName || '', // Required legacy field
+      description: productData.description || '',
+      manufacturingDetails: productData.manufacturingDetails || '',
       shippingAndReturns: {
         shippingDetails: [],
         returnPolicy: [],
@@ -1641,13 +1799,15 @@ const SingleProductUpload = React.memo(() => {
       },
       regularPrice: parseFloat(productData.regularPrice) || 0,
       salePrice: parseFloat(productData.salePrice) || 0,
-      returnable: productData.returnable === 'yes',
-      metaTitle: productData.metaTitle,
-      metaDescription: productData.metaDescription,
-      slugUrl: productData.slugUrl,
+      price: parseFloat(productData.regularPrice) || 0, // Required legacy field
+      stock: Math.max(1, customSizes.reduce((total, size) => total + (parseInt(size.quantity) || 0), 0)) || 1, // Required legacy field
+      returnable: productData.returnable === 'yes' || false,
+      metaTitle: productData.metaTitle || productData.productName || '',
+      metaDescription: productData.metaDescription || productData.description || '',
+      slugUrl: productData.slugUrl || productData.productName?.toLowerCase().replace(/\s+/g, '-') || '',
       categoryId: selectedCategory,
       subCategoryId: selectedSubCategory,
-      status: status,
+      status: status === 'live' ? 'published' : status, // Convert 'live' to 'published' for backend
       
       // Platform pricing (5 different platforms as requested)
       platformPricing: {
@@ -1697,15 +1857,33 @@ const SingleProductUpload = React.memo(() => {
       
       // Variants with images
       variants: variants.map(variant => ({
-        name: variant.name,
+        name: variant.name || '',
+        productName: variant.productName || '',
+        title: variant.title || '',
+        description: variant.description || '',
+        manufacturingDetails: variant.manufacturingDetails || '',
+        shippingAndReturns: {
+          shippingCost: variant.shippingReturns?.shippingCost || 0,
+          deliveryTime: variant.shippingReturns?.deliveryTime || '7-10 business days',
+          returnPolicy: variant.shippingReturns?.returnPolicy || '30 days return',
+          warranty: variant.shippingReturns?.warranty || 'No warranty'
+        },
+        regularPrice: variant.regularPrice || 0,
+        salePrice: variant.salePrice || 0,
         images: variant.images || [],
         videos: variant.videos || [],
-        colors: variant.colors || [],
-        additionalData: variant.additionalData || {}
+        filters: variant.filters || {},
+        stockSizes: variant.stockSizes || [],
+        customSizes: variant.customSizes || []
       })),
       
-      // Also show in options
-      alsoShowInOptions: alsoShowInOptions,
+      // Also show in options - convert to boolean structure expected by backend
+      alsoShowInOptions: {
+        youMightAlsoLike: alsoShowInOptions?.youMightAlsoLike?.value === 'yes' || false,
+        similarItems: alsoShowInOptions?.similarItems?.value === 'yes' || false,
+        othersAlsoBought: alsoShowInOptions?.othersAlsoBought?.value === 'yes' || false,
+        customOptions: []
+      },
       
       // Size charts
       sizeChart: sizeChart,
@@ -1741,11 +1919,12 @@ const SingleProductUpload = React.memo(() => {
     variants,
     alsoShowInOptions,
     sizeChart,
-    commonSizeChart
+    commonSizeChart,
+    productFilters
   ]);
 
   const handleSaveAsDraft = useCallback(() => {
-    if (!productData.productName.trim()) {
+    if (!productData.productName?.trim()) {
       showNotification("Product name is required", NOTIFICATION_TYPES.ERROR);
       return;
     }
@@ -1755,8 +1934,14 @@ const SingleProductUpload = React.memo(() => {
       return;
     }
 
-    const draftData = createProductDataForAPI('draft');
-    dispatch(createProduct(draftData));
+    try {
+      const draftData = createProductDataForAPI('draft');
+      console.log('Saving draft with data:', draftData);
+      dispatch(createProduct(draftData));
+    } catch (error) {
+      console.error('Error creating draft:', error);
+      showNotification("Failed to save draft", NOTIFICATION_TYPES.ERROR);
+    }
   }, [
     productData.productName,
     selectedCategory,
@@ -1767,7 +1952,7 @@ const SingleProductUpload = React.memo(() => {
   ]);
 
   const handlePublishNow = useCallback(() => {
-    if (!productData.productName.trim()) {
+    if (!productData.productName?.trim()) {
       showNotification("Product name is required", NOTIFICATION_TYPES.ERROR);
       return;
     }
@@ -1782,8 +1967,14 @@ const SingleProductUpload = React.memo(() => {
       return;
     }
 
-    const publishData = createProductDataForAPI('published');
-    dispatch(createProduct(publishData));
+    try {
+      const publishData = createProductDataForAPI('live');
+      console.log('Publishing with data:', publishData);
+      dispatch(createProduct(publishData));
+    } catch (error) {
+      console.error('Error publishing product:', error);
+      showNotification("Failed to publish product", NOTIFICATION_TYPES.ERROR);
+    }
   }, [
     productData.productName,
     productData.regularPrice,
@@ -1795,7 +1986,7 @@ const SingleProductUpload = React.memo(() => {
   ]);
 
   const handleScheduleForLater = useCallback(() => {
-    if (!productData.productName.trim()) {
+    if (!productData.productName?.trim()) {
       showNotification("Product name is required", NOTIFICATION_TYPES.ERROR);
       return;
     }
@@ -1805,18 +1996,78 @@ const SingleProductUpload = React.memo(() => {
       return;
     }
 
-    // For now, we'll create as scheduled status
-    // In a real app, you'd show a date/time picker modal
-    const scheduleData = createProductDataForAPI('scheduled');
-    dispatch(createProduct(scheduleData));
+    if (!productData.regularPrice || parseFloat(productData.regularPrice) <= 0) {
+      showNotification("Valid regular price is required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    // Show the scheduling modal
+    setIsScheduleModalOpen(true);
   }, [
     productData.productName,
+    productData.regularPrice,
     selectedCategory,
     selectedSubCategory,
+    showNotification
+  ]);
+
+  // ==============================
+  // SCHEDULING MODAL HANDLERS
+  // ==============================
+  const handleConfirmSchedule = useCallback(async () => {
+    if (!scheduleDate || !scheduleTime) {
+      showNotification("Please select both date and time", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+    if (scheduledDateTime <= new Date()) {
+      showNotification("Scheduled time must be in the future", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    setScheduleLoading(true);
+
+    try {
+      const scheduleData = createProductDataForAPI('scheduled');
+      scheduleData.scheduledPublishDate = scheduledDateTime.toISOString();
+      
+      dispatch(createProduct(scheduleData));
+      
+      setIsScheduleModalOpen(false);
+      setScheduleDate("");
+      setScheduleTime("");
+      
+      showNotification(
+        `Product scheduled for ${scheduledDateTime.toLocaleString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}`, 
+        NOTIFICATION_TYPES.SUCCESS
+      );
+    } catch (error) {
+      showNotification("Failed to schedule product", NOTIFICATION_TYPES.ERROR);
+    } finally {
+      setScheduleLoading(false);
+    }
+  }, [
+    scheduleDate,
+    scheduleTime,
     createProductDataForAPI,
     dispatch,
     showNotification
   ]);
+
+  const handleCancelSchedule = useCallback(() => {
+    setIsScheduleModalOpen(false);
+    setScheduleDate("");
+    setScheduleTime("");
+    setScheduleLoading(false);
+  }, []);
 
   // ==============================
   // VALIDATION AND REVIEW HANDLERS
@@ -2108,7 +2359,7 @@ const SingleProductUpload = React.memo(() => {
               </div>
 
               {/* Pricing Section */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 mb-16 max-w-[400px]">
                 <div>
                   <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
                     Regular Price
@@ -2362,7 +2613,7 @@ const SingleProductUpload = React.memo(() => {
             </div>
 
             {/* Right Column - Product Images */}
-            <div className="space-y-6 xl:absolute right-10 top-[-50px] w-[400px] sm:static 2xl:left-1/3">
+            <div className="space-y-6 xl:absolute right-10 top-[150px] w-[400px] sm:static 2xl:left-1/2 lg:left-1/3">
               <div>
                 <h3 className="text-[32px] font-bold text-[#111111] font-['Montserrat'] leading-[24px] mb-6">
                   Product Images/videos
@@ -2591,8 +2842,8 @@ const SingleProductUpload = React.memo(() => {
                   })()}
                 </div>
 
-                {/* Upload Areas */}
-                <div className="space-y-4 mb-6">
+                {/* Upload Areas - Moved to the right to avoid conflicts */}
+                <div className="space-y-4 mb-6 ml-8">
                   <div>
                     <h4 className="text-[21px] font-medium text-[#111111] font-['Montserrat'] mb-3">
                       Upload Images
@@ -2681,6 +2932,9 @@ const SingleProductUpload = React.memo(() => {
                       uploadStatus={variants[0]?.uploadStatus?.images || []}
                       onRemoveFile={(fileId) =>
                         removeFile(variants[0]?.id, fileId, "images")
+                      }
+                      onRetryUpload={(fileId) =>
+                        retryUpload(fileId, "images")
                       }
                       type="images"
                       maxDisplay={5}
@@ -2776,13 +3030,12 @@ const SingleProductUpload = React.memo(() => {
                       onRemoveFile={(fileId) =>
                         removeFile(variants[0]?.id, fileId, "videos")
                       }
+                      onRetryUpload={(fileId) =>
+                        retryUpload(fileId, "videos")
+                      }
                       type="videos"
                       maxDisplay={5}
                     />
-                    <p className="text-xs text-gray-500 font-['Montserrat'] mt-2">
-                      Note: Videos will appear in the main product media grid
-                      above and can be arranged with images
-                    </p>
                   </div>
                 </div>
               </div>
@@ -2791,20 +3044,20 @@ const SingleProductUpload = React.memo(() => {
 
 
 
-          {/* Dynamic Filter Section */}
+          {/* Dynamic Filter Section for Variant 1 */}
           <div className="mt-12 py-6 border-t border-gray-200">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-xl font-bold text-black mb-2 font-['Montserrat']">
-                  Product Filters
+                  Variant 1 Filters
                 </h3>
                 <p className="text-sm text-gray-600 font-['Montserrat']">
-                  Assign filters to help customers find your product
+                  Assign filters to help customers find this variant
                 </p>
               </div>
-              {Object.values(selectedFilters).some(v => v) && (
+              {Object.values(variants[0]?.filters || {}).some(v => v) && (
                 <button
-                  onClick={handleClearFilters}
+                  onClick={() => handleVariantClearFilters(variants[0]?.id)}
                   className="text-red-500 hover:text-red-700 text-sm font-medium"
                 >
                   Clear All Filters
@@ -2818,7 +3071,7 @@ const SingleProductUpload = React.memo(() => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Dynamic Filter Dropdowns */}
+                {/* Dynamic Filter Dropdowns for Variant 1 */}
                 {availableFilters.map((filter) => {
                   const filterKey = filter.key.toLowerCase();
                   return (
@@ -2827,8 +3080,8 @@ const SingleProductUpload = React.memo(() => {
                         {filter.key}
                       </label>
                       <select
-                        value={selectedFilters[filterKey] || ''}
-                        onChange={(e) => handleFilterSelect(filterKey, e.target.value)}
+                        value={(variants[0]?.filters && variants[0]?.filters[filterKey]) || ''}
+                        onChange={(e) => handleVariantFilterSelect(variants[0]?.id, filterKey, e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-['Montserrat'] bg-gray-50"
                       >
                         <option value="">Select {filter.key}</option>
@@ -2838,51 +3091,28 @@ const SingleProductUpload = React.memo(() => {
                           </option>
                         ))}
                       </select>
-                      {selectedFilters[filterKey] && (
+                      {variants[0]?.filters && variants[0]?.filters[filterKey] && (
                         <div className="mt-3 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
                           <div className="text-xs text-blue-600 font-medium mb-1">Selected:</div>
                           <div className="text-sm text-blue-800 font-['Montserrat']">
-                            {selectedFilters[filterKey]}
+                            {variants[0]?.filters[filterKey]}
                           </div>
                         </div>
                       )}
                     </div>
                   );
                 })}
-
-                {/* Category and Subcategory Display */}
-                <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3 font-['Montserrat']">
-                    Category
-                  </label>
-                  <div className="px-4 py-3 bg-gray-50 rounded-lg border">
-                    <div className="text-sm text-gray-800 font-['Montserrat']">
-                      {categories.find(cat => cat._id === selectedCategory)?.name || 'No category selected'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3 font-['Montserrat']">
-                    Subcategory
-                  </label>
-                  <div className="px-4 py-3 bg-gray-50 rounded-lg border">
-                    <div className="text-sm text-gray-800 font-['Montserrat']">
-                      {subCategories.find(sub => sub._id === selectedSubCategory)?.name || 'No subcategory selected'}
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
-            {/* Selected Filters Summary */}
-            {Object.values(selectedFilters).some(v => v) && (
+            {/* Selected Filters Summary for Variant 1 */}
+            {Object.values(variants[0]?.filters || {}).some(v => v) && (
               <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="text-sm font-semibold text-blue-800 mb-3 font-['Montserrat']">
-                  Applied Filters:
+                  Applied Filters for Variant 1:
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(selectedFilters).map(([key, value]) => {
+                  {Object.entries(variants[0]?.filters || {}).map(([key, value]) => {
                     if (!value) return null;
                     return (
                       <span
@@ -2891,7 +3121,7 @@ const SingleProductUpload = React.memo(() => {
                       >
                         {key}: {value}
                         <button
-                          onClick={() => handleFilterSelect(key, '')}
+                          onClick={() => handleVariantFilterSelect(variants[0]?.id, key, '')}
                           className="ml-2 hover:text-blue-600"
                         >
                           <X size={12} />
@@ -3961,6 +4191,9 @@ const SingleProductUpload = React.memo(() => {
                           onRemoveFile={(fileId) =>
                             removeFile(variant.id, fileId, "images")
                           }
+                          onRetryUpload={(fileId) =>
+                            retryUpload(fileId, "images")
+                          }
                           type="images"
                           maxDisplay={5}
                         />
@@ -4006,12 +4239,113 @@ const SingleProductUpload = React.memo(() => {
                           onRemoveFile={(fileId) =>
                             removeFile(variant.id, fileId, "videos")
                           }
+                          onRetryUpload={(fileId) =>
+                            retryUpload(fileId, "videos")
+                          }
                           type="videos"
                           maxDisplay={5}
                         />
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Variant-specific Product Filters */}
+                <div className="mt-8 py-6 border-t border-gray-200">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-black mb-2 font-['Montserrat']">
+                        Variant {variantNumber} Filters
+                      </h3>
+                      <p className="text-sm text-gray-600 font-['Montserrat']">
+                        Assign filters to help customers find this variant
+                      </p>
+                    </div>
+                    {Object.values(variant.filters || {}).some(v => v) && (
+                      <button
+                        onClick={() => handleVariantClearFilters(variant.id)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium"
+                      >
+                        Clear All Filters
+                      </button>
+                    )}
+                  </div>
+
+                  {filterLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Dynamic Filter Dropdowns for Variant */}
+                      {availableFilters.map((filter) => {
+                        const filterKey = filter.key.toLowerCase();
+                        return (
+                          <div key={filter._id} className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+                            <label className="block text-sm font-semibold text-gray-700 mb-3 font-['Montserrat'] capitalize">
+                              {filter.key}
+                            </label>
+                            <select
+                              value={(variant.filters && variant.filters[filterKey]) || ''}
+                              onChange={(e) => handleVariantFilterSelect(variant.id, filterKey, e.target.value)}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-['Montserrat'] bg-gray-50"
+                            >
+                              <option value="">Select {filter.key}</option>
+                              {filter.values.map((value, index) => (
+                                <option key={index} value={value.name}>
+                                  {value.name}
+                                </option>
+                              ))}
+                            </select>
+                            {variant.filters && variant.filters[filterKey] && (
+                              <div className="mt-3 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                                <div className="text-xs text-blue-600 font-medium mb-1">Selected:</div>
+                                <div className="text-sm text-blue-800 font-['Montserrat']">
+                                  {variant.filters[filterKey]}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Selected Filters Summary for Variant */}
+                  {Object.values(variant.filters || {}).some(v => v) && (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="text-sm font-semibold text-blue-800 mb-3 font-['Montserrat']">
+                        Applied Filters for Variant {variantNumber}:
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(variant.filters || {}).map(([key, value]) => {
+                          if (!value) return null;
+                          return (
+                            <span
+                              key={key}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {key}: {value}
+                              <button
+                                onClick={() => handleVariantFilterSelect(variant.id, key, '')}
+                                className="ml-2 hover:text-blue-600"
+                              >
+                                <X size={12} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {filterError && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-600 font-['Montserrat']">
+                        Error loading filters: {filterError}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -5250,6 +5584,96 @@ const SingleProductUpload = React.memo(() => {
               >
                 Close Review
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Product Modal */}
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] max-w-md w-full mx-4 relative">
+            {/* Modal Content */}
+            <div className="p-8 relative">
+              {/* Header */}
+              <h2 className="text-[24px] font-bold text-black mb-8 leading-[29px] font-['Montserrat'] text-center">
+                Schedule Product for Later
+              </h2>
+
+              {/* Form Fields */}
+              <div className="space-y-6 mb-8">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-['Montserrat']">
+                    Select Date
+                  </label>
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    min={new Date().toISOString().split('T')[0]} // Prevent past dates
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    className="w-full h-[50px] px-4 py-3 border border-gray-300 rounded-lg font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-['Montserrat']">
+                    Select Time
+                  </label>
+                  <input
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    className="w-full h-[50px] px-4 py-3 border border-gray-300 rounded-lg font-['Montserrat'] text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    required
+                  />
+                </div>
+                {scheduleDate && scheduleTime && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 font-['Montserrat']">
+                      <strong>Publish Date & Time:</strong><br />
+                      {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={handleConfirmSchedule}
+                  disabled={
+                    !scheduleDate || !scheduleTime || scheduleLoading ||
+                    new Date(`${scheduleDate}T${scheduleTime}`) <= new Date()
+                  }
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-[16px] leading-[1.2] min-w-[140px]"
+                >
+                  {scheduleLoading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Scheduling...
+                    </div>
+                  ) : !scheduleDate || !scheduleTime 
+                    ? 'Select Date & Time' 
+                    : new Date(`${scheduleDate}T${scheduleTime}`) <= new Date()
+                    ? 'Past Time Selected'
+                    : 'Schedule Now'
+                  }
+                </button>
+                <button
+                  onClick={handleCancelSchedule}
+                  disabled={scheduleLoading}
+                  className="bg-white hover:bg-gray-50 text-black font-['Montserrat'] font-medium py-4 px-8 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 text-[16px] leading-[1.2] border border-[#e4e4e4] min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

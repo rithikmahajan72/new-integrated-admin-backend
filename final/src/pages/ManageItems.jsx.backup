@@ -1,69 +1,113 @@
-import React, { useState, useMemo, useCallback, useEffect, memo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Edit2,
   Trash2,
-  ChevronDown,
   Plus,
-  X,
+  Eye,
   Filter,
   RefreshCw,
+  ChevronDown,
+  X,
+  Calendar,
+  Package,
+  ImageIcon,
   Tag,
+  DollarSign,
+  Star,
+  Users,
+  ShoppingCart,
+  ArrowUpDown,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { itemAPI, productAPI, categoryAPI, subCategoryAPI, filterAPI } from "../api/endpoints";
+
+// Import Redux slices
+import {
+  fetchProducts,
+  fetchProductById,
+  updateProduct,
+  deleteProduct,
+  selectAllProducts,
+  selectProductsLoading,
+  selectProductsError,
+  selectProductById,
+  clearSuccessMessage,
+  clearError,
+} from "../store/slices/productsSlice";
+
+import {
+  fetchCategories,
+  selectAllCategories,
+} from "../store/slices/categoriesSlice";
+
+import {
+  fetchSubCategories,
+  selectAllSubCategories,
+} from "../store/slices/subCategoriesSlice";
+
 import {
   fetchFilters,
   selectAvailableFilters,
-  selectAppliedFilters,
-  selectFilterLoading,
-  setColorFilter,
-  setSizeFilter,
-  setBrandFilter,
-  clearAllFilters
 } from "../store/slices/filtersSlice";
-import {
-  fetchProducts,
-  selectProductsItems,
-  selectProductsLoading,
-  selectProductsError,
-} from "../store/slices/productsSlice";
-import {
-  fetchCategories,
-  fetchSubCategories,
-  selectCategories,
-  selectSubCategories,
-  selectCategoriesLoading,
-  selectSubCategoriesLoading,
-  selectCategoriesError,
-  selectSubCategoriesError,
-} from "../store/slices/categoriesSlice";
 
-// All data is now loaded dynamically from the API
+// Import components
+import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
 
 const STATUS_STYLES = {
-  live: "text-[#00b69b]",
-  draft: "text-[#ef3826]",
-  scheduled: "text-[#ffd56d]",
+  live: "bg-green-100 text-green-800",
+  draft: "bg-gray-100 text-gray-800",
+  scheduled: "bg-yellow-100 text-yellow-800",
 };
 
-// Custom hooks for better state management
-const useManageItemsState = () => {
-  // Basic filters
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All categories");
-  const [selectedSubCategory, setSelectedSubCategory] =
-    useState("All subcategories");
-  const [selectedItem, setSelectedItem] = useState("Items");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [showDraftsOnly, setShowDraftsOnly] = useState(false);
-  const [showLiveOnly, setShowLiveOnly] = useState(false);
-  const [showScheduledOnly, setShowScheduledOnly] = useState(false);
+const ManageItems = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  // Items data
-  const [draftItems, setDraftItems] = useState([]);
-  const [publishedItems, setPublishedItems] = useState([]);
+  // Redux state
+  const products = useSelector(selectAllProducts);
+  const productsLoading = useSelector(selectProductsLoading);
+  const productsError = useSelector(selectProductsError);
+  const categories = useSelector(selectAllCategories);
+  const subCategories = useSelector(selectAllSubCategories);
+  const filters = useSelector(selectAvailableFilters);
+
+  // Check authentication
+  const { isAuthenticated, user } = useSelector(state => state.auth);
+  const isAdmin = useMemo(() => user?.isAdmin === true, [user?.isAdmin]);
+
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
+  // Modal states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Edit form states
+  const [editFormData, setEditFormData] = useState({
+    productName: "",
+    description: "",
+    regularPrice: "",
+    salePrice: "",
+    category: "",
+    subCategory: "",
+    status: "draft",
+    metaTitle: "",
+    metaDescription: "",
+    slugUrl: "",
+  });
   const [allItems, setAllItems] = useState([]);
   const [statistics, setStatistics] = useState({
     drafts: 0,
@@ -74,8 +118,9 @@ const useManageItemsState = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 
-  // Dynamic dropdown data (these are already available from Redux selectors above)
-  // Removed duplicate categories and subCategories state since they're already in Redux
+  // Dynamic dropdown data
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
   const [isSubCategoriesLoading, setIsSubCategoriesLoading] = useState(true);
 
@@ -108,6 +153,10 @@ const useManageItemsState = () => {
     setIsLoading,
     isFilterDropdownOpen,
     setIsFilterDropdownOpen,
+    categories,
+    setCategories,
+    subCategories,
+    setSubCategories,
     isCategoriesLoading,
     setIsCategoriesLoading,
     isSubCategoriesLoading,
@@ -267,15 +316,6 @@ const ManageItems = memo(() => {
   const state = useManageItemsState();
   const modalState = useModalState();
 
-  // Redux state
-  const products = useSelector(selectProductsItems) || [];
-  const productsLoading = useSelector(selectProductsLoading);
-  const productsError = useSelector(selectProductsError);
-  const categories = useSelector(selectCategories) || [];
-  const subCategories = useSelector(selectSubCategories) || [];
-  const categoriesLoading = useSelector(selectCategoriesLoading);
-  const subCategoriesLoading = useSelector(selectSubCategoriesLoading);
-
   // Filter Redux state
   const availableFilters = useSelector(selectAvailableFilters);
   const appliedFilters = useSelector(selectAppliedFilters);
@@ -292,17 +332,16 @@ const ManageItems = memo(() => {
       try {
         state.setIsLoading(true);
         
-        // Load data using Redux actions
-        dispatch(fetchProducts());
-        dispatch(fetchCategories());
-        dispatch(fetchSubCategories());
-        dispatch(fetchFilters());
-
-        // Still fetch stats and items directly for now
-        const [itemsResponse, statsResponse] = await Promise.all([
+        // Load data from API including filters
+        const [itemsResponse, statsResponse, categoriesResponse, subCategoriesResponse] = await Promise.all([
           productAPI.getAllProducts(),
-          itemAPI.getItemStatistics()
+          itemAPI.getItemStatistics(),
+          categoryAPI.getAllCategories(),
+          subCategoryAPI.getAllSubCategories()
         ]);
+
+        // Also fetch filters
+        dispatch(fetchFilters());
         
         console.log("ManageItems: Received API responses", { 
           itemsCount: Array.isArray(itemsResponse?.data) ? itemsResponse.data.length : 0,
@@ -382,15 +421,33 @@ const ManageItems = memo(() => {
           console.log("ManageItems: Updated statistics", statsResponse.data.data);
         }
 
-        // Categories are now managed by Redux - dispatch to load them
-        console.log("ManageItems: Dispatching fetchCategories to Redux");
-        dispatch(fetchCategories());
-        state.setIsCategoriesLoading(false);
+        // Handle categories response
+        console.log("ManageItems: Raw categories response", categoriesResponse);
+        if (categoriesResponse.data && categoriesResponse.data.data) {
+          const categories = Array.isArray(categoriesResponse.data.data) ? categoriesResponse.data.data : [];
+          console.log("ManageItems: Processed categories array", categories);
+          const categoryNames = categories.map(category => category.name || category.categoryName || category);
+          state.setCategories(categoryNames);
+          state.setIsCategoriesLoading(false);
+          console.log("ManageItems: Updated categories", categoryNames);
+        } else {
+          console.log("ManageItems: No categories data received");
+          state.setIsCategoriesLoading(false);
+        }
 
-        // Subcategories are now managed by Redux - dispatch to load them
-        console.log("ManageItems: Dispatching fetchSubCategories to Redux");
-        dispatch(fetchSubCategories());
-        state.setIsSubCategoriesLoading(false);
+        // Handle subcategories response
+        console.log("ManageItems: Raw subcategories response", subCategoriesResponse);
+        if (subCategoriesResponse.data && subCategoriesResponse.data.data) {
+          const subCategories = Array.isArray(subCategoriesResponse.data.data) ? subCategoriesResponse.data.data : [];
+          console.log("ManageItems: Processed subcategories array", subCategories);
+          const subCategoryNames = subCategories.map(subCategory => subCategory.name || subCategory.subCategoryName || subCategory);
+          state.setSubCategories(subCategoryNames);
+          state.setIsSubCategoriesLoading(false);
+          console.log("ManageItems: Updated subcategories", subCategoryNames);
+        } else {
+          console.log("ManageItems: No subcategories data received");
+          state.setIsSubCategoriesLoading(false);
+        }
         
         // Also load any saved local data
         const savedDrafts = localStorage.getItem("yoraa_draft_items");
@@ -1582,9 +1639,9 @@ const ManageItems = memo(() => {
                 {state.isCategoriesLoading ? (
                   <option disabled>Loading categories...</option>
                 ) : (
-                  categories.map((category, index) => (
-                    <option key={category._id || index} value={category.name || category}>
-                      {category.name || category}
+                  state.categories.map((category, index) => (
+                    <option key={index} value={category}>
+                      {category}
                     </option>
                   ))
                 )}
@@ -1605,9 +1662,9 @@ const ManageItems = memo(() => {
                 {state.isSubCategoriesLoading ? (
                   <option disabled>Loading subcategories...</option>
                 ) : (
-                  subCategories.map((subCategory, index) => (
-                    <option key={subCategory._id || index} value={subCategory.name || subCategory}>
-                      {subCategory.name || subCategory}
+                  state.subCategories.map((subCategory, index) => (
+                    <option key={index} value={subCategory}>
+                      {subCategory}
                     </option>
                   ))
                 )}

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { itemAPI, categoryAPI, subCategoryAPI } from '../../api/endpoints';
+import { itemAPI, productAPI, categoryAPI, subCategoryAPI } from '../../api/endpoints';
 import { apiCall } from '../../api/utils';
 
 // Async thunks for product operations
@@ -99,7 +99,7 @@ export const createProduct = createAsyncThunk(
   'products/createProduct',
   async (productData, { rejectWithValue }) => {
     try {
-      const result = await apiCall(itemAPI.createItem, productData);
+      const result = await apiCall(productAPI.createProduct, productData);
       if (result.success) {
         return result.data;
       } else {
@@ -115,7 +115,7 @@ export const updateProduct = createAsyncThunk(
   'products/updateProduct',
   async ({ productId, productData }, { rejectWithValue }) => {
     try {
-      const result = await apiCall(itemAPI.updateItem, productId, productData);
+      const result = await apiCall(productAPI.updateProduct, productId, productData);
       if (result.success) {
         return result.data;
       } else {
@@ -131,7 +131,7 @@ export const deleteProduct = createAsyncThunk(
   'products/deleteProduct',
   async (productId, { rejectWithValue }) => {
     try {
-      const result = await apiCall(itemAPI.deleteItem, productId);
+      const result = await apiCall(productAPI.deleteProduct, productId);
       if (result.success) {
         return { productId, data: result.data };
       } else {
