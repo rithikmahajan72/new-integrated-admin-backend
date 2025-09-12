@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useRef,
 } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Upload,
   Plus,
@@ -23,6 +24,23 @@ import {
 } from "../constants";
 import UploadProgressLoader from "../components/UploadProgressLoader";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
+import {
+  createProduct,
+  updateProduct,
+  selectCreateLoading,
+  selectUpdateLoading,
+  selectSuccessMessage,
+  selectProductsError,
+  clearSuccessMessage,
+  clearError,
+} from "../store/slices/productsSlice";
+import {
+  fetchCategories,
+} from "../store/slices/categoriesSlice";
+import {
+  fetchSubCategories,
+  fetchCategoriesForSubCategory,
+} from "../store/slices/subCategoriesSlice";
 
 // Constants for better maintainability
 const NOTIFICATION_TYPES = {
@@ -71,6 +89,21 @@ const UPLOAD_CONSTANTS = {
 
 const SingleProductUpload = React.memo(() => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // Redux state
+  const createLoading = useSelector(selectCreateLoading);
+  const updateLoading = useSelector(selectUpdateLoading);
+  const successMessage = useSelector(selectSuccessMessage);
+  const error = useSelector(selectProductsError);
+  const categories = useSelector(state => state.categories.categories);
+  const subCategories = useSelector(state => state.subCategories.subCategories);
+  const categoriesLoading = useSelector(state => state.categories.categoriesLoading);
+  const subCategoriesLoading = useSelector(state => state.subCategories.subCategoriesLoading);
+
+  // Check authentication
+  const { isAuthenticated, user } = useSelector(state => state.auth);
+  const isAdmin = useMemo(() => user?.isAdmin === true, [user?.isAdmin]);
 
   // ==============================
   // CORE PRODUCT DATA STATE
@@ -168,8 +201,59 @@ const SingleProductUpload = React.memo(() => {
   const recheckDropdownRef = useRef(null);
 
   // ==============================
+  // UTILITY FUNCTIONS
+  // ==============================
+
+  // Notification helper
+  const showNotification = useCallback(
+    (message, type = NOTIFICATION_TYPES.INFO, duration = 3000) => {
+      setNotification({ message, type, duration });
+    },
+    []
+  );
+
+  // ==============================
   // EFFECTS AND LIFECYCLE
   // ==============================
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    if (isAuthenticated && isAdmin) {
+      dispatch(fetchCategories());
+    }
+  }, [dispatch, isAuthenticated, isAdmin]);
+
+  // Fetch subcategories when category changes
+  useEffect(() => {
+    if (selectedCategory && selectedCategory !== "") {
+      dispatch(fetchSubCategories(selectedCategory));
+    } else {
+      dispatch(fetchSubCategories());
+    }
+  }, [selectedCategory, dispatch]);
+
+  // Handle success messages
+  useEffect(() => {
+    if (successMessage) {
+      showNotification(successMessage, NOTIFICATION_TYPES.SUCCESS);
+      dispatch(clearSuccessMessage());
+      
+      // Navigate to ManageItems after successful creation/update
+      if (successMessage.includes('created') || successMessage.includes('updated')) {
+        setTimeout(() => {
+          navigate('/manage-items');
+        }, 2000);
+      }
+    }
+  }, [successMessage, dispatch, showNotification, navigate]);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      showNotification(error, NOTIFICATION_TYPES.ERROR);
+      dispatch(clearError());
+    }
+  }, [error, dispatch, showNotification]);
 
   // Notification auto-dismiss effect
   useEffect(() => {
@@ -247,18 +331,6 @@ const SingleProductUpload = React.memo(() => {
         document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isRecheckDropdownOpen]);
-
-  // ==============================
-  // UTILITY FUNCTIONS
-  // ==============================
-
-  // Notification helper
-  const showNotification = useCallback(
-    (message, type = NOTIFICATION_TYPES.INFO, duration = 3000) => {
-      setNotification({ message, type, duration });
-    },
-    []
-  );
 
   // File validation helpers
   const validateVideoFile = useCallback((file) => {
@@ -1438,98 +1510,183 @@ const SingleProductUpload = React.memo(() => {
   // FORM SUBMISSION HANDLERS
   // ==============================
 
-  const handleSaveAsDraft = useCallback(() => {
-    console.log("Saving as draft:", { productData, variants, sizeChart });
-
-    // Create draft item data
-    const draftItem = {
-      id: Date.now(),
-      image: variants[0]?.images?.[0]?.url || "/api/placeholder/120/116",
-      productName: productData.productName || "Untitled Product",
-      category: selectedCategory || "Uncategorized",
-      subCategories: selectedSubCategory || "Uncategorized",
-      hsn: productData.hsn || "",
-      size: variants[0]?.customSizes?.map((s) => s.size) || [
-        "small",
-        "medium",
-        "large",
-      ],
-      quantity:
-        variants.reduce(
-          (total, variant) => total + (variant.quantity || 0),
-          0
-        ) || 0,
-      price: variants[0]?.regularPrice || productData.regularPrice || 0,
-      salePrice: variants[0]?.salePrice || productData.salePrice || 0,
-      platforms: {
-        yoraa: {
+  // Helper function to create product data for API
+  const createProductDataForAPI = useCallback((status = 'draft') => {
+    // Create the base product data
+    const baseProductData = {
+      productName: productData.productName,
+      title: productData.title,
+      description: productData.description,
+      manufacturingDetails: productData.manufacturingDetails,
+      shippingAndReturns: {
+        shippingDetails: [],
+        returnPolicy: [],
+        additionalInfo: productData.shippingReturns || ''
+      },
+      regularPrice: parseFloat(productData.regularPrice) || 0,
+      salePrice: parseFloat(productData.salePrice) || 0,
+      returnable: productData.returnable === 'yes',
+      metaTitle: productData.metaTitle,
+      metaDescription: productData.metaDescription,
+      slugUrl: productData.slugUrl,
+      categoryId: selectedCategory,
+      subCategoryId: selectedSubCategory,
+      status: status,
+      
+      // Platform pricing (5 different platforms as requested)
+      platformPricing: {
+        yoraa: { // Default platform
           enabled: true,
-          price: variants[0]?.regularPrice || productData.regularPrice || 0,
+          price: parseFloat(productData.regularPrice) || 0,
+          salePrice: parseFloat(productData.salePrice) || 0
         },
         myntra: {
           enabled: true,
-          price: variants[0]?.regularPrice || productData.regularPrice || 0,
+          price: parseFloat(productData.regularPrice) || 0,
+          salePrice: parseFloat(productData.salePrice) || 0
         },
         amazon: {
           enabled: true,
-          price: variants[0]?.regularPrice || productData.regularPrice || 0,
+          price: parseFloat(productData.regularPrice) || 0,
+          salePrice: parseFloat(productData.salePrice) || 0
         },
         flipkart: {
           enabled: true,
-          price: variants[0]?.regularPrice || productData.regularPrice || 0,
+          price: parseFloat(productData.regularPrice) || 0,
+          salePrice: parseFloat(productData.salePrice) || 0
         },
         nykaa: {
           enabled: true,
-          price: variants[0]?.regularPrice || productData.regularPrice || 0,
-        },
+          price: parseFloat(productData.regularPrice) || 0,
+          salePrice: parseFloat(productData.salePrice) || 0
+        }
       },
-      skus: variants[0]?.customSizes?.reduce((acc, size) => {
-        acc[size.size] = `draft/${size.size}/${Date.now()}`;
-        return acc;
-      }, {}) || {
-        small: `draft/s/${Date.now()}`,
-        medium: `draft/m/${Date.now()}`,
-        large: `draft/l/${Date.now()}`,
-      },
-      barcodeNo: productData.barcode || "",
-      status: "draft",
-      metaTitle: productData.metaTitle || "",
-      metaDescription: productData.metaDescription || "",
-      slugUrl: productData.slugUrl || "",
-      moveToSale: false,
-      keepCopyAndMove: false,
-      moveToEyx: false,
-      createdAt: new Date().toISOString(),
-      variants: variants,
-      sizeChart: sizeChart,
+      
+      // Size and stock information
+      stockSizeOption: stockSizeOption,
+      sizes: stockSizeOption === STOCK_SIZE_OPTIONS.SIZES ? customSizes.map(size => ({
+        size: size.size,
+        quantity: parseInt(size.quantity) || 0,
+        hsnCode: size.hsnCode || '',
+        sku: size.sku || `${selectedCategory}/${selectedSubCategory}/${productData.productName}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getDate()).padStart(2, '0')}/${Math.random().toString().slice(2, 10)}`,
+        barcode: size.barcode || '',
+        platformPricing: {
+          yoraa: { price: parseFloat(size.yoraaPrice) || parseFloat(productData.regularPrice) || 0 },
+          myntra: { price: parseFloat(size.myntraPrice) || parseFloat(productData.regularPrice) || 0 },
+          amazon: { price: parseFloat(size.amazonPrice) || parseFloat(productData.regularPrice) || 0 },
+          flipkart: { price: parseFloat(size.flipkartPrice) || parseFloat(productData.regularPrice) || 0 },
+          nykaa: { price: parseFloat(size.nykaaPrice) || parseFloat(productData.regularPrice) || 0 }
+        }
+      })) : [],
+      
+      // Variants with images
+      variants: variants.map(variant => ({
+        name: variant.name,
+        images: variant.images || [],
+        videos: variant.videos || [],
+        colors: variant.colors || [],
+        additionalData: variant.additionalData || {}
+      })),
+      
+      // Also show in options
       alsoShowInOptions: alsoShowInOptions,
+      
+      // Size charts
+      sizeChart: sizeChart,
+      commonSizeChart: commonSizeChart,
+      
+      // Additional metadata
+      filters: [], // Will be populated from filter selections
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
-    // Save to localStorage (in a real app, this would be an API call)
-    const existingDrafts = JSON.parse(
-      localStorage.getItem("yoraa_draft_items") || "[]"
-    );
-    const updatedDrafts = [...existingDrafts, draftItem];
-    localStorage.setItem("yoraa_draft_items", JSON.stringify(updatedDrafts));
-
-    showNotification(
-      "Product saved as draft successfully!",
-      NOTIFICATION_TYPES.SUCCESS
-    );
-
-    // Navigate to ManageItems page after a short delay
-    setTimeout(() => {
-      navigate("/manage-items");
-    }, 1500);
+    return baseProductData;
   }, [
     productData,
-    variants,
-    sizeChart,
     selectedCategory,
     selectedSubCategory,
+    stockSizeOption,
+    customSizes,
+    variants,
     alsoShowInOptions,
-    navigate,
-    showNotification,
+    sizeChart,
+    commonSizeChart
+  ]);
+
+  const handleSaveAsDraft = useCallback(() => {
+    if (!productData.productName.trim()) {
+      showNotification("Product name is required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    if (!selectedCategory || !selectedSubCategory) {
+      showNotification("Category and subcategory are required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    const draftData = createProductDataForAPI('draft');
+    dispatch(createProduct(draftData));
+  }, [
+    productData.productName,
+    selectedCategory,
+    selectedSubCategory,
+    createProductDataForAPI,
+    dispatch,
+    showNotification
+  ]);
+
+  const handlePublishNow = useCallback(() => {
+    if (!productData.productName.trim()) {
+      showNotification("Product name is required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    if (!selectedCategory || !selectedSubCategory) {
+      showNotification("Category and subcategory are required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    if (!productData.regularPrice || parseFloat(productData.regularPrice) <= 0) {
+      showNotification("Valid regular price is required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    const publishData = createProductDataForAPI('published');
+    dispatch(createProduct(publishData));
+  }, [
+    productData.productName,
+    productData.regularPrice,
+    selectedCategory,
+    selectedSubCategory,
+    createProductDataForAPI,
+    dispatch,
+    showNotification
+  ]);
+
+  const handleScheduleForLater = useCallback(() => {
+    if (!productData.productName.trim()) {
+      showNotification("Product name is required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    if (!selectedCategory || !selectedSubCategory) {
+      showNotification("Category and subcategory are required", NOTIFICATION_TYPES.ERROR);
+      return;
+    }
+
+    // For now, we'll create as scheduled status
+    // In a real app, you'd show a date/time picker modal
+    const scheduleData = createProductDataForAPI('scheduled');
+    dispatch(createProduct(scheduleData));
+  }, [
+    productData.productName,
+    selectedCategory,
+    selectedSubCategory,
+    createProductDataForAPI,
+    dispatch,
+    showNotification
   ]);
 
   // ==============================
@@ -1748,9 +1905,9 @@ const SingleProductUpload = React.memo(() => {
                 </label>
                 <input
                   type="text"
-                  value={variants[0]?.productName || ""}
+                  value={productData.productName || ""}
                   onChange={(e) =>
-                    handleVariantChange(1, "productName", e.target.value)
+                    setProductData(prev => ({ ...prev, productName: e.target.value }))
                   }
                   className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
                   placeholder="Enter product name"
@@ -1764,12 +1921,12 @@ const SingleProductUpload = React.memo(() => {
                 </label>
                 <input
                   type="text"
-                  value={variants[0]?.title || ""}
+                  value={productData.title || ""}
                   onChange={(e) =>
-                    handleVariantChange(1, "title", e.target.value)
+                    setProductData(prev => ({ ...prev, title: e.target.value }))
                   }
                   className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
-                  placeholder="Enter title"
+                  placeholder="Enter product title"
                 />
               </div>
 
@@ -1779,12 +1936,13 @@ const SingleProductUpload = React.memo(() => {
                   Description
                 </label>
                 <textarea
-                  value={variants[0]?.description || ""}
+                  value={productData.description || ""}
                   onChange={(e) =>
-                    handleVariantChange(1, "description", e.target.value)
+                    setProductData(prev => ({ ...prev, description: e.target.value }))
                   }
-                  className="w-full max-w-[500px] h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
-                  placeholder="Enter product description here..."
+                  rows={4}
+                  className="w-full max-w-[400px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                  placeholder="Enter product description"
                 />
               </div>
 
@@ -1794,48 +1952,48 @@ const SingleProductUpload = React.memo(() => {
                   Manufacturing Details
                 </label>
                 <textarea
-                  value={variants[0]?.manufacturingDetails || ""}
+                  value={productData.manufacturingDetails || ""}
                   onChange={(e) =>
-                    handleVariantChange(
-                      1,
-                      "manufacturingDetails",
-                      e.target.value
-                    )
+                    setProductData(prev => ({ ...prev, manufacturingDetails: e.target.value }))
                   }
-                  className="w-full max-w-[500px] h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
-                  placeholder="Enter manufacturing details"
+                  rows={3}
+                  className="w-full max-w-[400px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                  placeholder="Enter manufacturing details (model height, etc.)"
                 />
               </div>
 
-              {/* Shipping Returns and Exchange */}
+              {/* Shipping and Returns */}
               <div>
                 <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
-                  Shipping Returns and Exchange
+                  Shipping and Returns
                 </label>
                 <textarea
-                  value={variants[0]?.shippingReturns || ""}
+                  value={productData.shippingReturns || ""}
                   onChange={(e) =>
-                    handleVariantChange(1, "shippingReturns", e.target.value)
+                    setProductData(prev => ({ ...prev, shippingReturns: e.target.value }))
                   }
-                  className="w-full max-w-[500px] h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                  rows={3}
+                  className="w-full max-w-[400px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
                   placeholder="Enter shipping and returns policy"
                 />
               </div>
 
-              {/* Pricing */}
-              <div className="grid grid-cols-2 gap-6 max-w-[400px]">
+              {/* Pricing Section */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
                     Regular Price
                   </label>
                   <input
                     type="number"
-                    value={variants[0]?.regularPrice || ""}
+                    value={productData.regularPrice || ""}
                     onChange={(e) =>
-                      handleVariantChange(1, "regularPrice", e.target.value)
+                      setProductData(prev => ({ ...prev, regularPrice: e.target.value }))
                     }
                     className="w-full h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
                     placeholder="0.00"
+                    min="0"
+                    step="0.01"
                   />
                 </div>
                 <div>
@@ -1844,15 +2002,40 @@ const SingleProductUpload = React.memo(() => {
                   </label>
                   <input
                     type="number"
-                    value={variants[0]?.salePrice || ""}
+                    value={productData.salePrice || ""}
                     onChange={(e) =>
-                      handleVariantChange(1, "salePrice", e.target.value)
+                      setProductData(prev => ({ ...prev, salePrice: e.target.value }))
                     }
                     className="w-full h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
                     placeholder="0.00"
+                    min="0"
+                    step="0.01"
                   />
                 </div>
               </div>
+
+
+
+
+
+
+
+              {/* Legacy title field - keeping for compatibility */}
+              <div style={{ display: 'none' }}>
+                <input
+                  type="text"
+                  value={variants[0]?.title || ""}
+                  onChange={(e) =>
+                    handleVariantChange(1, "title", e.target.value)
+                  }
+                  className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                  placeholder="Enter title"
+                />
+              </div>
+
+
+
+
 
               {/* Stock Size */}
               <div className="space-y-4">
@@ -1994,6 +2177,58 @@ const SingleProductUpload = React.memo(() => {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Meta Data Fields */}
+              <div className="space-y-4 mt-8">
+                <h3 className="text-lg font-semibold text-[#111111] font-['Montserrat']">
+                  Meta Data Fields
+                </h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
+                    Meta Title
+                  </label>
+                  <input
+                    type="text"
+                    value={productData.metaTitle || ""}
+                    onChange={(e) =>
+                      setProductData(prev => ({ ...prev, metaTitle: e.target.value }))
+                    }
+                    className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                    placeholder="Enter meta title for SEO"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
+                    Meta Description
+                  </label>
+                  <textarea
+                    value={productData.metaDescription || ""}
+                    onChange={(e) =>
+                      setProductData(prev => ({ ...prev, metaDescription: e.target.value }))
+                    }
+                    rows={3}
+                    className="w-full max-w-[400px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                    placeholder="Enter meta description for SEO"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
+                    Slug URL
+                  </label>
+                  <input
+                    type="text"
+                    value={productData.slugUrl || ""}
+                    onChange={(e) =>
+                      setProductData(prev => ({ ...prev, slugUrl: e.target.value }))
+                    }
+                    className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                    placeholder="product-slug-url"
+                  />
+                </div>
               </div>
             </div>
 
@@ -2425,73 +2660,7 @@ const SingleProductUpload = React.memo(() => {
             </div>
           </div>
 
-          {/* Meta Data Section */}
-          <div className="mt-12 py-6 border-t border-gray-200">
-            <div className="flex items-center gap-4 mb-6">
-              <button className="bg-[#000AFF] text-white px-4 py-2.5 rounded-lg text-[14px] font-['Montserrat'] shadow-sm">
-                add meta data
-              </button>
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      handleExcelFileUpload(file);
-                    }
-                  }}
-                />
-                <div className="bg-[#000AFF] text-white px-4 py-2.5 rounded-lg flex items-center gap-2 text-[14px] font-['Montserrat'] shadow-sm hover:bg-blue-700 transition-colors">
-                  <Plus className="h-5 w-5" />
-                  {excelFile ? `${excelFile.name}` : "IMPORT EXCEL"}
-                </div>
-              </label>
-            </div>
 
-            <div className="grid grid-cols-3 gap-6">
-              <div>
-                <label className="block text-[14px] font-medium text-[#111111] font-['Montserrat'] mb-2">
-                  meta title
-                </label>
-                <input
-                  type="text"
-                  value={productData.metaTitle}
-                  onChange={(e) =>
-                    handleProductDataChange("metaTitle", e.target.value)
-                  }
-                  className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
-                />
-              </div>
-              <div>
-                <label className="block text-[14px] font-medium text-[#111111] font-['Montserrat'] mb-2">
-                  meta description
-                </label>
-                <input
-                  type="text"
-                  value={productData.metaDescription}
-                  onChange={(e) =>
-                    handleProductDataChange("metaDescription", e.target.value)
-                  }
-                  className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
-                />
-              </div>
-              <div>
-                <label className="block text-[14px] font-medium text-[#111111] font-['Montserrat'] mb-2">
-                  slug URL
-                </label>
-                <input
-                  type="text"
-                  value={productData.slugUrl}
-                  onChange={(e) =>
-                    handleProductDataChange("slugUrl", e.target.value)
-                  }
-                  className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
-                />
-              </div>
-            </div>
-          </div>
 
           {/* Filter Section for Variant 1 */}
           <div className="mt-12 py-6 border-t border-gray-200">
@@ -3170,6 +3339,58 @@ const SingleProductUpload = React.memo(() => {
                           )}
                         </>
                       )}
+                    </div>
+
+                    {/* Meta Data Fields for Variant */}
+                    <div className="space-y-4 mt-6">
+                      <h3 className="text-lg font-semibold text-[#111111] font-['Montserrat']">
+                        Meta Data Fields
+                      </h3>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
+                          Meta Title
+                        </label>
+                        <input
+                          type="text"
+                          value={variant.metaTitle || ""}
+                          onChange={(e) =>
+                            handleVariantChange(variantNumber, "metaTitle", e.target.value)
+                          }
+                          className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                          placeholder="Enter meta title for SEO"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
+                          Meta Description
+                        </label>
+                        <textarea
+                          value={variant.metaDescription || ""}
+                          onChange={(e) =>
+                            handleVariantChange(variantNumber, "metaDescription", e.target.value)
+                          }
+                          rows={3}
+                          className="w-full max-w-[400px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                          placeholder="Enter meta description for SEO"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-[#111111] font-['Montserrat'] mb-2">
+                          Slug URL
+                        </label>
+                        <input
+                          type="text"
+                          value={variant.slugUrl || ""}
+                          onChange={(e) =>
+                            handleVariantChange(variantNumber, "slugUrl", e.target.value)
+                          }
+                          className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
+                          placeholder="product-slug-url"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -4041,13 +4262,17 @@ const SingleProductUpload = React.memo(() => {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
+                  disabled={categoriesLoading}
+                  className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat'] disabled:opacity-50"
                 >
-                  <option value="">Select Category</option>
-                  <option value="men">Men</option>
-                  <option value="women">Women</option>
-                  <option value="kids">Kids</option>
-                  <option value="accessories">Accessories</option>
+                  <option value="">
+                    {categoriesLoading ? "Loading categories..." : "Select Category"}
+                  </option>
+                  {categories && Array.isArray(categories) && categories.map((category) => (
+                    <option key={category._id || category.id} value={category._id || category.id}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -4057,32 +4282,22 @@ const SingleProductUpload = React.memo(() => {
                 <select
                   value={selectedSubCategory}
                   onChange={(e) => setSelectedSubCategory(e.target.value)}
-                  className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
+                  disabled={subCategoriesLoading || !selectedCategory}
+                  className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat'] disabled:opacity-50"
                 >
-                  <option value="">Select Subcategory</option>
-                  {selectedCategory === "men" && (
-                    <>
-                      <option value="jacket">Jacket</option>
-                      <option value="shirt">Shirt</option>
-                      <option value="pants">Pants</option>
-                      <option value="shoes">Shoes</option>
-                    </>
-                  )}
-                  {selectedCategory === "women" && (
-                    <>
-                      <option value="dress">Dress</option>
-                      <option value="top">Top</option>
-                      <option value="skirt">Skirt</option>
-                      <option value="shoes">Shoes</option>
-                    </>
-                  )}
-                  {selectedCategory === "kids" && (
-                    <>
-                      <option value="clothing">Clothing</option>
-                      <option value="shoes">Shoes</option>
-                      <option value="toys">Toys</option>
-                    </>
-                  )}
+                  <option value="">
+                    {subCategoriesLoading 
+                      ? "Loading subcategories..." 
+                      : !selectedCategory 
+                        ? "Select category first"
+                        : "Select Subcategory"
+                    }
+                  </option>
+                  {subCategories && Array.isArray(subCategories) && subCategories.map((subCategory) => (
+                    <option key={subCategory._id || subCategory.id} value={subCategory._id || subCategory.id}>
+                      {subCategory.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -4096,13 +4311,31 @@ const SingleProductUpload = React.memo(() => {
           </div>
 
           {/* Action Buttons */}
-          <div className="mt-12 flex gap-4">
+          <div className="mt-12 flex gap-4 flex-wrap">
             <button
               onClick={handleSaveAsDraft}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg text-[16px] font-medium font-['Montserrat'] hover:bg-gray-600 transition-colors"
+              disabled={createLoading}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg text-[16px] font-medium font-['Montserrat'] hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save as Draft
+              {createLoading ? "Saving..." : "Save as Draft"}
             </button>
+            
+            <button
+              onClick={handlePublishNow}
+              disabled={createLoading}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg text-[16px] font-medium font-['Montserrat'] hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {createLoading ? "Publishing..." : "Publish Now"}
+            </button>
+            
+            <button
+              onClick={handleScheduleForLater}
+              disabled={createLoading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg text-[16px] font-medium font-['Montserrat'] hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {createLoading ? "Scheduling..." : "Schedule for Later"}
+            </button>
+            
             {/* Recheck Details Dropdown */}
             <div className="relative" ref={recheckDropdownRef}>
               <button

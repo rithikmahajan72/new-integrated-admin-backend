@@ -9,34 +9,76 @@ const mongoose = require("mongoose");
  */
 exports.createItem = async (req, res, newItemId) => {
   try {
-    if (!req.body.imageUrl) {
-      return res.status(400).json(ApiResponse(null, "Image is required", false, 400));
+    const {
+      productName,
+      title,
+      description,
+      manufacturingDetails,
+      shippingAndReturns,
+      regularPrice,
+      salePrice,
+      returnable = true,
+      metaTitle,
+      metaDescription,
+      slugUrl,
+      categoryId,
+      subCategoryId,
+      status = 'draft',
+      platformPricing = {},
+      stockSizeOption = 'sizes',
+      sizes = [],
+      variants = [],
+      alsoShowInOptions = {},
+      sizeChart = {},
+      commonSizeChart = {},
+      filters = [],
+      tags = [],
+      // Legacy fields for backward compatibility
+      name,
+      price,
+      stock,
+      brand,
+      style,
+      occasion,
+      fit,
+      material,
+      discountPrice,
+      imageUrl
+    } = req.body;
+
+    // Validate required fields
+    if (!productName && !name) {
+      return res.status(400).json(ApiResponse(null, "Product name is required", false, 400));
     }
 
-    const {
-      name, description, price, stock, brand, style, occasion,
-      fit, material, discountPrice, subCategoryId, categoryId,
-      imageUrl, filters
-    } = req.body;
+    if (!categoryId || !subCategoryId) {
+      return res.status(400).json(ApiResponse(null, "Category and subcategory are required", false, 400));
+    }
 
     const subCategory = await SubCategory.findById(subCategoryId);
     if (!subCategory) {
-      return res.status(500).json(ApiResponse(null, "SubCategory not found", false, 500));
+      return res.status(400).json(ApiResponse(null, "SubCategory not found", false, 400));
     }
 
-    // Generate unique productId
+    // Generate unique productId using the new format
     const productId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Parse and format filters if they exist
     let formattedFilters = [];
-    if (filters) {
+    if (filters && Array.isArray(filters)) {
+      formattedFilters = filters.map(filter => ({
+        key: filter.key,
+        value: filter.value,
+        code: filter.code || ""
+      }));
+    } else if (filters && typeof filters === 'string') {
       try {
-        const parsedFilters = JSON.parse(filters); // Parse the stringified filters
+        const parsedFilters = JSON.parse(filters);
         if (Array.isArray(parsedFilters)) {
           formattedFilters = parsedFilters.map(filter => ({
             key: filter.key,
             value: filter.value,
-            code: filter.code || "" // Default to empty string if code is missing
+            code: filter.code || ""
           }));
         }
       } catch (error) {
@@ -45,26 +87,110 @@ exports.createItem = async (req, res, newItemId) => {
       }
     }
 
-    const newItem = new Item({
+    // Prepare item data with new structure
+    const itemData = {
       _id: newItemId,
       productId,
-      name,
-      description,
-      price: Number(price), // Convert to number
-      stock: Number(stock),
-      subCategoryId,
-      brand,
-      style: style ? style.split(",") : [], // Convert comma-separated string to array
-      occasion: occasion ? occasion.split(",") : [],
-      fit: fit ? fit.split(",") : [],
-      material: material ? material.split(",") : [],
-      discountPrice: discountPrice ? Number(discountPrice) : undefined,
+      
+      // Use new fields or fall back to legacy fields
+      productName: productName || name,
+      title: title || productName || name,
+      description: description || '',
+      manufacturingDetails: manufacturingDetails || '',
+      shippingAndReturns: typeof shippingAndReturns === 'object' ? shippingAndReturns : {
+        shippingDetails: [],
+        returnPolicy: [],
+        additionalInfo: shippingAndReturns || ''
+      },
+      
+      // Pricing
+      regularPrice: Number(regularPrice || price || 0),
+      salePrice: Number(salePrice || discountPrice || 0),
+      returnable: Boolean(returnable),
+      
+      // Platform pricing for 5 different platforms
+      platformPricing: {
+        yoraa: {
+          enabled: true,
+          price: Number(regularPrice || price || 0),
+          salePrice: Number(salePrice || discountPrice || 0),
+          ...platformPricing.yoraa
+        },
+        myntra: {
+          enabled: platformPricing.myntra?.enabled || false,
+          price: Number(platformPricing.myntra?.price || regularPrice || price || 0),
+          salePrice: Number(platformPricing.myntra?.salePrice || salePrice || discountPrice || 0)
+        },
+        amazon: {
+          enabled: platformPricing.amazon?.enabled || false,
+          price: Number(platformPricing.amazon?.price || regularPrice || price || 0),
+          salePrice: Number(platformPricing.amazon?.salePrice || salePrice || discountPrice || 0)
+        },
+        flipkart: {
+          enabled: platformPricing.flipkart?.enabled || false,
+          price: Number(platformPricing.flipkart?.price || regularPrice || price || 0),
+          salePrice: Number(platformPricing.flipkart?.salePrice || salePrice || discountPrice || 0)
+        },
+        nykaa: {
+          enabled: platformPricing.nykaa?.enabled || false,
+          price: Number(platformPricing.nykaa?.price || regularPrice || price || 0),
+          salePrice: Number(platformPricing.nykaa?.salePrice || salePrice || discountPrice || 0)
+        }
+      },
+      
+      // Categories
       categoryId,
-      imageUrl,
-      filters: formattedFilters
-    });
+      subCategoryId,
+      
+      // Size and stock management
+      stockSizeOption,
+      sizes: sizes.map(size => ({
+        size: size.size,
+        quantity: parseInt(size.quantity) || 0,
+        hsnCode: size.hsnCode || '',
+        sku: size.sku || `${categoryId}/${subCategoryId}/${productName || name}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getDate()).padStart(2, '0')}/${Math.random().toString().slice(2, 10)}`,
+        barcode: size.barcode || '',
+        platformPricing: size.platformPricing || {}
+      })),
+      
+      // Variants
+      variants: variants.length > 0 ? variants : (imageUrl ? [{
+        name: 'Default',
+        images: [imageUrl],
+        videos: [],
+        colors: [],
+        additionalData: {}
+      }] : []),
+      
+      // Additional options
+      alsoShowInOptions,
+      sizeChart,
+      commonSizeChart,
+      filters: formattedFilters,
+      tags: Array.isArray(tags) ? tags : [],
+      status,
+      
+      // Meta data
+      metaTitle: metaTitle || productName || name,
+      metaDescription: metaDescription || description || '',
+      slugUrl: slugUrl || (productName || name).toLowerCase().replace(/\s+/g, '-'),
+      
+      // Legacy fields for backward compatibility
+      name: productName || name,
+      price: Number(regularPrice || price || 0),
+      stock: Number(stock || sizes.reduce((total, size) => total + (parseInt(size.quantity) || 0), 0) || 0),
+      brand,
+      style: style ? (Array.isArray(style) ? style : style.split(",")) : [],
+      occasion: occasion ? (Array.isArray(occasion) ? occasion : occasion.split(",")) : [],
+      fit: fit ? (Array.isArray(fit) ? fit : fit.split(",")) : [],
+      material: material ? (Array.isArray(material) ? material : material.split(",")) : [],
+      discountPrice: Number(salePrice || discountPrice || 0),
+      imageUrl: imageUrl || variants[0]?.images?.[0] || ''
+    };
 
+    const newItem = new Item(itemData);
     await newItem.save();
+    
     res.status(201).json(ApiResponse(newItem, "Item created successfully", true, 201));
   } catch (err) {
     console.error(err);

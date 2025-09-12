@@ -48,6 +48,7 @@ import ManageBannersOnRewards from "./pages/ManageBannersOnRewards";
 import ProductBundling from "./pages/ProductBundling";
 import ArrangementControl from "./pages/ArrangementControl";
 import NewPartner from "./pages/NewPartner";
+
 import FaqManagement from "./pages/FaqManagement";
 import CollectCommunicationPreferences from "./pages/Collect communication preferences";
 import CollectProfileVisibilityData from "./pages/collect Profile visibility data";
@@ -94,8 +95,7 @@ const App = () => {
         {/* ===== AUTHENTICATION ROUTES (without Layout) ===== */}
         <Route path="/auth" element={<AuthFlow />} />
 
-        {/* ===== TEST ROUTE ===== */}
-        <Route path="/test" element={<div className="p-8"><h1 className="text-2xl">Test Route - Navigation Works!</h1></div>} />
+
 
         {/* ===== DEMO ROUTES ===== */}
         <Route path="/profile-modal-demo" element={<ProfileModalDemo />} />
@@ -135,6 +135,7 @@ const App = () => {
 
           {/* ===== PRODUCT MANAGEMENT ===== */}
           <Route path="/manage-items" element={<ManageItems />} />
+
           <Route path="/products" element={<Products />} />
           <Route path="/upload-category" element={<UploadCategory />} />
           <Route path="/upload-category-simple" element={<UploadCategorySimple />} />
@@ -143,6 +144,7 @@ const App = () => {
             path="/single-product-upload"
             element={<SingleProductUpload />}
           />
+
 
           {/* ===== REVIEWS & RATINGS ===== */}
           <Route path="/manage-reviews" element={<ManageReviews />} />

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { itemAPI } from '../../api/endpoints';
+import { itemAPI, categoryAPI, subCategoryAPI } from '../../api/endpoints';
 import { apiCall } from '../../api/utils';
 
 // Async thunks for product operations
@@ -95,6 +95,88 @@ export const fetchProductDetails = createAsyncThunk(
   }
 );
 
+export const createProduct = createAsyncThunk(
+  'products/createProduct',
+  async (productData, { rejectWithValue }) => {
+    try {
+      const result = await apiCall(itemAPI.createItem, productData);
+      if (result.success) {
+        return result.data;
+      } else {
+        return rejectWithValue(result.message);
+      }
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to create product');
+    }
+  }
+);
+
+export const updateProduct = createAsyncThunk(
+  'products/updateProduct',
+  async ({ productId, productData }, { rejectWithValue }) => {
+    try {
+      const result = await apiCall(itemAPI.updateItem, productId, productData);
+      if (result.success) {
+        return result.data;
+      } else {
+        return rejectWithValue(result.message);
+      }
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to update product');
+    }
+  }
+);
+
+export const deleteProduct = createAsyncThunk(
+  'products/deleteProduct',
+  async (productId, { rejectWithValue }) => {
+    try {
+      const result = await apiCall(itemAPI.deleteItem, productId);
+      if (result.success) {
+        return { productId, data: result.data };
+      } else {
+        return rejectWithValue(result.message);
+      }
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to delete product');
+    }
+  }
+);
+
+export const fetchCategories = createAsyncThunk(
+  'products/fetchCategories',
+  async (_, { rejectWithValue }) => {
+    try {
+      const result = await apiCall(categoryAPI.getAllCategories);
+      if (result.success) {
+        return result.data;
+      } else {
+        return rejectWithValue(result.message);
+      }
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to fetch categories');
+    }
+  }
+);
+
+export const fetchSubCategories = createAsyncThunk(
+  'products/fetchSubCategories',
+  async (categoryId, { rejectWithValue }) => {
+    try {
+      const result = categoryId 
+        ? await apiCall(subCategoryAPI.getSubCategoriesByCategory, categoryId)
+        : await apiCall(subCategoryAPI.getAllSubCategories);
+      if (result.success) {
+        return result.data;
+      } else {
+        return rejectWithValue(result.message);
+      }
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to fetch subcategories');
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   // Products list
@@ -140,6 +222,22 @@ const initialState = {
   // Featured/recommended products
   featuredProducts: [],
   recommendedProducts: [],
+  
+  // Product creation/editing
+  createLoading: false,
+  updateLoading: false,
+  deleteLoading: false,
+  
+  // Categories and subcategories for product forms
+  categories: [],
+  subCategories: [],
+  categoriesLoading: false,
+  subCategoriesLoading: false,
+  categoriesError: null,
+  subCategoriesError: null,
+  
+  // Success messages
+  successMessage: null,
   
   lastUpdated: null,
 };
@@ -255,6 +353,18 @@ const productsSlice = createSlice({
       state.currentProduct = null;
       state.currentProductError = null;
     },
+    
+    clearSuccessMessage: (state) => {
+      state.successMessage = null;
+    },
+    
+    setSelectedCategory: (state, action) => {
+      state.filters.category = action.payload;
+    },
+    
+    setSelectedSubCategory: (state, action) => {
+      state.filters.subCategory = action.payload;
+    },
   },
   
   extraReducers: (builder) => {
@@ -358,6 +468,93 @@ const productsSlice = createSlice({
       .addCase(fetchProductDetails.rejected, (state, action) => {
         state.detailsLoading = false;
         state.detailsError = action.payload;
+      })
+      
+      // Create product cases
+      .addCase(createProduct.pending, (state) => {
+        state.createLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(createProduct.fulfilled, (state, action) => {
+        state.createLoading = false;
+        state.items.unshift(action.payload);
+        state.totalItems += 1;
+        state.successMessage = 'Product created successfully';
+        state.lastUpdated = new Date().toISOString();
+      })
+      .addCase(createProduct.rejected, (state, action) => {
+        state.createLoading = false;
+        state.error = action.payload;
+      })
+      
+      // Update product cases
+      .addCase(updateProduct.pending, (state) => {
+        state.updateLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(updateProduct.fulfilled, (state, action) => {
+        state.updateLoading = false;
+        const index = state.items.findIndex(item => item.id === action.payload.id);
+        if (index >= 0) {
+          state.items[index] = action.payload;
+        }
+        if (state.currentProduct && state.currentProduct.id === action.payload.id) {
+          state.currentProduct = action.payload;
+        }
+        state.successMessage = 'Product updated successfully';
+        state.lastUpdated = new Date().toISOString();
+      })
+      .addCase(updateProduct.rejected, (state, action) => {
+        state.updateLoading = false;
+        state.error = action.payload;
+      })
+      
+      // Delete product cases
+      .addCase(deleteProduct.pending, (state) => {
+        state.deleteLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(deleteProduct.fulfilled, (state, action) => {
+        state.deleteLoading = false;
+        state.items = state.items.filter(item => item.id !== action.payload.productId);
+        state.totalItems -= 1;
+        state.successMessage = 'Product deleted successfully';
+        state.lastUpdated = new Date().toISOString();
+      })
+      .addCase(deleteProduct.rejected, (state, action) => {
+        state.deleteLoading = false;
+        state.error = action.payload;
+      })
+      
+      // Fetch categories cases
+      .addCase(fetchCategories.pending, (state) => {
+        state.categoriesLoading = true;
+        state.categoriesError = null;
+      })
+      .addCase(fetchCategories.fulfilled, (state, action) => {
+        state.categoriesLoading = false;
+        state.categories = action.payload;
+      })
+      .addCase(fetchCategories.rejected, (state, action) => {
+        state.categoriesLoading = false;
+        state.categoriesError = action.payload;
+      })
+      
+      // Fetch subcategories cases
+      .addCase(fetchSubCategories.pending, (state) => {
+        state.subCategoriesLoading = true;
+        state.subCategoriesError = null;
+      })
+      .addCase(fetchSubCategories.fulfilled, (state, action) => {
+        state.subCategoriesLoading = false;
+        state.subCategories = action.payload;
+      })
+      .addCase(fetchSubCategories.rejected, (state, action) => {
+        state.subCategoriesLoading = false;
+        state.subCategoriesError = action.payload;
       });
   },
 });
@@ -376,6 +573,9 @@ export const {
   updateProductRating,
   clearError,
   clearCurrentProduct,
+  clearSuccessMessage,
+  setSelectedCategory,
+  setSelectedSubCategory,
 } = productsSlice.actions;
 
 // Selectors
@@ -395,6 +595,18 @@ export const selectProductsPagination = (state) => ({
 });
 export const selectRecentlyViewed = (state) => state.products.recentlyViewed;
 export const selectProductDetails = (state, productId) => state.products.productDetails[productId];
+
+// New selectors for product creation/editing
+export const selectCreateLoading = (state) => state.products.createLoading;
+export const selectUpdateLoading = (state) => state.products.updateLoading;
+export const selectDeleteLoading = (state) => state.products.deleteLoading;
+export const selectSuccessMessage = (state) => state.products.successMessage;
+export const selectCategories = (state) => state.products.categories;
+export const selectSubCategories = (state) => state.products.subCategories;
+export const selectCategoriesLoading = (state) => state.products.categoriesLoading;
+export const selectSubCategoriesLoading = (state) => state.products.subCategoriesLoading;
+export const selectCategoriesError = (state) => state.products.categoriesError;
+export const selectSubCategoriesError = (state) => state.products.subCategoriesError;
 
 // Export reducer
 export default productsSlice.reducer;

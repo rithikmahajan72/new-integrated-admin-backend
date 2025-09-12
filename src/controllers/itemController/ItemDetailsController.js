@@ -72,12 +72,33 @@ exports.createItemDetails = async (req, res) => {
     let itemDetailsData = req.body.data ? JSON.parse(req.body.data) : {};
     console.log("[Server] Parsed itemDetailsData:", itemDetailsData);
 
-    // Ensure arrays are properly formatted
+    // Ensure arrays are properly formatted for new structure
     itemDetailsData.fitDetails = Array.isArray(itemDetailsData.fitDetails) ? itemDetailsData.fitDetails : [];
     itemDetailsData.shippingAndReturns = itemDetailsData.shippingAndReturns || {
       shippingDetails: [],
       returnPolicy: [],
+      additionalInfo: ''
     };
+
+    // Handle new pricing structure with 5 platforms
+    itemDetailsData.platformPricing = itemDetailsData.platformPricing || {
+      yoraa: { enabled: true, price: 0, salePrice: 0 },
+      myntra: { enabled: false, price: 0, salePrice: 0 },
+      amazon: { enabled: false, price: 0, salePrice: 0 },
+      flipkart: { enabled: false, price: 0, salePrice: 0 },
+      nykaa: { enabled: false, price: 0, salePrice: 0 }
+    };
+
+    // Handle size management with new structure
+    itemDetailsData.stockSizeOption = itemDetailsData.stockSizeOption || 'sizes';
+    itemDetailsData.sizes = Array.isArray(itemDetailsData.sizes) ? itemDetailsData.sizes.map(size => ({
+      size: size.size,
+      quantity: parseInt(size.quantity) || 0,
+      hsnCode: size.hsnCode || '',
+      sku: size.sku || `${itemExists.categoryId}/${itemExists.subCategoryId}/${itemExists.productName || itemExists.name}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getDate()).padStart(2, '0')}/${Math.random().toString().slice(2, 10)}`,
+      barcode: size.barcode || '',
+      platformPricing: size.platformPricing || {}
+    })) : [];
 
     // Parse the colors field from req.body.colors
     const colorNames = req.body.colors ? JSON.parse(req.body.colors) : [];
@@ -87,17 +108,19 @@ exports.createItemDetails = async (req, res) => {
     const colors = await processMediaUploads(req.files, itemExists.subCategoryId, itemId, colorNames);
     console.log("[Server] Colors from processMediaUploads:", colors);
 
-    // Merge sizes from itemDetailsData into the colors array
+    // Merge sizes from itemDetailsData into the colors array with new structure
     if (itemDetailsData.colors) {
       itemDetailsData.colors.forEach(dataColor => {
         const colorEntry = colors.find(c => c.color === dataColor.color);
         if (colorEntry) {
           colorEntry.sizes = dataColor.sizes || [];
+          colorEntry.platformPricing = dataColor.platformPricing || {};
         } else {
           colors.push({
             color: dataColor.color,
             images: [],
             sizes: dataColor.sizes || [],
+            platformPricing: dataColor.platformPricing || {}
           });
         }
       });

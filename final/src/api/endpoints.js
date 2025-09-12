@@ -30,9 +30,9 @@ export const itemAPI = {
   getItemsBySubCategory: (subCategoryId) => API.get(`/api/items/subcategory/${subCategoryId}`),
   
   // Item management (admin)
-  createItem: (itemData) => API.post('/api/items', itemData),
-  updateItem: (itemId, itemData) => API.put(`/api/items/${itemId}`, itemData),
-  deleteItem: (itemId) => API.delete(`/api/items/${itemId}`),
+  createItem: (itemData) => API.post('/api/products', itemData), // Updated to use products endpoint
+  updateItem: (itemId, itemData) => API.put(`/api/products/${itemId}`, itemData), // Updated to use products endpoint
+  deleteItem: (itemId) => API.delete(`/api/products/${itemId}`), // Updated to use products endpoint
   
   // Item details
   getItemDetails: (itemId) => API.get(`/api/item-details/${itemId}`),

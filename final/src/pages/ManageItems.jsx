@@ -287,7 +287,8 @@ const ManageItems = memo(() => {
   const state = useManageItemsState();
   const modalState = useModalState();
 
-  const [sampleItems, setSampleItems] = useState(SAMPLE_ITEMS);
+  // Use SAMPLE_ITEMS directly instead of state to avoid unnecessary re-renders
+  const sampleItems = useMemo(() => SAMPLE_ITEMS, []);
 
   // Data loading effect - optimized with reduced dependencies
   useEffect(() => {
@@ -378,7 +379,11 @@ const ManageItems = memo(() => {
     };
   }, [
     state.statusFilter,
-    // Remove the setter functions from dependencies as they're stable
+    state.setStatusFilter,
+    state.setShowDraftsOnly,
+    state.setShowLiveOnly,
+    state.setShowScheduledOnly,
+    state.setIsFilterDropdownOpen,
   ]);
 
   // Dropdown click outside handler
@@ -635,6 +640,17 @@ const ManageItems = memo(() => {
     modalState.itemToDelete?.id,
   ]);
 
+  // Meta data input change handler
+  const handleMetaInputChange = useCallback(
+    (field, value) => {
+      modalState.setMetaFormData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    [modalState.setMetaFormData]
+  );
+
   // Optimized metadata handlers
   const metaDataHandlers = useMemo(() => {
     const handleViewMetaData = (item) => {
@@ -678,16 +694,6 @@ const ManageItems = memo(() => {
       modalState.setIsMetaDataSuccessModalOpen(false);
     };
 
-    const handleMetaInputChange = useCallback(
-      (field, value) => {
-        modalState.setMetaFormData((prev) => ({
-          ...prev,
-          [field]: value,
-        }));
-      },
-      [modalState.setMetaFormData]
-    );
-
     return {
       handleViewMetaData,
       handleCloseMetaData,
@@ -695,73 +701,62 @@ const ManageItems = memo(() => {
       handleCloseMetaDataSuccess,
       handleMetaInputChange,
     };
-  }, [modalState.selectedItemForMeta?.id]);
+  }, [modalState.selectedItemForMeta?.id, handleMetaInputChange]);
 
-  // Optimized item action handlers with useCallback
-  const itemActionHandlers = useMemo(() => {
-    const handleItemAction = useCallback(
-      (itemId, action, value) => {
-        console.log(`${action} for item ${itemId}:`, value);
+  // Optimized item action handlers
+  const handleItemAction = useCallback(
+    (itemId, action, value) => {
+      console.log(`${action} for item ${itemId}:`, value);
 
-        // Check if it's a sample item (ids 1, 2, 3)
-        const sampleItemIndex = sampleItems.findIndex(
-          (item) => item.id === itemId
+      // Check if it's a sample item (ids 1, 2, 3) - these are read-only
+      const sampleItemIndex = sampleItems.findIndex(
+        (item) => item.id === itemId
+      );
+      if (sampleItemIndex !== -1) {
+        console.log("Cannot update sample items as they are read-only");
+        return;
+      }
+
+      // Update draft items
+      const draftItemIndex = state.draftItems.findIndex(
+        (item) => item.id === itemId
+      );
+      if (draftItemIndex !== -1) {
+        const updatedDrafts = [...state.draftItems];
+        updatedDrafts[draftItemIndex] = {
+          ...updatedDrafts[draftItemIndex],
+          [action]: value,
+        };
+        state.setDraftItems(updatedDrafts);
+        localStorage.setItem(
+          "yoraa_draft_items",
+          JSON.stringify(updatedDrafts)
         );
-        if (sampleItemIndex !== -1) {
-          setSampleItems((prev) => {
-            const updated = [...prev];
-            updated[sampleItemIndex] = {
-              ...updated[sampleItemIndex],
-              [action]: value,
-            };
-            return updated;
-          });
-          return;
-        }
+        return;
+      }
 
-        // Update draft items
-        const draftItemIndex = state.draftItems.findIndex(
-          (item) => item.id === itemId
+      // Update published items
+      const publishedItemIndex = state.publishedItems.findIndex(
+        (item) => item.id === itemId
+      );
+      if (publishedItemIndex !== -1) {
+        const updatedPublished = [...state.publishedItems];
+        updatedPublished[publishedItemIndex] = {
+          ...updatedPublished[publishedItemIndex],
+          [action]: value,
+        };
+        state.setPublishedItems(updatedPublished);
+        localStorage.setItem(
+          "yoraa_published_items",
+          JSON.stringify(updatedPublished)
         );
-        if (draftItemIndex !== -1) {
-          const updatedDrafts = [...state.draftItems];
-          updatedDrafts[draftItemIndex] = {
-            ...updatedDrafts[draftItemIndex],
-            [action]: value,
-          };
-          state.setDraftItems(updatedDrafts);
-          localStorage.setItem(
-            "yoraa_draft_items",
-            JSON.stringify(updatedDrafts)
-          );
-          return;
-        }
+        return;
+      }
 
-        // Update published items
-        const publishedItemIndex = state.publishedItems.findIndex(
-          (item) => item.id === itemId
-        );
-        if (publishedItemIndex !== -1) {
-          const updatedPublished = [...state.publishedItems];
-          updatedPublished[publishedItemIndex] = {
-            ...updatedPublished[publishedItemIndex],
-            [action]: value,
-          };
-          state.setPublishedItems(updatedPublished);
-          localStorage.setItem(
-            "yoraa_published_items",
-            JSON.stringify(updatedPublished)
-          );
-          return;
-        }
-
-        console.log("Item not found in any collection");
-      },
-      [sampleItems, state.draftItems, state.publishedItems]
-    );
-
-    return { handleItemAction };
-  }, [sampleItems, state.draftItems, state.publishedItems]);
+      console.log("Item not found in any collection");
+    },
+    [sampleItems, state.draftItems, state.publishedItems, state.setDraftItems, state.setPublishedItems]
+  );
 
   // Optimized item lifecycle handlers with focused dependencies
   const lifecycleHandlers = useMemo(() => {

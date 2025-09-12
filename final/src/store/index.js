@@ -9,6 +9,7 @@ import cartSlice from './slices/cartSlice';
 import wishlistSlice from './slices/wishlistSlice';
 import productsSlice from './slices/productsSlice';
 import categoriesSlice from './slices/categoriesSlice';
+import subCategoriesSlice from './slices/subCategoriesSlice';
 import ordersSlice from './slices/ordersSlice';
 import userSlice from './slices/userSlice';
 import uiSlice from './slices/uiSlice';
@@ -44,6 +45,7 @@ const rootReducer = combineReducers({
   wishlist: wishlistSlice,
   products: productsSlice,
   categories: categoriesSlice,
+  subCategories: subCategoriesSlice,
   orders: ordersSlice,
   user: userSlice,
   ui: uiSlice,

@@ -1,8 +1,50 @@
-import React, { useState } from 'react';
-import { Search, Edit2, Trash2, ChevronDown, X, Upload, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Search, Edit2, Trash2, ChevronDown, X, Upload, Image as ImageIcon, Plus } from 'lucide-react';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 
+// Import subcategory actions
+import {
+  fetchSubCategories,
+  fetchCategoriesForSubCategory,
+  createSubCategory,
+  updateSubCategory,
+  deleteSubCategory,
+  setSearchTerm,
+  setSelectedCategory,
+  clearFilters,
+  clearSuccessMessage,
+  clearError,
+  selectFilteredSubCategories,
+  selectSubCategoriesLoading,
+  selectCategoriesForSubCategory,
+  selectCategoriesLoading,
+  selectCreateLoading,
+  selectUpdateLoading,
+  selectDeleteLoading,
+  selectSuccessMessage,
+  selectError,
+  selectSearchTerm,
+  selectSelectedCategory
+} from '../store/slices/subCategoriesSlice';
+
 const SubCategory = () => {
+  const dispatch = useDispatch();
+  const fileInputRef = useRef(null);
+
+  // Redux selectors
+  const subCategories = useSelector(selectFilteredSubCategories);
+  const subCategoriesLoading = useSelector(selectSubCategoriesLoading);
+  const categories = useSelector(selectCategoriesForSubCategory);
+  const categoriesLoading = useSelector(selectCategoriesLoading);
+  const createLoading = useSelector(selectCreateLoading);
+  const updateLoading = useSelector(selectUpdateLoading);
+  const deleteLoading = useSelector(selectDeleteLoading);
+  const successMessage = useSelector(selectSuccessMessage);
+  const error = useSelector(selectError);
+  const searchTerm = useSelector(selectSearchTerm);
+  const selectedCategory = useSelector(selectSelectedCategory);
+
   // Modal states
   const [modals, setModals] = useState({
     add: false,
@@ -13,26 +55,41 @@ const SubCategory = () => {
 
   // Form states
   const [formData, setFormData] = useState({
-    selectedCategory: 'Category',
-    selectedSubCategory: 'sub category',
-    searchTerm: '',
-    newSubCategoryName: '',
-    uploadedImage: null
+    name: '',
+    description: '',
+    categoryId: '',
+    image: null,
+    imagePreview: null
   });
 
   // SubCategory states
   const [editingSubCategory, setEditingSubCategory] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Constants
-  const SAMPLE_SUBCATEGORIES = [
-    { id: 1, category: 'men', subCategory: 'jacket', image: '/api/placeholder/208/208' },
-    { id: 2, category: 'women', subCategory: 'shirt', image: '/api/placeholder/208/208' },
-    { id: 3, category: 'Kids', subCategory: 'top', image: '/api/placeholder/208/208' }
-  ];
+  // Effects
+  useEffect(() => {
+    dispatch(fetchSubCategories());
+    dispatch(fetchCategoriesForSubCategory());
+  }, [dispatch]);
 
-  const CATEGORY_OPTIONS = ['men', 'women', 'kids'];
-  const SUBCATEGORY_OPTIONS = ['jacket', 'shirt', 'top', 'jeans', 'shorts'];
+  useEffect(() => {
+    if (successMessage) {
+      setModals(prev => ({ ...prev, success: true }));
+      setTimeout(() => {
+        dispatch(clearSuccessMessage());
+        setModals(prev => ({ ...prev, success: false }));
+      }, 3000);
+    }
+  }, [successMessage, dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      setTimeout(() => {
+        dispatch(clearError());
+      }, 5000);
+    }
+  }, [error, dispatch]);
 
   // Utility functions
   const openModal = (modalName) => {
@@ -53,13 +110,18 @@ const SubCategory = () => {
   };
 
   const resetFormData = () => {
-    setFormData(prev => ({
-      ...prev,
-      newSubCategoryName: '',
-      uploadedImage: null
-    }));
+    setFormData({
+      name: '',
+      description: '',
+      categoryId: '',
+      image: null,
+      imagePreview: null
+    });
     setEditingSubCategory(null);
     setDeleteConfirmation(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const updateFormData = (key, value) => {
@@ -72,14 +134,40 @@ const SubCategory = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        updateFormData('uploadedImage', e.target.result);
+        setFormData(prev => ({
+          ...prev,
+          image: file,
+          imagePreview: e.target.result
+        }));
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveImage = () => {
-    updateFormData('uploadedImage', null);
+    setFormData(prev => ({
+      ...prev,
+      image: null,
+      imagePreview: null
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Search and filter handlers
+  const handleSearchChange = (event) => {
+    dispatch(setSearchTerm(event.target.value));
+  };
+
+  const handleCategoryFilter = (categoryId) => {
+    dispatch(setSelectedCategory(categoryId === selectedCategory ? null : categoryId));
+    setDropdownOpen(false);
+  };
+
+  const clearAllFilters = () => {
+    dispatch(clearFilters());
+    setDropdownOpen(false);
   };
 
   // SubCategory management handlers
@@ -88,42 +176,85 @@ const SubCategory = () => {
     openModal('add');
   };
 
-  const handleSaveNewSubCategory = () => {
-    console.log('Adding new subcategory:', formData.newSubCategoryName, 'Image:', formData.uploadedImage);
-    // API call would go here
-    closeModal('add');
-    openModal('success');
-  };
+  const handleSaveNewSubCategory = async () => {
+    if (!formData.name.trim() || !formData.categoryId) {
+      return;
+    }
 
-  const handleEdit = (subCategoryId) => {
-    const subCategoryToEdit = SAMPLE_SUBCATEGORIES.find(subCat => subCat.id === subCategoryId);
-    if (subCategoryToEdit) {
-      setEditingSubCategory(subCategoryToEdit);
-      updateFormData('newSubCategoryName', subCategoryToEdit.subCategory);
-      updateFormData('uploadedImage', subCategoryToEdit.image);
-      openModal('edit');
+    const formDataToSend = new FormData();
+    formDataToSend.append('name', formData.name.trim());
+    formDataToSend.append('description', formData.description.trim());
+    formDataToSend.append('categoryId', formData.categoryId);
+    
+    if (formData.image) {
+      formDataToSend.append('image', formData.image);
+    }
+
+    try {
+      await dispatch(createSubCategory(formDataToSend)).unwrap();
+      closeModal('add');
+      resetFormData();
+    } catch (error) {
+      console.error('Error creating subcategory:', error);
     }
   };
 
-  const handleSaveEdit = () => {
-    console.log('Saving edit for subcategory:', editingSubCategory.id, 'New name:', formData.newSubCategoryName);
-    // API call would go here
-    closeModal('edit');
-    openModal('success');
+  const handleEdit = (subCategory) => {
+    setEditingSubCategory(subCategory);
+    setFormData({
+      name: subCategory.name,
+      description: subCategory.description || '',
+      categoryId: subCategory.categoryId,
+      image: null,
+      imagePreview: subCategory.imageUrl || null
+    });
+    openModal('edit');
   };
 
-  const handleDelete = (subCategoryId) => {
-    const subCategoryToDelete = SAMPLE_SUBCATEGORIES.find(subCat => subCat.id === subCategoryId);
-    if (subCategoryToDelete) {
-      setDeleteConfirmation(subCategoryToDelete);
+  const handleSaveEdit = async () => {
+    if (!formData.name.trim() || !formData.categoryId || !editingSubCategory) {
+      return;
+    }
+
+    const formDataToSend = new FormData();
+    formDataToSend.append('name', formData.name.trim());
+    formDataToSend.append('description', formData.description.trim());
+    formDataToSend.append('categoryId', formData.categoryId);
+    
+    if (formData.image) {
+      formDataToSend.append('image', formData.image);
+    }
+
+    try {
+      await dispatch(updateSubCategory({
+        subCategoryId: editingSubCategory._id,
+        subCategoryData: formDataToSend
+      })).unwrap();
+      closeModal('edit');
+      resetFormData();
+    } catch (error) {
+      console.error('Error updating subcategory:', error);
     }
   };
 
-  const confirmDelete = () => {
-    console.log('Deleting subcategory:', deleteConfirmation.id);
-    // API call would go here
-    setDeleteConfirmation(null);
-    openModal('deleteSuccess');
+  const handleDelete = (subCategory) => {
+    setDeleteConfirmation(subCategory);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmation) return;
+
+    try {
+      await dispatch(deleteSubCategory(deleteConfirmation._id)).unwrap();
+      setDeleteConfirmation(null);
+      openModal('deleteSuccess');
+      setTimeout(() => {
+        closeModal('deleteSuccess');
+      }, 2000);
+    } catch (error) {
+      console.error('Error deleting subcategory:', error);
+      setDeleteConfirmation(null);
+    }
   };
 
   const handleCloseWithReset = (modalName) => {
@@ -131,11 +262,11 @@ const SubCategory = () => {
     resetFormData();
   };
 
-  // Computed values
-  const filteredSubCategories = SAMPLE_SUBCATEGORIES.filter(subCategory =>
-    subCategory.category.toLowerCase().includes(formData.searchTerm.toLowerCase()) ||
-    subCategory.subCategory.toLowerCase().includes(formData.searchTerm.toLowerCase())
-  );
+  // Get category name by ID
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(cat => cat._id === categoryId);
+    return category ? category.name : 'Unknown Category';
+  };
 
   // Component renderers
   const renderImageUploadSection = (title = "Upload image") => (
@@ -143,10 +274,10 @@ const SubCategory = () => {
       <h3 className="text-lg font-semibold text-gray-900 mb-6">{title}</h3>
       
       <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50">
-        {formData.uploadedImage ? (
+        {formData.imagePreview ? (
           <div className="space-y-4">
             <img
-              src={formData.uploadedImage}
+              src={formData.imagePreview}
               alt="SubCategory"
               className="mx-auto w-32 h-32 object-cover rounded-lg"
             />
@@ -175,6 +306,7 @@ const SubCategory = () => {
           <Upload className="h-4 w-4" />
           Upload image
           <input
+            ref={fileInputRef}
             type="file"
             className="hidden"
             accept="image/*"
@@ -185,31 +317,58 @@ const SubCategory = () => {
     </div>
   );
 
-  const renderSubCategoryInput = (title, placeholder = "Enter subcategory name") => (
-    <div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">{title}</h3>
-      
-      <input
-        type="text"
-        value={formData.newSubCategoryName}
-        onChange={(e) => updateFormData('newSubCategoryName', e.target.value)}
-        className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-        placeholder={placeholder}
-      />
+  const renderSubCategoryForm = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-6">SubCategory Details</h3>
+        
+        <div className="space-y-4">
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => updateFormData('name', e.target.value)}
+            className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+            placeholder="Enter subcategory name"
+          />
+          
+          <textarea
+            value={formData.description}
+            onChange={(e) => updateFormData('description', e.target.value)}
+            className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base resize-none"
+            placeholder="Enter subcategory description (optional)"
+            rows={3}
+          />
+          
+          <select
+            value={formData.categoryId}
+            onChange={(e) => updateFormData('categoryId', e.target.value)}
+            className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+          >
+            <option value="">Select a category</option>
+            {categories.map((category) => (
+              <option key={category._id} value={category._id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
     </div>
   );
 
-  const renderModalActions = (onSave, onCancel, saveText = "save", cancelText = "go back") => (
+  const renderModalActions = (onSave, onCancel, saveText = "Save", cancelText = "Cancel", loading = false) => (
     <div className="flex justify-center gap-4 mt-12">
       <button
         onClick={onSave}
-        className="bg-black hover:bg-gray-800 text-white font-medium py-3 px-12 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+        disabled={loading}
+        className="bg-black hover:bg-gray-800 text-white font-medium py-3 px-12 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {saveText}
+        {loading ? 'Saving...' : saveText}
       </button>
       <button
         onClick={onCancel}
-        className="text-gray-600 hover:text-gray-800 border-2 border-black rounded-xl font-medium py-3 px-12 transition-colors focus:outline-none"
+        disabled={loading}
+        className="text-gray-600 hover:text-gray-800 border-2 border-black rounded-xl font-medium py-3 px-12 transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {cancelText}
       </button>
@@ -243,14 +402,40 @@ const SubCategory = () => {
     </div>
   );
 
+  if (subCategoriesLoading) {
+    return (
+      <div className="bg-white min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading subcategories...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white min-h-screen">
+      {/* Error message */}
+      {error && (
+        <div className="mx-6 mb-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+            <span className="block sm:inline">{error}</span>
+            <button
+              onClick={() => dispatch(clearError())}
+              className="absolute top-0 bottom-0 right-0 px-4 py-3"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Container */}
       <div className="mx-6 bg-white">
         
         {/* Header */}
         <div className="py-8 px-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-8">Create Subcategory</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-8">Manage Subcategories</h1>
           
           {/* Controls Section */}
           <div className="flex items-center gap-6 justify-between">
@@ -264,46 +449,58 @@ const SubCategory = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search"
-                  value={formData.searchTerm}
-                  onChange={(e) => updateFormData('searchTerm', e.target.value)}
+                  placeholder="Search subcategories..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
                   className="block w-80 pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
-              {/* Category Dropdown */}
+              {/* Category Filter Dropdown */}
               <div className="relative">
-                <select
-                  value={formData.selectedCategory}
-                  onChange={(e) => updateFormData('selectedCategory', e.target.value)}
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-8 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-8 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48 text-left flex items-center justify-between"
                 >
-                  <option value="Category" disabled>Category</option>
-                  {CATEGORY_OPTIONS.map((option, index) => (
-                    <option key={index} value={option}>{option}</option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                  <span>
+                    {selectedCategory 
+                      ? getCategoryName(selectedCategory)
+                      : 'All Categories'
+                    }
+                  </span>
                   <ChevronDown className="h-4 w-4 text-gray-400" />
-                </div>
+                </button>
+                
+                {dropdownOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-10">
+                    <button
+                      onClick={() => handleCategoryFilter(null)}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50 first:rounded-t-lg"
+                    >
+                      All Categories
+                    </button>
+                    {categories.map((category) => (
+                      <button
+                        key={category._id}
+                        onClick={() => handleCategoryFilter(category._id)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 last:rounded-b-lg"
+                      >
+                        {category.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Sub Category Dropdown */}
-              <div className="relative">
-                <select
-                  value={formData.selectedSubCategory}
-                  onChange={(e) => updateFormData('selectedSubCategory', e.target.value)}
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-8 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
+              {/* Clear Filters */}
+              {(searchTerm || selectedCategory) && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-sm text-gray-600 hover:text-gray-800 underline"
                 >
-                  <option value="sub category" disabled>sub category</option>
-                  {SUBCATEGORY_OPTIONS.map((option, index) => (
-                    <option key={index} value={option}>{option}</option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                </div>
-              </div>
+                  Clear filters
+                </button>
+              )}
             </div>
 
             {/* Add SubCategory Button */}
@@ -311,7 +508,8 @@ const SubCategory = () => {
               onClick={handleAddNewSubCategory}
               className="bg-black hover:bg-gray-800 text-white font-medium py-2.5 px-6 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 flex items-center gap-2"
             >
-              + Add subcategory
+              <Plus className="h-4 w-4" />
+              Add subcategory
             </button>
           </div>
         </div>
@@ -322,64 +520,82 @@ const SubCategory = () => {
           {/* Table Header */}
           <div className="border-2 border-gray-200 rounded-2xl overflow-hidden">
             <div className="grid grid-cols-12 gap-6 p-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-              <div className="col-span-2">
+              <div className="col-span-3">
                 <h3 className="text-sm font-semibold text-gray-800">Image</h3>
               </div>
-              <div className="col-span-4">
+              <div className="col-span-3">
                 <h3 className="text-sm font-semibold text-gray-800">Category</h3>
               </div>
-              <div className="col-span-4">
-                <h3 className="text-sm font-semibold text-gray-800">sub category</h3>
+              <div className="col-span-3">
+                <h3 className="text-sm font-semibold text-gray-800">SubCategory</h3>
               </div>
               <div className="col-span-2">
-                <h3 className="text-sm font-semibold text-gray-800">Action</h3>
+                <h3 className="text-sm font-semibold text-gray-800">Description</h3>
+              </div>
+              <div className="col-span-1">
+                <h3 className="text-sm font-semibold text-gray-800">Actions</h3>
               </div>
             </div>
 
             {/* SubCategory Rows */}
             <div className="divide-y divide-gray-200">
-              {filteredSubCategories.map((subCategory) => (
-                <div key={subCategory.id} className="grid grid-cols-12 gap-6 p-4 items-center hover:bg-gray-50 transition-colors duration-150">
+              {subCategories.map((subCategory) => (
+                <div key={subCategory._id} className="grid grid-cols-12 gap-6 p-4 items-center hover:bg-gray-50 transition-colors duration-150">
                   
                   {/* Image Column */}
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
-                      <img
-                        src={subCategory.image}
-                        alt={subCategory.subCategory}
-                        className="w-full h-full object-cover"
-                      />
+                      {subCategory.imageUrl ? (
+                        <img
+                          src={subCategory.imageUrl}
+                          alt={subCategory.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Category Column */}
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <p className="text-base font-medium text-gray-900">
-                      {subCategory.category}
+                      {getCategoryName(subCategory.categoryId)}
                     </p>
                   </div>
 
                   {/* SubCategory Column */}
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <p className="text-base font-medium text-gray-900">
-                      {subCategory.subCategory}
+                      {subCategory.name}
+                    </p>
+                  </div>
+
+                  {/* Description Column */}
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-600">
+                      {subCategory.description || 'No description'}
                     </p>
                   </div>
 
                   {/* Action Column */}
-                  <div className="col-span-2">
+                  <div className="col-span-1">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleEdit(subCategory.id)}
+                        onClick={() => handleEdit(subCategory)}
                         className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
                         title="Edit SubCategory"
+                        disabled={updateLoading}
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(subCategory.id)}
+                        onClick={() => handleDelete(subCategory)}
                         className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150"
                         title="Delete SubCategory"
+                        disabled={deleteLoading}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -390,10 +606,15 @@ const SubCategory = () => {
             </div>
 
             {/* Empty State */}
-            {filteredSubCategories.length === 0 && (
+            {subCategories.length === 0 && !subCategoriesLoading && (
               <div className="p-12 text-center text-gray-500">
-                <p className="text-lg">No subcategories found matching your search criteria.</p>
-                <p className="text-sm mt-2">Try adjusting your search terms or add a new subcategory.</p>
+                <p className="text-lg">No subcategories found.</p>
+                <p className="text-sm mt-2">
+                  {searchTerm || selectedCategory 
+                    ? 'Try adjusting your search terms or filters.'
+                    : 'Get started by adding your first subcategory.'
+                  }
+                </p>
               </div>
             )}
           </div>
@@ -403,16 +624,17 @@ const SubCategory = () => {
       {/* Add SubCategory Modal */}
       {modals.add && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
             
             {/* Modal Header */}
             <div className="relative p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900 text-center">
-                Add subcategory
+                Add SubCategory
               </h2>
               <button
                 onClick={() => handleCloseWithReset('add')}
                 className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                disabled={createLoading}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -421,12 +643,15 @@ const SubCategory = () => {
             {/* Modal Content */}
             <div className="p-8">
               <div className="grid grid-cols-2 gap-12">
-                {renderImageUploadSection()}
-                {renderSubCategoryInput("Type new subcategory")}
+                {renderImageUploadSection("Upload SubCategory Image")}
+                {renderSubCategoryForm()}
               </div>
               {renderModalActions(
                 handleSaveNewSubCategory,
-                () => handleCloseWithReset('add')
+                () => handleCloseWithReset('add'),
+                "Create SubCategory",
+                "Cancel",
+                createLoading
               )}
             </div>
           </div>
@@ -434,9 +659,9 @@ const SubCategory = () => {
       )}
 
       {/* Edit SubCategory Modal */}
-      {modals.edit && editingSubCategory && (
+      {modals.edit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
             
             {/* Modal Header */}
             <div className="relative p-6 border-b border-gray-200">
@@ -446,6 +671,7 @@ const SubCategory = () => {
               <button
                 onClick={() => handleCloseWithReset('edit')}
                 className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                disabled={updateLoading}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -454,12 +680,15 @@ const SubCategory = () => {
             {/* Modal Content */}
             <div className="p-8">
               <div className="grid grid-cols-2 gap-12">
-                {renderImageUploadSection()}
-                {renderSubCategoryInput("Edit subcategory name")}
+                {renderImageUploadSection("Update SubCategory Image")}
+                {renderSubCategoryForm()}
               </div>
               {renderModalActions(
                 handleSaveEdit,
-                () => handleCloseWithReset('edit')
+                () => handleCloseWithReset('edit'),
+                "Update SubCategory",
+                "Cancel",
+                updateLoading
               )}
             </div>
           </div>
@@ -468,22 +697,24 @@ const SubCategory = () => {
 
       {/* Success Modal */}
       {modals.success && renderSuccessModal(
-        "subcategory updated\nsuccessfully!",
-        () => handleCloseWithReset('success')
+        successMessage || "Operation completed successfully!",
+        () => closeModal('success')
       )}
 
       {/* Delete Success Modal */}
       {modals.deleteSuccess && renderSuccessModal(
-        "Subcategory deleted\nsuccessfully!",
-        () => handleCloseWithReset('deleteSuccess')
+        "SubCategory deleted successfully!",
+        () => closeModal('deleteSuccess')
       )}
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
-        isOpen={deleteConfirmation}
+        isOpen={!!deleteConfirmation}
         onClose={() => setDeleteConfirmation(null)}
         onConfirm={confirmDelete}
-        title="Are you sure you want to delete this subcategory?"
+        title={`Are you sure you want to delete "${deleteConfirmation?.name}" subcategory?`}
+        message="This action cannot be undone. All items associated with this subcategory will also be affected."
+        loading={deleteLoading}
       />
     </div>
   );
