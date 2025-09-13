@@ -175,7 +175,16 @@ export const uploadUtils = {
       console.log('Making image upload API call...');
       const response = await imageAPI.uploadSingleImage(formData, config);
       console.log('Image upload API response:', response);
-      return response;
+      
+      // Extract the URL from the response - backend returns { data: { imageUrl: "..." } }
+      const imageUrl = response?.data?.data?.imageUrl || response?.data?.imageUrl || response?.imageUrl;
+      
+      if (imageUrl) {
+        return { data: { imageUrl } }; // Return in expected format matching backend structure
+      } else {
+        console.error('No URL found in response:', response);
+        throw new Error('Upload completed but no URL returned from server');
+      }
     } catch (error) {
       console.error('Image upload failed in uploadUtils:', error);
       console.error('Error response:', error.response?.data);
@@ -209,7 +218,16 @@ export const uploadUtils = {
       console.log('Making video upload API call...');
       const response = await imageAPI.uploadSingleVideo(formData, config);
       console.log('Video upload API response:', response);
-      return response;
+      
+      // Extract the URL from the response - backend returns { data: { videoUrl: "..." } }
+      const videoUrl = response?.data?.data?.videoUrl || response?.data?.videoUrl || response?.videoUrl;
+      
+      if (videoUrl) {
+        return { data: { videoUrl } }; // Return in expected format matching backend structure
+      } else {
+        console.error('No URL found in response:', response);
+        throw new Error('Upload completed but no URL returned from server');
+      }
     } catch (error) {
       console.error('Video upload failed in uploadUtils:', error);
       console.error('Error response:', error.response?.data);

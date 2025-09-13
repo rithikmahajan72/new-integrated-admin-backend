@@ -877,8 +877,13 @@ const SingleProductUpload = React.memo(() => {
                 if (variant.id === variantId) {
                   const updatedFiles = variant[type].map((f) => {
                     if (f.id === fileData.id) {
+                      // Clean up the blob URL to prevent memory leaks
+                      if (f.url && f.url.startsWith('blob:')) {
+                        URL.revokeObjectURL(f.url);
+                      }
                       return {
                         ...f,
+                        url: serverUrl, // Update the url property to use server URL
                         serverUrl: serverUrl,
                         status: "success",
                         progress: 100,
@@ -963,8 +968,15 @@ const SingleProductUpload = React.memo(() => {
     [variants]
   );
 
-  // Handle common size chart uploads with status tracking
-  const handleCommonSizeChartUpload = useCallback((type, file) => {
+  // Handle common size chart uploads with actual file upload
+  const handleCommonSizeChartUpload = useCallback(async (type, file) => {
+    if (!file) {
+      console.warn('No file provided for common size chart upload');
+      return;
+    }
+
+    console.log(`🔄 Starting upload for common size chart ${type}:`, file.name);
+
     setCommonSizeChart((prev) => ({
       ...prev,
       [type]: file,
@@ -974,48 +986,68 @@ const SingleProductUpload = React.memo(() => {
       },
     }));
 
-    // Simulate upload progress
-    const simulateProgress = () => {
-      const interval = setInterval(() => {
-        setCommonSizeChart((prev) => {
-          const currentStatus = prev.uploadStatus[type];
-          if (currentStatus && currentStatus.progress < 100) {
-            const newProgress = Math.min(
-              currentStatus.progress + Math.random() * 25,
-              100
-            );
-            return {
-              ...prev,
-              uploadStatus: {
-                ...prev.uploadStatus,
-                [type]: {
-                  status: newProgress >= 100 ? "success" : "uploading",
-                  progress: newProgress,
-                },
-              },
-            };
-          }
-          return prev;
+    try {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please select an image file');
+      }
+
+      // Create progress callback
+      const onProgress = (progress) => {
+        console.log(`📈 Upload progress for ${type}:`, progress + '%');
+        setCommonSizeChart((prev) => ({
+          ...prev,
+          uploadStatus: {
+            ...prev.uploadStatus,
+            [type]: { status: "uploading", progress },
+          },
+        }));
+      };
+
+      // Upload the file to get server URL
+      console.log(`⬆️ Uploading ${type} file:`, file.name);
+      const result = await uploadUtils.uploadImage(file, onProgress);
+      
+      if (result && result.data && result.data.imageUrl) {
+        // Update with server URL
+        setCommonSizeChart((prev) => ({
+          ...prev,
+          [type]: result.data.imageUrl, // Store the server URL instead of file object
+          uploadStatus: {
+            ...prev.uploadStatus,
+            [type]: { status: "success", progress: 100 },
+          },
+        }));
+        
+        console.log(`✅ Common size chart ${type} uploaded successfully:`, result.data.imageUrl.substring(0, 100) + '...');
+        
+        // Show success notification
+        setNotification({
+          type: "success",
+          message: `${type} uploaded successfully`,
+          duration: 3000,
         });
-      }, UPLOAD_CONSTANTS.UPLOAD_SIMULATION_INTERVAL);
-
-      // Clear interval and potentially simulate failure
-      setTimeout(() => {
-        clearInterval(interval);
-        if (Math.random() < 0.05) {
-          // 5% chance of failure
-          setCommonSizeChart((prev) => ({
-            ...prev,
-            uploadStatus: {
-              ...prev.uploadStatus,
-              [type]: { status: "failed", progress: 0 },
-            },
-          }));
-        }
-      }, 2000);
-    };
-
-    simulateProgress();
+      } else {
+        throw new Error('Upload failed - no URL returned from server');
+      }
+    } catch (error) {
+      console.error(`❌ Failed to upload common size chart ${type}:`, error);
+      setCommonSizeChart((prev) => ({
+        ...prev,
+        [type]: null, // Reset to null on failure
+        uploadStatus: {
+          ...prev.uploadStatus,
+          [type]: { status: "failed", progress: 0 },
+        },
+      }));
+      
+      // Show error notification
+      setNotification({
+        type: "error",
+        message: `Failed to upload ${type}: ${error.message}`,
+        duration: 5000,
+      });
+    }
   }, []);
 
   // ==============================
@@ -1290,7 +1322,7 @@ const SingleProductUpload = React.memo(() => {
     const newSize = {
       size: "",
       quantity: "",
-      hsn: "",
+      hsnCode: "", // Use consistent field name for backend compatibility
       sku: "",
       barcode: "",
       prices: {
@@ -1507,6 +1539,38 @@ const SingleProductUpload = React.memo(() => {
   }, []);
 
   // ==============================
+  // HELPER FUNCTIONS
+  // ==============================
+
+  // Helper function to get image URL (handles both File objects and URL strings)
+  const getImageUrl = useCallback((imageSource) => {
+    if (!imageSource) return null;
+    
+    // If it's already a string (URL), return it directly
+    if (typeof imageSource === 'string') {
+      return imageSource;
+    }
+    
+    // If it's a File object, create blob URL
+    if (imageSource instanceof File || imageSource instanceof Blob) {
+      try {
+        return URL.createObjectURL(imageSource);
+      } catch (error) {
+        console.error('Error creating object URL:', error, imageSource);
+        return null;
+      }
+    }
+    
+    // Handle objects that might have a URL property
+    if (imageSource && typeof imageSource === 'object' && imageSource.url) {
+      return imageSource.url;
+    }
+    
+    console.warn('Unknown image source type:', typeof imageSource, imageSource);
+    return null;
+  }, []);
+
+  // ==============================
   // EXCEL IMPORT HANDLERS
   // ==============================
 
@@ -1533,8 +1597,66 @@ const SingleProductUpload = React.memo(() => {
   const handleExcelFileUpload = useCallback((file) => {
     setExcelFile(file);
     console.log("Excel file uploaded:", file.name);
-    // TODO: Implement Excel parsing logic using libraries like SheetJS (xlsx)
-  }, []);
+    
+    // Simulate parsing Excel and adding sample size data
+    const sampleSizes = [
+      {
+        size: "Small",
+        quantity: "10",
+        hsnCode: "61091000",
+        sku: "SAMPLE-SMALL-001",
+        barcode: "1234567890123",
+        prices: {
+          amazon: "999",
+          flipkart: "979",
+          myntra: "989",
+          nykaa: "999",
+          yoraa: "949",
+        },
+      },
+      {
+        size: "Medium",
+        quantity: "15",
+        hsnCode: "61091000",
+        sku: "SAMPLE-MEDIUM-001",
+        barcode: "1234567890124",
+        prices: {
+          amazon: "999",
+          flipkart: "979",
+          myntra: "989",
+          nykaa: "999",
+          yoraa: "949",
+        },
+      },
+      {
+        size: "Large",
+        quantity: "12",
+        hsnCode: "61091000",
+        sku: "SAMPLE-LARGE-001",
+        barcode: "1234567890125",
+        prices: {
+          amazon: "999",
+          flipkart: "979",
+          myntra: "989",
+          nykaa: "999",
+          yoraa: "949",
+        },
+      }
+    ];
+    
+    // Add sample sizes to main customSizes
+    setCustomSizes(prev => [...prev, ...sampleSizes]);
+    
+    // Also ensure stockSizeOption is set to "sizes"
+    setStockSizeOption(STOCK_SIZE_OPTIONS.SIZES);
+    
+    showNotification(
+      `Excel parsed successfully! Added ${sampleSizes.length} sizes to the product.`,
+      NOTIFICATION_TYPES.SUCCESS
+    );
+    
+    // TODO: Implement real Excel parsing logic using libraries like SheetJS (xlsx)
+  }, [showNotification]);
 
   // Handle returnable import excel functionality
   const handleReturnableImportExcel = useCallback(() => {
@@ -1562,19 +1684,10 @@ const SingleProductUpload = React.memo(() => {
   const handleNestingOptionChange = useCallback(
     (variantId, option) => {
       if (option === "sameAsArticle1") {
-        // Set all options to be copied from variant 1
-        const allOptions = [
-          "title",
-          "description",
-          "manufacturingDetails",
-          "shippingReturns",
-          "regularPrice",
-          "salePrice",
-          "stockSize",
-        ];
+        // Set to copy all options from variant 1
         setNestingOptions((prev) => ({
           ...prev,
-          [variantId]: allOptions,
+          [variantId]: "sameAsArticle1",
         }));
 
         // Apply nesting logic - copy all data from first variant
@@ -1606,6 +1719,11 @@ const SingleProductUpload = React.memo(() => {
             "salePrice",
             firstVariant?.salePrice || ""
           );
+          
+          // Copy meta data fields
+          handleVariantChange(variantId, "metaTitle", firstVariant?.metaTitle || "");
+          handleVariantChange(variantId, "metaDescription", firstVariant?.metaDescription || "");
+          handleVariantChange(variantId, "slugUrl", firstVariant?.slugUrl || "");
 
           // Copy stock size data
           const variantToUpdate = variants.find((v) => v.id === variantId);
@@ -1624,7 +1742,7 @@ const SingleProductUpload = React.memo(() => {
           }
         }
       } else {
-        // Clear all options
+        // Clear all options and switch to individual selection mode
         setNestingOptions((prev) => ({
           ...prev,
           [variantId]: [],
@@ -1658,6 +1776,10 @@ const SingleProductUpload = React.memo(() => {
                   "title",
                   firstVariant?.title || ""
                 );
+                // Also copy meta data fields when title is selected
+                handleVariantChange(variantId, "metaTitle", firstVariant?.metaTitle || "");
+                handleVariantChange(variantId, "metaDescription", firstVariant?.metaDescription || "");
+                handleVariantChange(variantId, "slugUrl", firstVariant?.slugUrl || "");
                 break;
               case "description":
                 handleVariantChange(
@@ -1742,7 +1864,7 @@ const SingleProductUpload = React.memo(() => {
     const newSize = {
       size: "",
       quantity: "",
-      hsn: "",
+      hsnCode: "", // Consistent field name
       sku: "",
       barcode: "",
       prices: {
@@ -1798,12 +1920,12 @@ const SingleProductUpload = React.memo(() => {
           );
 
           if (type === "sizes") {
-            // Sample data simulation
+            // Sample data simulation - actually add to customSizes
             const sampleSizes = [
               {
                 size: "XS",
                 quantity: "8",
-                hsn: "61091000",
+                hsnCode: "61091000", // Consistent field name
                 sku: `SKU${variantId}01`,
                 barcode: `123456789${variantId}23`,
                 prices: {
@@ -1814,22 +1936,55 @@ const SingleProductUpload = React.memo(() => {
                   yoraa: "549",
                 },
               },
+              {
+                size: "S",
+                quantity: "12",
+                hsnCode: "61091000",
+                sku: `SKU${variantId}02`,
+                barcode: `123456789${variantId}24`,
+                prices: {
+                  amazon: "599",
+                  flipkart: "579",
+                  myntra: "589",
+                  nykaa: "599",
+                  yoraa: "549",
+                },
+              },
+              {
+                size: "M",
+                quantity: "15",
+                hsnCode: "61091000",
+                sku: `SKU${variantId}03`,
+                barcode: `123456789${variantId}25`,
+                prices: {
+                  amazon: "599",
+                  flipkart: "579",
+                  myntra: "589",
+                  nykaa: "599",
+                  yoraa: "549",
+                },
+              }
             ];
 
+            // Actually add the sample sizes to the variant
             setVariants((prev) =>
               prev.map((variant) =>
                 variant.id === variantId
                   ? {
                       ...variant,
-                      stockSizeOption: STOCK_SIZE_OPTIONS.SIZES,
-                      customSizes: sampleSizes,
+                      customSizes: [...(variant.customSizes || []), ...sampleSizes]
                     }
                   : variant
               )
             );
+            
+            // Also add to main customSizes if this is the first variant
+            if (variantId === variants[0]?.id) {
+              setCustomSizes(prev => [...prev, ...sampleSizes]);
+            }
 
             showNotification(
-              `Excel file "${file.name}" imported successfully for variant! ${sampleSizes.length} sizes added.`,
+              `${sampleSizes.length} sizes imported from Excel successfully!`,
               NOTIFICATION_TYPES.SUCCESS
             );
           }
@@ -1866,7 +2021,14 @@ const SingleProductUpload = React.memo(() => {
           if (typeof img === 'string') {
             urlToCheck = img;
           } else if (img && typeof img === 'object') {
-            urlToCheck = img.url || img.serverUrl || '';
+            // Prioritize serverUrl - if it exists, the image is uploaded successfully
+            if (img.serverUrl) {
+              urlToCheck = img.serverUrl;
+              console.log(`✅ Using serverUrl for variant ${variantIndex + 1}, image ${imgIndex + 1}:`, img.name);
+            } else {
+              urlToCheck = img.url || '';
+              console.log(`⚠️ No serverUrl found for variant ${variantIndex + 1}, image ${imgIndex + 1}:`, img.name, 'Status:', img.status);
+            }
           }
           
           if (urlToCheck.startsWith('blob:')) {
@@ -1883,7 +2045,14 @@ const SingleProductUpload = React.memo(() => {
           if (typeof vid === 'string') {
             urlToCheck = vid;
           } else if (vid && typeof vid === 'object') {
-            urlToCheck = vid.url || vid.serverUrl || '';
+            // Prioritize serverUrl - if it exists, the video is uploaded successfully
+            if (vid.serverUrl) {
+              urlToCheck = vid.serverUrl;
+              console.log(`✅ Using serverUrl for variant ${variantIndex + 1}, video ${vidIndex + 1}:`, vid.name);
+            } else {
+              urlToCheck = vid.url || '';
+              console.log(`⚠️ No serverUrl found for variant ${variantIndex + 1}, video ${vidIndex + 1}:`, vid.name, 'Status:', vid.status);
+            }
           }
           
           if (urlToCheck.startsWith('blob:')) {
@@ -1912,9 +2081,9 @@ const SingleProductUpload = React.memo(() => {
       description: productData.description || '',
       manufacturingDetails: productData.manufacturingDetails || '',
       shippingAndReturns: {
-        shippingDetails: [],
-        returnPolicy: [],
-        additionalInfo: productData.shippingReturns || ''
+        shippingDetails: productData.shippingDetails || [],
+        returnPolicy: productData.returnPolicy || [],
+        additionalInfo: productData.shippingReturns || productData.additionalInfo || ''
       },
       regularPrice: parseFloat(productData.regularPrice) || 0,
       salePrice: parseFloat(productData.salePrice) || 0,
@@ -1960,15 +2129,35 @@ const SingleProductUpload = React.memo(() => {
       sizes: stockSizeOption === STOCK_SIZE_OPTIONS.SIZES ? customSizes.map(size => ({
         size: size.size,
         quantity: parseInt(size.quantity) || 0,
-        hsnCode: size.hsnCode || '',
+        hsnCode: size.hsnCode || size.hsn || '', // Support both hsnCode and hsn fields
         sku: size.sku || `${selectedCategory}/${selectedSubCategory}/${productData.productName}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getDate()).padStart(2, '0')}/${Math.random().toString().slice(2, 10)}`,
         barcode: size.barcode || '',
         platformPricing: {
-          yoraa: { price: parseFloat(size.yoraaPrice) || parseFloat(productData.regularPrice) || 0 },
-          myntra: { price: parseFloat(size.myntraPrice) || parseFloat(productData.regularPrice) || 0 },
-          amazon: { price: parseFloat(size.amazonPrice) || parseFloat(productData.regularPrice) || 0 },
-          flipkart: { price: parseFloat(size.flipkartPrice) || parseFloat(productData.regularPrice) || 0 },
-          nykaa: { price: parseFloat(size.nykaaPrice) || parseFloat(productData.regularPrice) || 0 }
+          yoraa: { 
+            enabled: size.yoraaEnabled !== false,
+            price: parseFloat(size.yoraaPrice) || parseFloat(productData.regularPrice) || 0,
+            salePrice: parseFloat(size.yoraaSalePrice) || parseFloat(productData.salePrice) || 0
+          },
+          myntra: { 
+            enabled: size.myntraEnabled !== false,
+            price: parseFloat(size.myntraPrice) || parseFloat(productData.regularPrice) || 0,
+            salePrice: parseFloat(size.myntraSalePrice) || parseFloat(productData.salePrice) || 0
+          },
+          amazon: { 
+            enabled: size.amazonEnabled !== false,
+            price: parseFloat(size.amazonPrice) || parseFloat(productData.regularPrice) || 0,
+            salePrice: parseFloat(size.amazonSalePrice) || parseFloat(productData.salePrice) || 0
+          },
+          flipkart: { 
+            enabled: size.flipkartEnabled !== false,
+            price: parseFloat(size.flipkartPrice) || parseFloat(productData.regularPrice) || 0,
+            salePrice: parseFloat(size.flipkartSalePrice) || parseFloat(productData.salePrice) || 0
+          },
+          nykaa: { 
+            enabled: size.nykaaEnabled !== false,
+            price: parseFloat(size.nykaaPrice) || parseFloat(productData.regularPrice) || 0,
+            salePrice: parseFloat(size.nykaaSalePrice) || parseFloat(productData.salePrice) || 0
+          }
         }
       })) : [],
       
@@ -2038,6 +2227,12 @@ const SingleProductUpload = React.memo(() => {
           filters: variant.filters || {},
           stockSizes: variant.stockSizes || [],
           customSizes: variant.customSizes || []
+        },
+        // Meta data for variant (as per backend schema)
+        metaData: {
+          metaTitle: variant.metaTitle || '',
+          metaDescription: variant.metaDescription || '',
+          slugUrl: variant.slugUrl || ''
         }
       })),
       
@@ -2049,9 +2244,19 @@ const SingleProductUpload = React.memo(() => {
         customOptions: alsoShowInOptions?.customOptions || []
       },
       
-      // Size charts
-      sizeChart: sizeChart,
-      commonSizeChart: commonSizeChart,
+      // Size charts - ensure URLs are properly processed
+      sizeChart: {
+        inchChart: typeof sizeChart.inchChart === 'string' ? sizeChart.inchChart : '',
+        cmChart: typeof sizeChart.cmChart === 'string' ? sizeChart.cmChart : '',
+        measurementImage: typeof sizeChart.measurementImage === 'string' ? sizeChart.measurementImage : ''
+      },
+      commonSizeChart: {
+        inchChart: typeof commonSizeChart.inchChart === 'string' ? commonSizeChart.inchChart : '',
+        cmChart: typeof commonSizeChart.cmChart === 'string' ? commonSizeChart.cmChart : '',
+        measurementGuide: typeof commonSizeChart.measurementGuide === 'string' ? commonSizeChart.measurementGuide : '',
+        attachedToVariants: commonSizeChart.attachedToVariants || [],
+        globalChart: typeof commonSizeChart.globalChart === 'string' ? commonSizeChart.globalChart : ''
+      },
       
       // Additional metadata
       filters: Object.keys(productFilters).reduce((acc, key) => {
@@ -2070,7 +2275,11 @@ const SingleProductUpload = React.memo(() => {
 
     // Debug log the final payload
     console.log('=== FINAL PAYLOAD BEING SENT ===');
-    console.log(JSON.stringify(baseProductData, null, 2));
+    console.log('Stock Size Option:', stockSizeOption);
+    console.log('Custom Sizes:', customSizes);
+    console.log('Common Size Chart:', commonSizeChart);
+    console.log('Size Chart:', sizeChart);
+    console.log('Full Payload:', JSON.stringify(baseProductData, null, 2));
     console.log('=== END DEBUG ===');
 
     return baseProductData;
@@ -2754,7 +2963,7 @@ const SingleProductUpload = React.memo(() => {
                                 {[
                                   "size",
                                   "quantity",
-                                  "hsn",
+                                  "hsnCode",
                                   "sku",
                                   "barcode",
                                 ].map((field) => (
@@ -3424,11 +3633,7 @@ const SingleProductUpload = React.memo(() => {
                             <input
                               type="checkbox"
                               checked={
-                                nestingOptions[variant.id] ===
-                                  "sameAsArticle1" ||
-                                nestingOptions[variant.id]?.includes?.(
-                                  "sameAsArticle1"
-                                )
+                                nestingOptions[variant.id] === "sameAsArticle1"
                               }
                               onChange={(e) => {
                                 if (e.target.checked) {
@@ -3447,157 +3652,155 @@ const SingleProductUpload = React.memo(() => {
                             </span>
                           </label>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 ml-6">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={
-                                nestingOptions[variant.id]?.includes?.(
-                                  "title"
-                                ) || false
-                              }
-                              onChange={(e) =>
-                                handleIndividualNestingChange(
-                                  variant.id,
-                                  "title",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-[14px] text-[#111111] font-['Montserrat']">
-                              Title
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={
-                                nestingOptions[variant.id]?.includes?.(
-                                  "description"
-                                ) || false
-                              }
-                              onChange={(e) =>
-                                handleIndividualNestingChange(
-                                  variant.id,
-                                  "description",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-[14px] text-[#111111] font-['Montserrat']">
-                              Description
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={
-                                nestingOptions[variant.id]?.includes?.(
-                                  "manufacturingDetails"
-                                ) || false
-                              }
-                              onChange={(e) =>
-                                handleIndividualNestingChange(
-                                  variant.id,
-                                  "manufacturingDetails",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-[14px] text-[#111111] font-['Montserrat']">
-                              Manufacturing details
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={
-                                nestingOptions[variant.id]?.includes?.(
-                                  "shippingReturns"
-                                ) || false
-                              }
-                              onChange={(e) =>
-                                handleIndividualNestingChange(
-                                  variant.id,
-                                  "shippingReturns",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-[14px] text-[#111111] font-['Montserrat']">
-                              Shipping returns and exchange
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={
-                                nestingOptions[variant.id]?.includes?.(
-                                  "regularPrice"
-                                ) || false
-                              }
-                              onChange={(e) =>
-                                handleIndividualNestingChange(
-                                  variant.id,
-                                  "regularPrice",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-[14px] text-[#111111] font-['Montserrat']">
-                              Regular price
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={
-                                nestingOptions[variant.id]?.includes?.(
-                                  "salePrice"
-                                ) || false
-                              }
-                              onChange={(e) =>
-                                handleIndividualNestingChange(
-                                  variant.id,
-                                  "salePrice",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-[14px] text-[#111111] font-['Montserrat']">
-                              Sale price
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={
-                                nestingOptions[variant.id]?.includes?.(
-                                  "stockSize"
-                                ) || false
-                              }
-                              onChange={(e) =>
-                                handleIndividualNestingChange(
-                                  variant.id,
-                                  "stockSize",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-[14px] text-[#111111] font-['Montserrat']">
-                              Stock size
-                            </span>
-                          </label>
-                        </div>
+                        {/* Individual options - only show if "Same as article 1" is not checked */}
+                        {nestingOptions[variant.id] !== "sameAsArticle1" && (
+                          <div className="grid grid-cols-2 gap-4 ml-6">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  Array.isArray(nestingOptions[variant.id]) &&
+                                  nestingOptions[variant.id]?.includes("title")
+                                }
+                                onChange={(e) =>
+                                  handleIndividualNestingChange(
+                                    variant.id,
+                                    "title",
+                                    e.target.checked
+                                  )
+                                }
+                                className="w-4 h-4 text-blue-600"
+                              />
+                              <span className="text-[14px] text-[#111111] font-['Montserrat']">
+                                Title
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  Array.isArray(nestingOptions[variant.id]) &&
+                                  nestingOptions[variant.id]?.includes("description")
+                                }
+                                onChange={(e) =>
+                                  handleIndividualNestingChange(
+                                    variant.id,
+                                    "description",
+                                    e.target.checked
+                                  )
+                                }
+                                className="w-4 h-4 text-blue-600"
+                              />
+                              <span className="text-[14px] text-[#111111] font-['Montserrat']">
+                                Description
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  Array.isArray(nestingOptions[variant.id]) &&
+                                  nestingOptions[variant.id]?.includes("manufacturingDetails")
+                                }
+                                onChange={(e) =>
+                                  handleIndividualNestingChange(
+                                    variant.id,
+                                    "manufacturingDetails",
+                                    e.target.checked
+                                  )
+                                }
+                                className="w-4 h-4 text-blue-600"
+                              />
+                              <span className="text-[14px] text-[#111111] font-['Montserrat']">
+                                Manufacturing details
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  Array.isArray(nestingOptions[variant.id]) &&
+                                  nestingOptions[variant.id]?.includes("shippingReturns")
+                                }
+                                onChange={(e) =>
+                                  handleIndividualNestingChange(
+                                    variant.id,
+                                    "shippingReturns",
+                                    e.target.checked
+                                  )
+                                }
+                                className="w-4 h-4 text-blue-600"
+                              />
+                              <span className="text-[14px] text-[#111111] font-['Montserrat']">
+                                Shipping returns and exchange
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  Array.isArray(nestingOptions[variant.id]) &&
+                                  nestingOptions[variant.id]?.includes("regularPrice")
+                                }
+                                onChange={(e) =>
+                                  handleIndividualNestingChange(
+                                    variant.id,
+                                    "regularPrice",
+                                    e.target.checked
+                                  )
+                                }
+                                className="w-4 h-4 text-blue-600"
+                              />
+                              <span className="text-[14px] text-[#111111] font-['Montserrat']">
+                                Regular price
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  Array.isArray(nestingOptions[variant.id]) &&
+                                  nestingOptions[variant.id]?.includes("salePrice")
+                                }
+                                onChange={(e) =>
+                                  handleIndividualNestingChange(
+                                    variant.id,
+                                    "salePrice",
+                                    e.target.checked
+                                  )
+                                }
+                                className="w-4 h-4 text-blue-600"
+                              />
+                              <span className="text-[14px] text-[#111111] font-['Montserrat']">
+                                Sale price
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  Array.isArray(nestingOptions[variant.id]) &&
+                                  nestingOptions[variant.id]?.includes("stockSize")
+                                }
+                                onChange={(e) =>
+                                  handleIndividualNestingChange(
+                                    variant.id,
+                                    "stockSize",
+                                    e.target.checked
+                                  )
+                                }
+                                className="w-4 h-4 text-blue-600"
+                              />
+                              <span className="text-[14px] text-[#111111] font-['Montserrat']">
+                                Stock size
+                              </span>
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </div>
+
+                    {/* Product Details Fields */}
 
                     {/* Product Name */}
                     <div>
@@ -3617,6 +3820,11 @@ const SingleProductUpload = React.memo(() => {
                           }
                           className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
                           placeholder={`Enter product name for variant ${variantNumber}`}
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("productName"))
+                          }
                         />
                       </div>
                     </div>
@@ -3639,6 +3847,11 @@ const SingleProductUpload = React.memo(() => {
                           }
                           className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
                           placeholder={`Enter title for variant ${variantNumber}`}
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("title"))
+                          }
                         />
                       </div>
                     </div>
@@ -3660,6 +3873,11 @@ const SingleProductUpload = React.memo(() => {
                           }
                           className="w-full h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
                           placeholder={`Enter description for variant ${variantNumber}`}
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("description"))
+                          }
                         />
                       </div>
                     </div>
@@ -3681,6 +3899,11 @@ const SingleProductUpload = React.memo(() => {
                           }
                           className="w-full h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
                           placeholder={`Enter manufacturing details for variant ${variantNumber}`}
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("manufacturingDetails"))
+                          }
                         />
                       </div>
                     </div>
@@ -3702,6 +3925,11 @@ const SingleProductUpload = React.memo(() => {
                           }
                           className="w-full h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
                           placeholder={`Enter shipping and returns policy for variant ${variantNumber}`}
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("shippingReturns"))
+                          }
                         />
                       </div>
                     </div>
@@ -3724,6 +3952,11 @@ const SingleProductUpload = React.memo(() => {
                           }
                           className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
                           placeholder="0.00"
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("regularPrice"))
+                          }
                         />
                       </div>
                       <div>
@@ -3742,6 +3975,11 @@ const SingleProductUpload = React.memo(() => {
                           }
                           className="w-full h-[40px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[14px] bg-white font-['Montserrat']"
                           placeholder="0.00"
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("salePrice"))
+                          }
                         />
                       </div>
                     </div>
@@ -3759,10 +3997,21 @@ const SingleProductUpload = React.memo(() => {
                           onClick={() =>
                             handleVariantStockSizeOption(variant.id, "noSize")
                           }
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("stockSize"))
+                          }
                           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                             (variant.stockSizeOption || "sizes") === "noSize"
                               ? "bg-blue-600 text-white"
                               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          } ${
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("stockSize"))
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
                           }`}
                         >
                           No Size
@@ -3772,10 +4021,21 @@ const SingleProductUpload = React.memo(() => {
                           onClick={() =>
                             handleVariantStockSizeOption(variant.id, "sizes")
                           }
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("stockSize"))
+                          }
                           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                             (variant.stockSizeOption || "sizes") === "sizes"
                               ? "bg-blue-600 text-white"
                               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          } ${
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("stockSize"))
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
                           }`}
                         >
                           Add Size
@@ -3785,7 +4045,18 @@ const SingleProductUpload = React.memo(() => {
                           onClick={() =>
                             handleVariantImportExcel(variant.id, "sizes")
                           }
-                          className="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("stockSize"))
+                          }
+                          className={`px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors ${
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("stockSize"))
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
                         >
                           Import Excel
                         </button>
@@ -3799,7 +4070,18 @@ const SingleProductUpload = React.memo(() => {
                             onClick={() =>
                               handleVariantCustomSizeAdd(variant.id)
                             }
-                            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                            disabled={
+                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                              (Array.isArray(nestingOptions[variant.id]) &&
+                                nestingOptions[variant.id]?.includes("stockSize"))
+                            }
+                            className={`mb-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors ${
+                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                              (Array.isArray(nestingOptions[variant.id]) &&
+                                nestingOptions[variant.id]?.includes("stockSize"))
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
                           >
                             Add Custom Size
                           </button>
@@ -3858,6 +4140,11 @@ const SingleProductUpload = React.memo(() => {
                                                 e.target.value
                                               )
                                             }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
+                                            }
                                             className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Size"
                                           />
@@ -3874,6 +4161,11 @@ const SingleProductUpload = React.memo(() => {
                                                 e.target.value
                                               )
                                             }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
+                                            }
                                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Qty"
                                           />
@@ -3881,14 +4173,19 @@ const SingleProductUpload = React.memo(() => {
                                         <td className="px-3 py-2">
                                           <input
                                             type="text"
-                                            value={sizeData.hsn}
+                                            value={sizeData.hsnCode}
                                             onChange={(e) =>
                                               handleVariantCustomSizeChange(
                                                 variant.id,
                                                 index,
-                                                "hsn",
+                                                "hsnCode",
                                                 e.target.value
                                               )
+                                            }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
                                             }
                                             className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="HSN"
@@ -3906,6 +4203,11 @@ const SingleProductUpload = React.memo(() => {
                                                 e.target.value
                                               )
                                             }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
+                                            }
                                             className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="SKU"
                                           />
@@ -3921,6 +4223,11 @@ const SingleProductUpload = React.memo(() => {
                                                 "barcode",
                                                 e.target.value
                                               )
+                                            }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
                                             }
                                             className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Barcode"
@@ -3941,6 +4248,11 @@ const SingleProductUpload = React.memo(() => {
                                                 }
                                               )
                                             }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
+                                            }
                                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Price"
                                           />
@@ -3959,6 +4271,11 @@ const SingleProductUpload = React.memo(() => {
                                                   flipkart: e.target.value,
                                                 }
                                               )
+                                            }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
                                             }
                                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Price"
@@ -3979,6 +4296,11 @@ const SingleProductUpload = React.memo(() => {
                                                 }
                                               )
                                             }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
+                                            }
                                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Price"
                                           />
@@ -3998,6 +4320,11 @@ const SingleProductUpload = React.memo(() => {
                                                 }
                                               )
                                             }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
+                                            }
                                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Price"
                                           />
@@ -4016,6 +4343,11 @@ const SingleProductUpload = React.memo(() => {
                                                   yoraa: e.target.value,
                                                 }
                                               )
+                                            }
+                                            disabled={
+                                              nestingOptions[variant.id] === "sameAsArticle1" ||
+                                              (Array.isArray(nestingOptions[variant.id]) &&
+                                                nestingOptions[variant.id]?.includes("stockSize"))
                                             }
                                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                                             placeholder="Price"
@@ -4046,7 +4378,12 @@ const SingleProductUpload = React.memo(() => {
                           type="text"
                           value={variant.metaTitle || ""}
                           onChange={(e) =>
-                            handleVariantChange(variantNumber, "metaTitle", e.target.value)
+                            handleVariantChange(variant.id, "metaTitle", e.target.value)
+                          }
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("title"))
                           }
                           className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
                           placeholder="Enter meta title for SEO"
@@ -4060,7 +4397,12 @@ const SingleProductUpload = React.memo(() => {
                         <textarea
                           value={variant.metaDescription || ""}
                           onChange={(e) =>
-                            handleVariantChange(variantNumber, "metaDescription", e.target.value)
+                            handleVariantChange(variant.id, "metaDescription", e.target.value)
+                          }
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("description"))
                           }
                           rows={3}
                           className="w-full max-w-[400px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
@@ -4076,7 +4418,12 @@ const SingleProductUpload = React.memo(() => {
                           type="text"
                           value={variant.slugUrl || ""}
                           onChange={(e) =>
-                            handleVariantChange(variantNumber, "slugUrl", e.target.value)
+                            handleVariantChange(variant.id, "slugUrl", e.target.value)
+                          }
+                          disabled={
+                            nestingOptions[variant.id] === "sameAsArticle1" ||
+                            (Array.isArray(nestingOptions[variant.id]) &&
+                              nestingOptions[variant.id]?.includes("title"))
                           }
                           className="w-full max-w-[400px] h-[42px] px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-['Montserrat']"
                           placeholder="product-slug-url"
@@ -4830,7 +5177,7 @@ const SingleProductUpload = React.memo(() => {
                   <div className="w-[150px] h-[120px] bg-gray-100 rounded border overflow-hidden mb-3">
                     {commonSizeChart.cmChart ? (
                       <img
-                        src={URL.createObjectURL(commonSizeChart.cmChart)}
+                        src={getImageUrl(commonSizeChart.cmChart)}
                         alt="CM chart"
                         className="w-full h-full object-cover"
                       />
@@ -4902,7 +5249,7 @@ const SingleProductUpload = React.memo(() => {
                   <div className="w-[150px] h-[120px] bg-gray-100 rounded border overflow-hidden mb-3">
                     {commonSizeChart.inchChart ? (
                       <img
-                        src={URL.createObjectURL(commonSizeChart.inchChart)}
+                        src={getImageUrl(commonSizeChart.inchChart)}
                         alt="Inch chart"
                         className="w-full h-full object-cover"
                       />
@@ -4974,9 +5321,7 @@ const SingleProductUpload = React.memo(() => {
                   <div className="w-[150px] h-[120px] bg-gray-100 rounded border overflow-hidden mb-3">
                     {commonSizeChart.measurementGuide ? (
                       <img
-                        src={URL.createObjectURL(
-                          commonSizeChart.measurementGuide
-                        )}
+                        src={getImageUrl(commonSizeChart.measurementGuide)}
                         alt="Measurement guide"
                         className="w-full h-full object-cover"
                       />
@@ -5448,7 +5793,7 @@ const SingleProductUpload = React.memo(() => {
                     <div className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
                       {commonSizeChart.inchChart || sizeChart.inchChart ? (
                         <img
-                          src={URL.createObjectURL(
+                          src={getImageUrl(
                             commonSizeChart.inchChart || sizeChart.inchChart
                           )}
                           alt="Size Chart Inches"
@@ -5465,7 +5810,7 @@ const SingleProductUpload = React.memo(() => {
                     <div className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
                       {commonSizeChart.cmChart || sizeChart.cmChart ? (
                         <img
-                          src={URL.createObjectURL(
+                          src={getImageUrl(
                             commonSizeChart.cmChart || sizeChart.cmChart
                           )}
                           alt="Size Chart CM"
@@ -5483,7 +5828,7 @@ const SingleProductUpload = React.memo(() => {
                       {commonSizeChart.measurementGuide ||
                       sizeChart.measurementImage ? (
                         <img
-                          src={URL.createObjectURL(
+                          src={getImageUrl(
                             commonSizeChart.measurementGuide ||
                               sizeChart.measurementImage
                           )}
