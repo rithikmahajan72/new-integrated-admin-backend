@@ -1,5 +1,7 @@
+// Clock and CalendarX icons imported from lucide-react - CACHE BUST v2.0
 import React, { useState, useMemo, useCallback, useEffect, memo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+// Import icons with Clock and CalendarX explicitly for scheduling features - FIXED
 import {
   Search,
   Edit2,
@@ -10,10 +12,13 @@ import {
   Filter,
   RefreshCw,
   Tag,
-  Clock,
-  CalendarX,
+  Clock as ClockIcon,
+  CalendarX as CalendarXIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+// Cache bust verification
+console.log("ManageItems.jsx loaded with ClockIcon:", typeof ClockIcon, "and CalendarXIcon:", typeof CalendarXIcon);
 import { itemAPI, productAPI, categoryAPI, subCategoryAPI, filterAPI } from "../api/endpoints";
 import {
   fetchFilters,
@@ -329,7 +334,7 @@ const ManageItems = memo(() => {
             price: item.regularPrice || item.price || 0,
             salePrice: item.salePrice || item.regularPrice || item.price || 0,
             regularPrice: item.regularPrice || item.price || 0,
-            status: item.status === 'published' ? 'live' : item.status,
+            status: item.status === 'published' ? 'live' : (item.status || 'draft'),
             metaTitle: item.metaTitle || "",
             metaDescription: item.metaDescription || "",
             slugUrl: item.slugUrl || "",
@@ -674,6 +679,9 @@ const ManageItems = memo(() => {
       (sizes || []).map((size) => skus?.[size] || 'N/A').join(", ");
 
     const getStatusStyle = (status) => {
+      if (!status || typeof status !== 'string') {
+        return STATUS_STYLES.draft;
+      }
       return STATUS_STYLES[status.toLowerCase()] || STATUS_STYLES.draft;
     };
 
@@ -880,10 +888,6 @@ const ManageItems = memo(() => {
           image: modalState.editingItem.image,
           thumbnail: modalState.editingItem.thumbnail,
           variants: modalState.editingItem.variants || [],
-          description: modalState.editingItem.description || "",
-          manufacturingDetails: modalState.editingItem.manufacturingDetails || "",
-          shippingReturns: modalState.editingItem.shippingReturns || "",
-          returnable: modalState.editingItem.returnable || false,
           filters: modalState.editingItem.filters || [],
           tags: modalState.editingItem.tags || []
         };
@@ -983,6 +987,16 @@ const ManageItems = memo(() => {
       }));
     };
 
+    const handleVariantFieldChange = (variantIndex, field, value) => {
+      // Update the editing item's variants directly since they're not in the form data
+      modalState.setEditingItem(prev => ({
+        ...prev,
+        variants: prev.variants.map((variant, index) => 
+          index === variantIndex ? { ...variant, [field]: value } : variant
+        )
+      }));
+    };
+
     const handleCloseSuccess = () => {
       modalState.setIsSuccessModalOpen(false);
     };
@@ -999,6 +1013,7 @@ const ManageItems = memo(() => {
       handleSizeFieldChange,
       handlePlatformChange,
       handleActionChange,
+      handleVariantFieldChange,
     };
   }, [navigate, allItems]); // Removed the problematic function dependencies
 
@@ -2037,7 +2052,7 @@ const ManageItems = memo(() => {
               item.status
             )} text-[14px] font-semibold font-['Montserrat'] rounded-full px-3 py-1`}
           >
-            {item.status}
+            {item.status || 'Draft'}
           </span>
           {item.status === "scheduled" && item.scheduledDate && item.scheduledTime && (
             <div className="text-[10px] text-gray-500 mt-1 font-['Montserrat']">
@@ -2073,7 +2088,7 @@ const ManageItems = memo(() => {
                   className="p-2 text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-full transition-colors"
                   title="Schedule"
                 >
-                  <Clock className="h-4 w-4" />
+                  <ClockIcon className="h-4 w-4" />
                 </button>
               </>
             ) : item.status === "scheduled" ? (
@@ -2082,7 +2097,7 @@ const ManageItems = memo(() => {
                 className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
                 title="Cancel Schedule"
               >
-                <CalendarX className="h-4 w-4" />
+                <CalendarXIcon className="h-4 w-4" />
               </button>
             ) : null}
 
@@ -2753,6 +2768,96 @@ const ManageItems = memo(() => {
                     </div>
                   </div>
                 </div>
+
+                {/* Product Variants Section */}
+                {modalState.editingItem?.variants && modalState.editingItem.variants.length > 0 && (
+                  <div className="mb-8">
+                    <h4 className="font-['Montserrat'] font-bold text-[18px] text-[#111111] mb-4">
+                      Product Variants
+                    </h4>
+                    
+                    {modalState.editingItem.variants.map((variant, variantIndex) => (
+                      <div key={variantIndex} className="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+                        <h5 className="font-['Montserrat'] font-semibold text-[16px] text-[#111111] mb-4">
+                          Variant {variantIndex + 1} {variant.name ? `- ${variant.name}` : ''}
+                        </h5>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Variant Name */}
+                          <div>
+                            <label className="block font-['Montserrat'] font-medium text-[14px] text-[#111111] mb-2">
+                              Variant Name
+                            </label>
+                            <input
+                              type="text"
+                              value={variant.name || ''}
+                              onChange={(e) => actionHandlers.handleVariantFieldChange(variantIndex, 'name', e.target.value)}
+                              className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter variant name"
+                            />
+                          </div>
+
+                          {/* Variant SKU */}
+                          <div>
+                            <label className="block font-['Montserrat'] font-medium text-[14px] text-[#111111] mb-2">
+                              Variant SKU
+                            </label>
+                            <input
+                              type="text"
+                              value={variant.sku || ''}
+                              onChange={(e) => actionHandlers.handleVariantFieldChange(variantIndex, 'sku', e.target.value)}
+                              className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter variant SKU"
+                            />
+                          </div>
+
+                          {/* Variant Price */}
+                          <div>
+                            <label className="block font-['Montserrat'] font-medium text-[14px] text-[#111111] mb-2">
+                              Variant Price
+                            </label>
+                            <input
+                              type="number"
+                              value={variant.price || ''}
+                              onChange={(e) => actionHandlers.handleVariantFieldChange(variantIndex, 'price', e.target.value)}
+                              className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          {/* Variant Stock */}
+                          <div>
+                            <label className="block font-['Montserrat'] font-medium text-[14px] text-[#111111] mb-2">
+                              Stock Quantity
+                            </label>
+                            <input
+                              type="number"
+                              value={variant.stock || variant.quantity || ''}
+                              onChange={(e) => actionHandlers.handleVariantFieldChange(variantIndex, 'stock', e.target.value)}
+                              className="w-full h-10 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Variant Meta Fields */}
+                        <div className="grid grid-cols-1 gap-4 mt-4">
+                          <div>
+                            <label className="block font-['Montserrat'] font-medium text-[14px] text-[#111111] mb-2">
+                              Variant Description
+                            </label>
+                            <textarea
+                              value={variant.description || ''}
+                              onChange={(e) => actionHandlers.handleVariantFieldChange(variantIndex, 'description', e.target.value)}
+                              className="w-full h-16 px-3 py-2 border border-[#979797] rounded-[12px] text-[14px] font-['Montserrat'] font-medium text-[#111111] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                              placeholder="Enter variant description"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Fixed Action Buttons at Bottom */}

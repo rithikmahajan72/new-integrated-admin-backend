@@ -43,6 +43,97 @@ itemRouter.get(
     }
   }
 );
+
+// POST /api/items/upload-image
+// Standalone image upload endpoint for frontend to upload individual images
+itemRouter.post(
+  "/upload-image",
+  verifyToken, // Ensure user is authenticated
+  checkAdminRole, // Ensure user has admin role
+  upload.single("image"), // Handle single file upload (field name: "image")
+  async (req, res) => {
+    try {
+      // Check if an image file was uploaded
+      if (!req.file) {
+        return res
+          .status(400)
+          .json(ApiResponse(null, "No file uploaded", false, 400));
+      }
+
+      // Generate a unique filename with timestamp
+      const timestamp = Date.now();
+      const uniqueId = Math.random().toString(36).substr(2, 9);
+      const fileName = `upload_${timestamp}_${uniqueId}`;
+
+      // Upload the image to AWS S3 in a general uploads folder
+      const fileUrl = await uploadMultipart(
+        req.file,
+        `uploads/images`,
+        fileName
+      );
+
+      console.log("Image uploaded to:", fileUrl);
+
+      // Send success response with the uploaded image URL
+      res
+        .status(200)
+        .json(ApiResponse({ imageUrl: fileUrl }, "Image uploaded successfully", true, 200));
+    } catch (error) {
+      console.error("Image upload error:", error);
+      res
+        .status(500)
+        .json(
+          ApiResponse(null, "Image upload failed", false, 500, error.message)
+        );
+    }
+  }
+);
+
+// POST /api/items/upload-video
+// Standalone video upload endpoint for frontend to upload individual videos
+itemRouter.post(
+  "/upload-video",
+  verifyToken, // Ensure user is authenticated
+  checkAdminRole, // Ensure user has admin role
+  upload.single("video"), // Handle single file upload (field name: "video")
+  async (req, res) => {
+    try {
+      // Check if a video file was uploaded
+      if (!req.file) {
+        return res
+          .status(400)
+          .json(ApiResponse(null, "No file uploaded", false, 400));
+      }
+
+      // Generate a unique filename with timestamp
+      const timestamp = Date.now();
+      const uniqueId = Math.random().toString(36).substr(2, 9);
+      const fileName = `upload_${timestamp}_${uniqueId}`;
+
+      // Upload the video to AWS S3 in a general uploads folder
+      const fileUrl = await uploadMultipart(
+        req.file,
+        `uploads/videos`,
+        fileName
+      );
+
+      console.log("Video uploaded to:", fileUrl);
+
+      // Send success response with the uploaded video URL
+      res
+        .status(200)
+        .json(ApiResponse({ videoUrl: fileUrl }, "Video uploaded successfully", true, 200));
+    } catch (error) {
+      console.error("Video upload error:", error);
+      res
+        .status(500)
+        .json(
+          ApiResponse(null, "Video upload failed", false, 500, error.message)
+        );
+    }
+  }
+);
+
 itemRouter.post(
   "/",
   verifyToken, // Ensure user is authenticated

@@ -179,8 +179,17 @@ export const bulkUploadAPI = {
 
 // Image Upload API endpoints
 export const imageAPI = {
-  uploadImage: (formData) => API.post('/api/images/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  uploadImage: (formData, config = {}) => API.post('/api/images/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...config
+  }),
+  uploadSingleImage: (formData, config = {}) => API.post('/api/items/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...config
+  }),
+  uploadSingleVideo: (formData, config = {}) => API.post('/api/items/upload-video', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...config
   }),
   deleteImage: (imageId) => API.delete(`/api/images/${imageId}`),
   getSignedUrl: (fileName) => API.post('/api/images/signed-url', { fileName }),

@@ -145,3 +145,93 @@ export const debounce = (func, wait) => {
     timeout = setTimeout(later, wait);
   };
 };
+
+// File upload utilities
+import { imageAPI } from './endpoints';
+
+export const uploadUtils = {
+  // Upload a single image file
+  uploadImage: async (file, onProgress = null) => {
+    try {
+      console.log('Starting image upload for file:', file.name);
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      // Create a config object for tracking upload progress
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      };
+      
+      if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Image upload progress: ${percentCompleted}%`);
+          onProgress(percentCompleted);
+        };
+      }
+      
+      console.log('Making image upload API call...');
+      const response = await imageAPI.uploadSingleImage(formData, config);
+      console.log('Image upload API response:', response);
+      return response;
+    } catch (error) {
+      console.error('Image upload failed in uploadUtils:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      throw error;
+    }
+  },
+
+  // Upload a single video file
+  uploadVideo: async (file, onProgress = null) => {
+    try {
+      console.log('Starting video upload for file:', file.name);
+      const formData = new FormData();
+      formData.append('video', file);
+      
+      // Create a config object for tracking upload progress
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      };
+      
+      if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Video upload progress: ${percentCompleted}%`);
+          onProgress(percentCompleted);
+        };
+      }
+      
+      console.log('Making video upload API call...');
+      const response = await imageAPI.uploadSingleVideo(formData, config);
+      console.log('Video upload API response:', response);
+      return response;
+    } catch (error) {
+      console.error('Video upload failed in uploadUtils:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      throw error;
+    }
+  },
+
+  // Upload multiple files with progress tracking
+  uploadMultipleFiles: async (files, type = 'image', onProgress = null) => {
+    const uploadPromises = files.map(async (file, index) => {
+      const fileProgressCallback = onProgress ? (progress) => {
+        onProgress(index, progress);
+      } : null;
+      
+      if (type === 'image') {
+        return await uploadUtils.uploadImage(file, fileProgressCallback);
+      } else if (type === 'video') {
+        return await uploadUtils.uploadVideo(file, fileProgressCallback);
+      }
+    });
+    
+    return await Promise.all(uploadPromises);
+  }
+};

@@ -53,6 +53,7 @@ import {
   selectFilterLoading,
   selectFilterError,
 } from "../store/slices/filtersSlice";
+import { uploadUtils } from "../api/utils"; // Import the upload utilities
 
 // Constants for better maintainability
 const NOTIFICATION_TYPES = {
@@ -651,7 +652,7 @@ const SingleProductUpload = React.memo(() => {
   // ==============================
 
   const handleImageUpload = useCallback(
-    (variantId, files, type = "images") => {
+    async (variantId, files, type = "images") => {
       // Find the current variant to check slot limits
       const currentVariant = variants.find((v) => v.id === variantId);
       if (!currentVariant) return;
@@ -755,7 +756,11 @@ const SingleProductUpload = React.memo(() => {
 
       if (errors.length > 0) {
         console.warn("File validation errors:", errors);
-        // TODO: Show user-friendly error messages
+        setNotification({
+          type: "error",
+          message: "Some files failed validation: " + errors.join(", "),
+          duration: 5000,
+        });
       }
 
       if (validFiles.length > 0) {
@@ -767,7 +772,8 @@ const SingleProductUpload = React.memo(() => {
           progress: 0,
           status: "uploading",
           type: file.type.startsWith("image/") ? "image" : "video",
-          url: URL.createObjectURL(file),
+          url: URL.createObjectURL(file), // Temporary preview URL
+          serverUrl: null, // Will be set after upload
         }));
 
         // Update variant with new files and upload status
@@ -797,22 +803,120 @@ const SingleProductUpload = React.memo(() => {
           })
         );
 
-        // Simulate upload progress for each file
-        newFiles.forEach((fileData) => {
-          const interval = setInterval(() => {
+        // Upload each file to the server
+        for (const fileData of newFiles) {
+          try {
+            const onProgress = (progress) => {
+              setVariants((prev) =>
+                prev.map((variant) => {
+                  if (variant.id === variantId) {
+                    const updatedFiles = variant[type].map((f) => {
+                      if (f.id === fileData.id) {
+                        return {
+                          ...f,
+                          progress: progress,
+                          status: progress >= 100 ? "success" : "uploading",
+                        };
+                      }
+                      return f;
+                    });
+
+                    const updatedStatus = variant.uploadStatus[type].map((s) => {
+                      if (s.id === fileData.id) {
+                        return {
+                          ...s,
+                          progress: progress,
+                          status: progress >= 100 ? "success" : "uploading",
+                        };
+                      }
+                      return s;
+                    });
+
+                    return {
+                      ...variant,
+                      [type]: updatedFiles,
+                      uploadStatus: {
+                        ...variant.uploadStatus,
+                        [type]: updatedStatus,
+                      },
+                    };
+                  }
+                  return variant;
+                })
+              );
+            };
+
+            // Upload the file using the appropriate API
+            let result;
+            console.log(`Starting ${type === "images" ? "image" : "video"} upload for file:`, fileData.name);
+            
+            if (type === "images") {
+              result = await uploadUtils.uploadImage(fileData.file, onProgress);
+            } else if (type === "videos") {
+              result = await uploadUtils.uploadVideo(fileData.file, onProgress);
+            }
+
+            console.log(`${type === "images" ? "Image" : "Video"} upload result:`, result);
+
+            // Extract the server URL from the response
+            let serverUrl = null;
+            if (result && result.data) {
+              // Try different possible response structures
+              serverUrl = result.data.imageUrl || result.data.videoUrl || result.data.data?.imageUrl || result.data.data?.videoUrl;
+            }
+
+            if (!serverUrl) {
+              throw new Error('No URL returned from server');
+            }
+
+            console.log(`${type === "images" ? "Image" : "Video"} uploaded successfully. Server URL:`, serverUrl);
+
+            // Update the file data with the server URL
             setVariants((prev) =>
               prev.map((variant) => {
                 if (variant.id === variantId) {
                   const updatedFiles = variant[type].map((f) => {
-                    if (f.id === fileData.id && f.progress < 100) {
-                      const newProgress = Math.min(
-                        f.progress + Math.random() * 20,
-                        100
-                      );
+                    if (f.id === fileData.id) {
                       return {
                         ...f,
-                        progress: newProgress,
-                        status: newProgress >= 100 ? "success" : "uploading",
+                        serverUrl: serverUrl,
+                        status: "success",
+                        progress: 100,
+                      };
+                    }
+                    return f;
+                  });
+
+                  return {
+                    ...variant,
+                    [type]: updatedFiles,
+                  };
+                }
+                return variant;
+              })
+            );
+
+            console.log(`${type.slice(0, -1)} uploaded successfully:`, result);
+
+          } catch (error) {
+            console.error(`${type.slice(0, -1)} upload failed for file ${fileData.name}:`, error);
+            console.error('Error details:', {
+              message: error.message,
+              response: error.response?.data,
+              status: error.response?.status,
+              stack: error.stack
+            });
+            
+            // Mark the file as failed
+            setVariants((prev) =>
+              prev.map((variant) => {
+                if (variant.id === variantId) {
+                  const updatedFiles = variant[type].map((f) => {
+                    if (f.id === fileData.id) {
+                      return {
+                        ...f,
+                        status: "failed",
+                        progress: 0,
                       };
                     }
                     return f;
@@ -820,14 +924,10 @@ const SingleProductUpload = React.memo(() => {
 
                   const updatedStatus = variant.uploadStatus[type].map((s) => {
                     if (s.id === fileData.id) {
-                      const newProgress = Math.min(
-                        s.progress + Math.random() * 20,
-                        100
-                      );
                       return {
                         ...s,
-                        progress: newProgress,
-                        status: newProgress >= 100 ? "success" : "uploading",
+                        status: "failed",
+                        progress: 0,
                       };
                     }
                     return s;
@@ -845,44 +945,18 @@ const SingleProductUpload = React.memo(() => {
                 return variant;
               })
             );
-          }, 200);
 
-          // Clear interval when complete and potentially simulate some failures
-          setTimeout(() => {
-            clearInterval(interval);
-            // Randomly simulate some upload failures (10% chance)
-            if (Math.random() < 0.1) {
-              setVariants((prev) =>
-                prev.map((variant) => {
-                  if (variant.id === variantId) {
-                    const updatedStatus = variant.uploadStatus[type].map(
-                      (s) => {
-                        if (s.id === fileData.id) {
-                          return { ...s, status: "failed", progress: 0 };
-                        }
-                        return s;
-                      }
-                    );
-
-                    return {
-                      ...variant,
-                      uploadStatus: {
-                        ...variant.uploadStatus,
-                        [type]: updatedStatus,
-                      },
-                    };
-                  }
-                  return variant;
-                })
-              );
-            }
-          }, 2500);
-        });
+            setNotification({
+              type: "error",
+              message: `Failed to upload ${fileData.name}: ${error.message}`,
+              duration: 5000,
+            });
+          }
+        }
 
         console.log(
-          `Uploading valid ${type} for variant:`,
-          variantId,
-          validFiles
+          `Starting upload of ${validFiles.length} ${type} for variant:`,
+          variantId
         );
       }
     },
@@ -1772,6 +1846,56 @@ const SingleProductUpload = React.memo(() => {
 
   // Helper function to create product data for API
   const createProductDataForAPI = useCallback((status = 'draft') => {
+    // Validate required fields before creating payload
+    if (!productData.productName?.trim()) {
+      throw new Error('Product name is required');
+    }
+    if (!selectedCategory) {
+      throw new Error('Category is required');
+    }
+    if (!selectedSubCategory) {
+      throw new Error('Subcategory is required');
+    }
+    
+    // 🚨 CRITICAL BLOB URL CHECK - Prevent blob URLs from being sent to backend
+    console.log('🔍 Checking for blob URLs in variants before API call...');
+    variants.forEach((variant, variantIndex) => {
+      if (variant.images && Array.isArray(variant.images)) {
+        variant.images.forEach((img, imgIndex) => {
+          let urlToCheck = '';
+          if (typeof img === 'string') {
+            urlToCheck = img;
+          } else if (img && typeof img === 'object') {
+            urlToCheck = img.url || img.serverUrl || '';
+          }
+          
+          if (urlToCheck.startsWith('blob:')) {
+            console.error(`❌ BLOB URL DETECTED in variant ${variantIndex + 1}, image ${imgIndex + 1}:`, urlToCheck);
+            console.error('Image object:', img);
+            throw new Error(`Cannot create product: Variant ${variantIndex + 1} has unuploaded images. Please wait for uploads to complete or re-upload failed files.`);
+          }
+        });
+      }
+      
+      if (variant.videos && Array.isArray(variant.videos)) {
+        variant.videos.forEach((vid, vidIndex) => {
+          let urlToCheck = '';
+          if (typeof vid === 'string') {
+            urlToCheck = vid;
+          } else if (vid && typeof vid === 'object') {
+            urlToCheck = vid.url || vid.serverUrl || '';
+          }
+          
+          if (urlToCheck.startsWith('blob:')) {
+            console.error(`❌ BLOB URL DETECTED in variant ${variantIndex + 1}, video ${vidIndex + 1}:`, urlToCheck);
+            console.error('Video object:', vid);
+            throw new Error(`Cannot create product: Variant ${variantIndex + 1} has unuploaded videos. Please wait for uploads to complete or re-upload failed files.`);
+          }
+        });
+      }
+    });
+    console.log('✅ No blob URLs detected in variants');
+    
     // Debug logging
     console.log('=== DEBUG PRODUCT DATA ===');
     console.log('productData:', productData);
@@ -1781,15 +1905,10 @@ const SingleProductUpload = React.memo(() => {
     console.log('categoryId:', selectedCategory);
     console.log('subCategoryId:', selectedSubCategory);
     
-    // Generate unique product ID
-    const productId = `PRD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Create the base product data
+    // Create the base product data (let backend generate productId)
     const baseProductData = {
-      productId: productId,
       productName: productData.productName || '',
       title: productData.title || productData.productName || '',
-      name: productData.productName || '', // Required legacy field
       description: productData.description || '',
       manufacturingDetails: productData.manufacturingDetails || '',
       shippingAndReturns: {
@@ -1799,15 +1918,13 @@ const SingleProductUpload = React.memo(() => {
       },
       regularPrice: parseFloat(productData.regularPrice) || 0,
       salePrice: parseFloat(productData.salePrice) || 0,
-      price: parseFloat(productData.regularPrice) || 0, // Required legacy field
-      stock: Math.max(1, customSizes.reduce((total, size) => total + (parseInt(size.quantity) || 0), 0)) || 1, // Required legacy field
-      returnable: productData.returnable === 'yes' || false,
+      returnable: Boolean(productData.returnable === 'yes' || productData.returnable === true),
       metaTitle: productData.metaTitle || productData.productName || '',
       metaDescription: productData.metaDescription || productData.description || '',
       slugUrl: productData.slugUrl || productData.productName?.toLowerCase().replace(/\s+/g, '-') || '',
       categoryId: selectedCategory,
       subCategoryId: selectedSubCategory,
-      status: status === 'live' ? 'published' : status, // Convert 'live' to 'published' for backend
+      status: status, // Keep original status - backend expects 'live' for published products
       
       // Platform pricing (5 different platforms as requested)
       platformPricing: {
@@ -1855,34 +1972,81 @@ const SingleProductUpload = React.memo(() => {
         }
       })) : [],
       
-      // Variants with images
+      // Variants with simplified structure to match backend model
       variants: variants.map(variant => ({
-        name: variant.name || '',
-        productName: variant.productName || '',
-        title: variant.title || '',
-        description: variant.description || '',
-        manufacturingDetails: variant.manufacturingDetails || '',
-        shippingAndReturns: {
-          shippingCost: variant.shippingReturns?.shippingCost || 0,
-          deliveryTime: variant.shippingReturns?.deliveryTime || '7-10 business days',
-          returnPolicy: variant.shippingReturns?.returnPolicy || '30 days return',
-          warranty: variant.shippingReturns?.warranty || 'No warranty'
-        },
-        regularPrice: variant.regularPrice || 0,
-        salePrice: variant.salePrice || 0,
-        images: variant.images || [],
-        videos: variant.videos || [],
-        filters: variant.filters || {},
-        stockSizes: variant.stockSizes || [],
-        customSizes: variant.customSizes || []
+        name: variant.name || 'Variant 1',
+        images: (variant.images || []).map(img => {
+          // If it's already a string (URL), return as is
+          if (typeof img === 'string') return img;
+          // If it's an object with serverUrl property (actual uploaded URL), use that
+          if (img && typeof img === 'object' && img.serverUrl) {
+            console.log('✅ Using server URL for image:', img.name, img.serverUrl.substring(0, 100) + '...');
+            return img.serverUrl;
+          }
+          // IMPORTANT: Don't use blob URLs - they won't work in production!
+          if (img && typeof img === 'object' && img.url && img.url.startsWith('blob:')) {
+            console.warn('⚠️ Skipping blob URL for image:', img.name, '- upload may have failed');
+            console.warn('Image details:', {
+              name: img.name,
+              status: img.status,
+              progress: img.progress,
+              serverUrl: img.serverUrl,
+              url: img.url
+            });
+            // Return empty string to filter out blob URLs
+            return '';
+          }
+          // If it's an object with url property that's not a blob URL, use it
+          if (img && typeof img === 'object' && img.url) return img.url;
+          // Otherwise return empty string as fallback
+          return '';
+        }).filter(url => url !== ''), // Remove empty URLs
+        videos: (variant.videos || []).map(vid => {
+          if (typeof vid === 'string') return vid;
+          // If it's an object with serverUrl property (actual uploaded URL), use that
+          if (vid && typeof vid === 'object' && vid.serverUrl) {
+            console.log('✅ Using server URL for video:', vid.name, vid.serverUrl.substring(0, 100) + '...');
+            return vid.serverUrl;
+          }
+          // IMPORTANT: Don't use blob URLs - they won't work in production!
+          if (vid && typeof vid === 'object' && vid.url && vid.url.startsWith('blob:')) {
+            console.warn('⚠️ Skipping blob URL for video:', vid.name, '- upload may have failed');
+            console.warn('Video details:', {
+              name: vid.name,
+              status: vid.status,
+              progress: vid.progress,
+              serverUrl: vid.serverUrl,
+              url: vid.url
+            });
+            // Return empty string to filter out blob URLs
+            return '';
+          }
+          // If it's an object with url property that's not a blob URL, use it
+          if (vid && typeof vid === 'object' && vid.url) return vid.url;
+          return '';
+        }).filter(url => url !== ''),
+        colors: variant.colors || [],
+        additionalData: {
+          // Store additional variant data here
+          productName: variant.productName || '',
+          title: variant.title || '',
+          description: variant.description || '',
+          manufacturingDetails: variant.manufacturingDetails || '',
+          shippingAndReturns: variant.shippingReturns || {},
+          regularPrice: variant.regularPrice || 0,
+          salePrice: variant.salePrice || 0,
+          filters: variant.filters || {},
+          stockSizes: variant.stockSizes || [],
+          customSizes: variant.customSizes || []
+        }
       })),
       
       // Also show in options - convert to boolean structure expected by backend
       alsoShowInOptions: {
-        youMightAlsoLike: alsoShowInOptions?.youMightAlsoLike?.value === 'yes' || false,
-        similarItems: alsoShowInOptions?.similarItems?.value === 'yes' || false,
-        othersAlsoBought: alsoShowInOptions?.othersAlsoBought?.value === 'yes' || false,
-        customOptions: []
+        youMightAlsoLike: Boolean(alsoShowInOptions?.youMightAlsoLike?.value === 'yes' || alsoShowInOptions?.youMightAlsoLike === true),
+        similarItems: Boolean(alsoShowInOptions?.similarItems?.value === 'yes' || alsoShowInOptions?.similarItems === true),
+        othersAlsoBought: Boolean(alsoShowInOptions?.othersAlsoBought?.value === 'yes' || alsoShowInOptions?.othersAlsoBought === true),
+        customOptions: alsoShowInOptions?.customOptions || []
       },
       
       // Size charts
@@ -1923,6 +2087,45 @@ const SingleProductUpload = React.memo(() => {
     productFilters
   ]);
 
+  // Helper function to validate uploads before product creation
+  const validateUploads = useCallback(() => {
+    const issues = [];
+    
+    variants.forEach((variant, variantIndex) => {
+      // Check images
+      if (variant.images && variant.images.length > 0) {
+        variant.images.forEach((img, imgIndex) => {
+          if (img && typeof img === 'object') {
+            if (img.status === 'failed') {
+              issues.push(`Variant ${variantIndex + 1}, Image ${imgIndex + 1}: Upload failed (${img.name})`);
+            } else if (img.status === 'uploading') {
+              issues.push(`Variant ${variantIndex + 1}, Image ${imgIndex + 1}: Still uploading (${img.name})`);
+            } else if (!img.serverUrl && img.url && img.url.startsWith('blob:')) {
+              issues.push(`Variant ${variantIndex + 1}, Image ${imgIndex + 1}: Upload incomplete - using temporary URL (${img.name})`);
+            }
+          }
+        });
+      }
+      
+      // Check videos
+      if (variant.videos && variant.videos.length > 0) {
+        variant.videos.forEach((vid, vidIndex) => {
+          if (vid && typeof vid === 'object') {
+            if (vid.status === 'failed') {
+              issues.push(`Variant ${variantIndex + 1}, Video ${vidIndex + 1}: Upload failed (${vid.name})`);
+            } else if (vid.status === 'uploading') {
+              issues.push(`Variant ${variantIndex + 1}, Video ${vidIndex + 1}: Still uploading (${vid.name})`);
+            } else if (!vid.serverUrl && vid.url && vid.url.startsWith('blob:')) {
+              issues.push(`Variant ${variantIndex + 1}, Video ${vidIndex + 1}: Upload incomplete - using temporary URL (${vid.name})`);
+            }
+          }
+        });
+      }
+    });
+    
+    return issues;
+  }, [variants]);
+
   const handleSaveAsDraft = useCallback(() => {
     if (!productData.productName?.trim()) {
       showNotification("Product name is required", NOTIFICATION_TYPES.ERROR);
@@ -1934,10 +2137,35 @@ const SingleProductUpload = React.memo(() => {
       return;
     }
 
+    // Check for upload issues
+    const uploadIssues = validateUploads();
+    if (uploadIssues.length > 0) {
+      console.warn('Upload issues detected:', uploadIssues);
+      showNotification(
+        `Warning: Some files may not have uploaded properly. ${uploadIssues.length} issue(s) found. Check console for details.`,
+        NOTIFICATION_TYPES.WARNING
+      );
+      // Continue with draft save anyway, but warn user
+    }
+
     try {
       const draftData = createProductDataForAPI('draft');
       console.log('Saving draft with data:', draftData);
-      dispatch(createProduct(draftData));
+      
+      dispatch(createProduct(draftData))
+        .then((result) => {
+          if (createProduct.fulfilled.match(result)) {
+            console.log('Draft saved successfully:', result.payload);
+            showNotification("Draft saved successfully!", NOTIFICATION_TYPES.SUCCESS);
+          } else {
+            console.error('Draft save failed:', result.payload);
+            showNotification(`Failed to save draft: ${result.payload}`, NOTIFICATION_TYPES.ERROR);
+          }
+        })
+        .catch((error) => {
+          console.error('Error in dispatch:', error);
+          showNotification("Failed to save draft", NOTIFICATION_TYPES.ERROR);
+        });
     } catch (error) {
       console.error('Error creating draft:', error);
       showNotification("Failed to save draft", NOTIFICATION_TYPES.ERROR);
@@ -1948,7 +2176,8 @@ const SingleProductUpload = React.memo(() => {
     selectedSubCategory,
     createProductDataForAPI,
     dispatch,
-    showNotification
+    showNotification,
+    validateUploads
   ]);
 
   const handlePublishNow = useCallback(() => {
@@ -1967,10 +2196,36 @@ const SingleProductUpload = React.memo(() => {
       return;
     }
 
+    // Check for upload issues - more strict for publishing
+    const uploadIssues = validateUploads();
+    if (uploadIssues.length > 0) {
+      console.warn('Upload issues detected:', uploadIssues);
+      showNotification(
+        `Cannot publish: ${uploadIssues.length} upload issue(s) found. Please wait for uploads to complete or re-upload failed files.`,
+        NOTIFICATION_TYPES.ERROR
+      );
+      console.error('Upload issues preventing publish:', uploadIssues);
+      return; // Don't allow publishing with upload issues
+    }
+
     try {
       const publishData = createProductDataForAPI('live');
       console.log('Publishing with data:', publishData);
-      dispatch(createProduct(publishData));
+      
+      dispatch(createProduct(publishData))
+        .then((result) => {
+          if (createProduct.fulfilled.match(result)) {
+            console.log('Product created successfully:', result.payload);
+            showNotification("Product published successfully!", NOTIFICATION_TYPES.SUCCESS);
+          } else {
+            console.error('Product creation failed:', result.payload);
+            showNotification(`Failed to publish product: ${result.payload}`, NOTIFICATION_TYPES.ERROR);
+          }
+        })
+        .catch((error) => {
+          console.error('Error in dispatch:', error);
+          showNotification("Failed to publish product", NOTIFICATION_TYPES.ERROR);
+        });
     } catch (error) {
       console.error('Error publishing product:', error);
       showNotification("Failed to publish product", NOTIFICATION_TYPES.ERROR);
@@ -1982,7 +2237,8 @@ const SingleProductUpload = React.memo(() => {
     selectedSubCategory,
     createProductDataForAPI,
     dispatch,
-    showNotification
+    showNotification,
+    validateUploads
   ]);
 
   const handleScheduleForLater = useCallback(() => {

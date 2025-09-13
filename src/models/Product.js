@@ -24,13 +24,44 @@ const sizeSchema = new Schema({
     }
 }, { _id: false });
 
-// Variant schema for different product variants
+// Variant schema for different product variants with enhanced fields
 const variantSchema = new Schema({
     name: { type: String, required: true },
+    
+    // Basic variant information
+    productName: { type: String, default: '' },
+    title: { type: String, default: '' },
+    description: { type: String, default: '' },
+    manufacturingDetails: { type: String, default: '' },
+    
+    // Variant-specific pricing
+    regularPrice: { type: Number, default: 0 },
+    salePrice: { type: Number, default: 0 },
+    
+    // Shipping and returns for variant
+    shippingAndReturns: { type: Schema.Types.Mixed, default: {} },
+    
+    // Media for variant
     images: [{ type: String }], // Array of image URLs
     videos: [{ type: String }], // Array of video URLs
+    
+    // Variant filters and options
+    filters: { type: Schema.Types.Mixed, default: {} },
     colors: [{ type: String }], // Array of color options
-    additionalData: { type: Schema.Types.Mixed } // Flexible additional data
+    
+    // Variant size management
+    stockSizes: [{ type: Schema.Types.Mixed }],
+    customSizes: [{ type: Schema.Types.Mixed }],
+    
+    // Meta data for variant
+    metaData: {
+        metaTitle: { type: String, default: '' },
+        metaDescription: { type: String, default: '' },
+        slugUrl: { type: String, default: '' }
+    },
+    
+    // Additional data for nested options
+    additionalData: { type: Schema.Types.Mixed, default: {} }
 }, { _id: false });
 
 const productSchema= new Schema({
@@ -110,8 +141,26 @@ const productSchema= new Schema({
     },
     sizes: [sizeSchema],
     
-    // Variants with images up to 5 (can be increased)
+    // Enhanced media management
+    images: [{
+        url: { type: String, required: true },
+        order: { type: Number, default: 0 },
+        alt: { type: String, default: '' },
+        isMain: { type: Boolean, default: false }
+    }],
+    videos: [{
+        url: { type: String, required: true },
+        order: { type: Number, default: 0 },
+        title: { type: String, default: '' }
+    }],
+    mediaOrder: [{ type: Number }],
+    
+    // Variants with enhanced structure
     variants: [variantSchema],
+    
+    // Enhanced filter assignment
+    filters: [{ type: Schema.Types.Mixed }],
+    productFilters: [{ type: Schema.Types.Mixed }],
     
     // Size charts (uploaded as excel/image)
     sizeChart: {
@@ -122,7 +171,9 @@ const productSchema= new Schema({
     commonSizeChart: {
         cmChart: { type: String },
         inchChart: { type: String },
-        measurementGuide: { type: String }
+        measurementGuide: { type: String },
+        attachedToVariants: [{ type: Number }], // Array of variant indices
+        globalChart: { type: String }
     },
     
     // Meta data fields
@@ -139,25 +190,37 @@ const productSchema= new Schema({
         default: ''
     },
     
-    // Filter assignment
-    filters: [{
-        key: { type: String },
-        value: { type: String },
-        code: { type: String }
-    }],
-    
-    // Also show in options (different apps option)
+    // Enhanced also show in options
     alsoShowInOptions: {
-        youMightAlsoLike: { type: Boolean, default: false },
-        similarItems: { type: Boolean, default: false },
-        othersAlsoBought: { type: Boolean, default: false },
-        // Dynamic options can be added
-        customOptions: [{ 
-            id: String, 
-            label: String, 
-            value: Boolean 
-        }]
+        similarItems: {
+            enabled: { type: Boolean, default: false },
+            placement: { type: String, default: 'default' },
+            items: [{ type: Schema.Types.Mixed }]
+        },
+        othersAlsoBought: {
+            enabled: { type: Boolean, default: false },
+            placement: { type: String, default: 'default' },
+            items: [{ type: Schema.Types.Mixed }]
+        },
+        youMightAlsoLike: {
+            enabled: { type: Boolean, default: false },
+            placement: { type: String, default: 'default' },
+            items: [{ type: Schema.Types.Mixed }]
+        },
+        customOptions: [{ type: Schema.Types.Mixed }],
+        appPlacements: { type: Schema.Types.Mixed, default: {} }
     },
+    
+    // Enhanced publishing and scheduling options
+    publishingOptions: {
+        action: { type: String, enum: ['draft', 'publish', 'schedule', 'save_later'], default: 'draft' },
+        scheduledDate: { type: String },
+        scheduledTime: { type: String },
+        publishAt: { type: Date },
+        autoPublish: { type: Boolean, default: false },
+        notificationSettings: { type: Schema.Types.Mixed, default: {} }
+    },
+    publishedAt: { type: Date },
     
     // Product status
     status: {
@@ -186,6 +249,7 @@ const productSchema= new Schema({
     
     // Additional fields
     tags: [{ type: String }],
+    additionalData: { type: Schema.Types.Mixed, default: {} },
     
     // Legacy fields (keeping for backward compatibility)
     price: {

@@ -55,6 +55,33 @@ exports.createItem = async (req, res, newItemId) => {
       return res.status(400).json(ApiResponse(null, "Category and subcategory are required", false, 400));
     }
 
+    // Validate that no blob URLs are being sent
+    const validateUrls = (urlArray, type) => {
+      if (Array.isArray(urlArray)) {
+        const blobUrls = urlArray.filter(url => typeof url === 'string' && url.startsWith('blob:'));
+        if (blobUrls.length > 0) {
+          throw new Error(`Invalid ${type} URLs detected. Found ${blobUrls.length} temporary blob URL(s). Please ensure all files are properly uploaded to the server before submitting.`);
+        }
+      }
+    };
+
+    // Check variants for blob URLs
+    if (variants && Array.isArray(variants)) {
+      variants.forEach((variant, index) => {
+        if (variant.images) {
+          validateUrls(variant.images, `image in variant ${index + 1}`);
+        }
+        if (variant.videos) {
+          validateUrls(variant.videos, `video in variant ${index + 1}`);
+        }
+      });
+    }
+
+    // Check legacy imageUrl
+    if (imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('blob:')) {
+      return res.status(400).json(ApiResponse(null, "Invalid image URL detected. Please ensure the image is properly uploaded to the server before submitting.", false, 400));
+    }
+
     const subCategory = await SubCategory.findById(subCategoryId);
     if (!subCategory) {
       return res.status(400).json(ApiResponse(null, "SubCategory not found", false, 400));
@@ -164,8 +191,12 @@ exports.createItem = async (req, res, newItemId) => {
       
       // Additional options
       alsoShowInOptions,
-      sizeChart,
-      commonSizeChart,
+      sizeChart: typeof sizeChart === 'object' ? sizeChart : {},
+      commonSizeChart: {
+        cmChart: typeof commonSizeChart?.cmChart === 'string' ? commonSizeChart.cmChart : '',
+        inchChart: typeof commonSizeChart?.inchChart === 'string' ? commonSizeChart.inchChart : '',
+        measurementGuide: typeof commonSizeChart?.measurementGuide === 'string' ? commonSizeChart.measurementGuide : ''
+      },
       filters: formattedFilters,
       tags: Array.isArray(tags) ? tags : [],
       status,
@@ -383,51 +414,17 @@ exports.getItemsByFilter = async (req, res) => {
  * Get all items (with pagination)
  */
 exports.getAllItems = async (req, res) => {
-  console.log("Fetching all items with populated data")
+  console.log("qqqqqqqqqqqqqq")
   try {
     const { page = 1, limit = 100 } = req.query;
-    
-    // Populate referenced fields to show actual data instead of ObjectIds
     const items = await Item.find()
-      .populate('categoryId', 'name _id')
-      .populate('subCategoryId', 'name _id')
       .skip((page - 1) * Number(limit))
-      .limit(Number(limit))
-      .lean(); // Use lean() for better performance
+      .limit(Number(limit));
 
     const totalItems = await Item.countDocuments();
 
-    // Transform data to match frontend expectations
-    const transformedItems = items.map(item => ({
-      ...item,
-      // Map populated data to expected field names
-      category: item.categoryId?.name || 'Unknown Category',
-      subCategory: item.subCategoryId?.name || 'Unknown Subcategory',
-      subCategories: item.subCategoryId?.name || 'Unknown Subcategory',
-      // Extract price information
-      price: item.regularPrice || item.price || 0,
-      salePrice: item.salePrice || item.discountPrice || 0,
-      // Map size information
-      size: item.sizes || [],
-      sizes: item.sizes || [],
-      // Calculate quantity from stock sizes
-      quantity: item.stockSizes?.reduce((total, size) => total + (size.stock || 0), 0) || item.stock || 0,
-      // Map HSN and barcode
-      hsn: item.hsn || 'N/A',
-      barcodeNo: item.barcode || 'N/A',
-      // Map SKU information
-      skus: item.stockSizes?.reduce((acc, size) => {
-        acc[size.size] = size.sku || 'N/A';
-        return acc;
-      }, {}) || {},
-      // Map platform pricing
-      platforms: item.platformPricing || {},
-      // Ensure filters are in the right format
-      filters: item.filters || []
-    }));
-
     res.status(200).json({
-      items: transformedItems,
+      items,
       totalPages: Math.ceil(totalItems / limit),
       currentPage: Number(page),
     });
