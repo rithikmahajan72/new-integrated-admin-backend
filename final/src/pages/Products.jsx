@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { itemAPI } from '../api/endpoints';
 import { Search, Filter, ShoppingCart, Eye, Heart, Star } from 'lucide-react';
+import SaveForLaterButton from '../components/SaveForLaterButton';
 
 const Products = () => {
   const navigate = useNavigate();
@@ -71,6 +72,12 @@ const Products = () => {
           <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50">
             <Heart className="w-4 h-4 text-gray-600" />
           </button>
+          <SaveForLaterButton 
+            item={product} 
+            size="sm"
+            variant="icon"
+            showText={false}
+          />
           <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50">
             <Eye className="w-4 h-4 text-gray-600" />
           </button>

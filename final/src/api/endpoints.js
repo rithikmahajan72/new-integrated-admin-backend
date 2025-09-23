@@ -21,6 +21,15 @@ export const userAPI = {
   getUserById: (userId) => API.get(`/api/user/${userId}`),
 };
 
+// Firebase Admin API endpoints
+export const firebaseAPI = {
+  getAllUsers: () => API.get('/api/firebase/users'),
+  getUserById: (uid) => API.get(`/api/firebase/users/${uid}`),
+  blockUser: (uid, reason) => API.post(`/api/firebase/users/${uid}/block`, { reason }),
+  unblockUser: (uid) => API.post(`/api/firebase/users/${uid}/unblock`),
+  deleteUser: (uid) => API.delete(`/api/firebase/users/${uid}`),
+};
+
 // Items/Products API endpoints
 export const itemAPI = {
   // Get items
@@ -116,6 +125,57 @@ export const wishlistAPI = {
   clearWishlist: () => API.delete('/api/wishlist/clear'),
 };
 
+// Save For Later API endpoints
+export const saveForLaterAPI = {
+  getSaveForLater: () => API.get('/save-for-later'),
+  addToSaveForLater: (data) => API.post('/save-for-later/add', data),
+  removeFromSaveForLater: (itemId) => API.delete(`/save-for-later/remove/${itemId}`),
+  clearSaveForLater: () => API.delete('/save-for-later/clear'),
+  moveToCart: (data) => API.post('/save-for-later/move-to-cart', data),
+  moveToWishlist: (data) => API.post('/save-for-later/move-to-wishlist', data),
+  updateNote: (itemId, data) => API.put(`/save-for-later/update-note/${itemId}`, data)
+};
+
+// Promo Code API endpoints
+export const promoCodeAPI = {
+  // Get all promo codes with filtering and pagination
+  getAllPromoCodes: (params = {}) => API.get('/api/promoCode/admin/promo-codes', { params }),
+  
+  // Get promo code by ID
+  getPromoCodeById: (id) => API.get(`/api/promoCode/admin/promo-codes/${id}`),
+  
+  // Create new promo code
+  createPromoCode: (promoCodeData) => API.post('/api/promoCode/admin/promo-codes', promoCodeData),
+  
+  // Update promo code
+  updatePromoCode: (id, promoCodeData) => API.put(`/api/promoCode/admin/promo-codes/${id}`, promoCodeData),
+  
+  // Delete promo code
+  deletePromoCode: (id) => API.delete(`/api/promoCode/admin/promo-codes/${id}`),
+  
+  // Validate promo code (public endpoint)
+  validatePromoCode: (data) => API.post('/api/promoCode/promo-codes/validate', data),
+  
+  // Bulk operations
+  bulkToggleStatus: (data) => API.post('/api/promoCode/admin/promo-codes/bulk/toggle-status', data),
+  bulkDelete: (data) => API.post('/api/promoCode/admin/promo-codes/bulk/delete', data),
+  
+  // Get statistics
+  getPromoCodeStats: () => API.get('/api/promoCode/admin/promo-codes/stats'),
+  
+  // Search promo codes
+  searchPromoCodes: (query) => API.get(`/api/promoCode/admin/promo-codes/search?q=${encodeURIComponent(query)}`),
+  
+  // Get promo codes by status
+  getPromoCodesByStatus: (isActive) => API.get(`/api/promoCode/admin/promo-codes/status/${isActive}`),
+  
+  // Get expired promo codes
+  getExpiredPromoCodes: () => API.get('/api/promoCode/admin/promo-codes/expired'),
+  
+  // Clone promo code
+  clonePromoCode: (id) => API.post(`/api/promoCode/admin/promo-codes/${id}/clone`),
+};
+
 // Order API endpoints
 export const orderAPI = {
   getAllOrders: (params = {}) => API.get('/api/orders', { params }),
@@ -152,8 +212,8 @@ export const reviewAPI = {
   getUserReviews: () => API.get('/api/reviews/user'),
 };
 
-// Promo Code API endpoints
-export const promoCodeAPI = {
+// Legacy Promo Code endpoints (kept for backward compatibility)
+export const legacyPromoAPI = {
   validatePromoCode: (code) => API.post('/api/promo/validate', { code }),
   applyPromoCode: (code, orderData) => API.post('/api/promo/apply', { code, ...orderData }),
   getUserPromoCodes: () => API.get('/api/promo/user'),
@@ -202,10 +262,21 @@ export const filterAPI = {
 
 // Notification API endpoints
 export const notificationAPI = {
-  getAllNotifications: () => API.get('/api/notifications'),
+  getAllNotifications: () => API.get('/api/notifications/notifications'),
   markAsRead: (notificationId) => API.put(`/api/notifications/${notificationId}/read`),
   markAllAsRead: () => API.put('/api/notifications/read-all'),
   deleteNotification: (notificationId) => API.delete(`/api/notifications/${notificationId}`),
+};
+
+// Push Notification API endpoints
+export const pushNotificationAPI = {
+  sendNotification: (notificationData) => API.post('/api/notifications/send-notification', notificationData),
+  uploadNotificationImage: (formData) => API.post('/api/notifications/upload-notification-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getNotificationHistory: () => API.get('/api/notifications/notifications'),
+  scheduleNotification: (notificationData) => API.post('/api/notifications/schedule-notification', notificationData),
+  cancelScheduledNotification: (notificationId) => API.delete(`/api/notifications/schedule/${notificationId}`),
 };
 
 // Bulk Upload API endpoints (admin)
@@ -266,6 +337,81 @@ export const partnerAPI = {
   
   // Partner authentication endpoints
   partnerLogin: (credentials) => API.post('/api/partners/auth/login', credentials),
+};
+
+// Points System API endpoints
+export const pointsAPI = {
+  // System configuration
+  getSystemConfig: () => API.get('/api/points/config'),
+  updateSystemConfig: (configData) => API.put('/api/points/config', configData),
+  
+  // Users with points
+  getAllUsersWithPoints: (params = {}) => API.get('/api/points/users', { params }),
+  getUserPoints: (userId) => API.get(`/api/points/user/${userId}`),
+  getUserPointsHistory: (userId, params = {}) => API.get(`/api/points/user/${userId}/history`, { params }),
+  
+  // Points operations
+  allocatePoints: (userId, pointsData) => API.post(`/api/points/user/${userId}/allocate`, pointsData),
+  redeemPoints: (userId, pointsData) => API.post(`/api/points/user/${userId}/redeem`, pointsData),
+  updateUserPoints: (userId, pointsData) => API.put(`/api/points/user/${userId}`, pointsData),
+  deleteUserPoints: (userId) => API.delete(`/api/points/user/${userId}`),
+  
+  // Summary and statistics
+  getPointsSummary: () => API.get('/api/points/summary'),
+};
+
+// Invite Friend API endpoints
+export const inviteFriendAPI = {
+  // Admin endpoints
+  getAllInviteCodes: (params = {}) => API.get('/api/invite-friend/admin/all', { params }),
+  getInviteCodeById: (id) => API.get(`/api/invite-friend/admin/${id}`),
+  createInviteCode: (inviteCodeData) => API.post('/api/invite-friend/admin/create', inviteCodeData),
+  updateInviteCode: (id, inviteCodeData) => API.put(`/api/invite-friend/admin/${id}`, inviteCodeData),
+  deleteInviteCode: (id) => API.delete(`/api/invite-friend/admin/${id}`),
+  toggleStatus: (id) => API.patch(`/api/invite-friend/admin/${id}/toggle-status`),
+  generateCode: (options = {}) => API.post('/api/invite-friend/admin/generate-code', options),
+  getDetailedStats: () => API.get('/api/invite-friend/admin/detailed-stats'),
+  bulkDelete: (data) => API.delete('/api/invite-friend/admin/bulk-delete', { data }),
+  bulkUpdateStatus: (data) => API.patch('/api/invite-friend/admin/bulk-status', data),
+  exportCodes: () => API.get('/api/invite-friend/admin/export'),
+  getRedemptionAnalytics: (params = {}) => API.get('/api/invite-friend/admin/analytics/redemptions', { params }),
+  getPerformanceAnalytics: () => API.get('/api/invite-friend/admin/analytics/performance'),
+  
+  // Public endpoints
+  validateCode: (code) => API.get(`/api/invite-friend/validate/${code}`),
+  getStats: () => API.get('/api/invite-friend/stats'),
+  
+  // User endpoints
+  redeemCode: (codeData) => API.post('/api/invite-friend/redeem', codeData),
+  getUserRedeemed: () => API.get('/api/invite-friend/my-redeemed')
+};
+
+// Create endpoints object for easier access
+export const endpoints = {
+  inviteFriend: {
+    // Admin endpoints
+    getAllInviteCodes: '/api/invite-friend/admin/all',
+    getInviteCodeById: (id) => `/api/invite-friend/admin/${id}`,
+    createInviteCode: '/api/invite-friend/admin/create',
+    updateInviteCode: (id) => `/api/invite-friend/admin/${id}`,
+    deleteInviteCode: (id) => `/api/invite-friend/admin/${id}`,
+    toggleStatus: (id) => `/api/invite-friend/admin/${id}/toggle-status`,
+    generateCode: '/api/invite-friend/admin/generate-code',
+    getDetailedStats: '/api/invite-friend/admin/detailed-stats',
+    bulkDelete: '/api/invite-friend/admin/bulk-delete',
+    bulkUpdateStatus: '/api/invite-friend/admin/bulk-status',
+    exportCodes: '/api/invite-friend/admin/export',
+    getRedemptionAnalytics: '/api/invite-friend/admin/analytics/redemptions',
+    getPerformanceAnalytics: '/api/invite-friend/admin/analytics/performance',
+    
+    // Public endpoints
+    validateCode: (code) => `/api/invite-friend/validate/${code}`,
+    getStats: '/api/invite-friend/stats',
+    
+    // User endpoints
+    redeemCode: '/api/invite-friend/redeem',
+    getUserRedeemed: '/api/invite-friend/my-redeemed'
+  }
 };
 
 export default API;

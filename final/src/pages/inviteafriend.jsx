@@ -2,1102 +2,869 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useReducer,
+  useEffect,
   useRef,
 } from "react";
+import { useDispatch, useSelector } from 'react-redux';
+import { 
+  Search, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Power, 
+  Eye,
+  MoreHorizontal,
+  Calendar,
+  Users,
+  TrendingUp,
+  Filter,
+  Download,
+  RefreshCw
+} from "lucide-react";
 import TwoFactorAuth from "../components/TwoFactorAuth";
+import SuccessModal from "../components/SuccessModal";
+import { toast } from 'react-hot-toast';
 
-// Constants for better performance
-const OTP_INPUT_PATTERNS = [
-  'input[data-otp-index="{index}"]',
-  "#otp-{index}",
-  "#otp-off-{index}",
-  "#edit-otp-{index}",
-  "#delete-otp-{index}",
-  "#issue-otp-{index}",
-];
+// Import Redux actions
+import {
+  getAllInviteCodes,
+  createInviteCode,
+  updateInviteCode,
+  deleteInviteCode,
+  toggleInviteCodeStatus,
+  generateInviteCode,
+  getInviteCodeStats,
+  getDetailedInviteCodeStats,
+  bulkDeleteInviteCodes,
+  bulkUpdateStatus,
+  clearError,
+  updateFilters,
+  resetFilters,
+  setCurrentInviteCode,
+  clearCurrentInviteCode
+} from '../store/inviteFriendSlice';
 
-const DIGIT_REGEX = /^\d*$/;
+const InviteFriend = () => {
+  const dispatch = useDispatch();
+  
+  // Redux state
+  const {
+    inviteCodes,
+    currentInviteCode,
+    stats,
+    detailedStats,
+    loading,
+    error,
+    pagination,
+    filters
+  } = useSelector(state => state.inviteFriend);
 
-// Modal state management using useReducer for better performance
-const initialModalState = {
-  // Edit flow
-  showEditModal: false,
-  showEdit2FAModal: false,
-  showEditSuccessModal: false,
+  // Local state for modals and forms
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  
+  const [selectedCodes, setSelectedCodes] = useState([]);
+  const [currentAction, setCurrentAction] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    code: '',
+    description: '',
+    discountType: 'percentage',
+    discountValue: '',
+    maxRedemptions: 100,
+    expiryDate: '',
+    terms: '',
+    minOrderValue: 0
+  });
 
-  // Delete flow
-  showDeleteConfirmationModal: false,
-  showDeleteSuccessModal: false,
-  showDelete2FAModal: false,
-  showDeleteFinalSuccessModal: false,
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  
+  // Load data on component mount
+  useEffect(() => {
+    dispatch(getAllInviteCodes({ page: 1, limit: 10 }));
+    dispatch(getInviteCodeStats());
+    dispatch(getDetailedInviteCodeStats());
+  }, [dispatch]);
 
-  // Toggle flow
-  showConfirmationModal: false,
-  showOffConfirmationModal: false,
-  show2FAModal: false,
-  showOff2FAModal: false,
-  showSuccessModal: false,
-  showOffSuccessModal: false,
-  showFinalSuccessModal: false,
-  showOffFinalSuccessModal: false,
+  // Filter codes based on search and status
+  const filteredCodes = useMemo(() => {
+    let filtered = inviteCodes;
+    
+    if (searchTerm) {
+      filtered = filtered.filter(code => 
+        code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        code.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(code => code.status === statusFilter);
+    }
+    
+    return filtered;
+  }, [inviteCodes, searchTerm, statusFilter]);
 
-  // Issue flow
-  showIssue2FAModal: false,
-  showIssueSuccessModal: false,
-  showIssueFinalSuccessModal: false,
-};
+  // Handle form input changes
+  const handleInputChange = useCallback((field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  }, []);
 
-const modalReducer = (state, action) => {
-  switch (action.type) {
-    case "SHOW_MODAL":
-      return { ...state, [action.modal]: true };
-    case "HIDE_MODAL":
-      return { ...state, [action.modal]: false };
-    case "HIDE_MULTIPLE_MODALS":
-      const updates = {};
-      action.modals.forEach((modal) => {
-        updates[modal] = false;
-      });
-      return { ...state, ...updates };
-    case "RESET_MODALS":
-      return initialModalState;
-    default:
-      return state;
-  }
-};
-
-// Form state management
-const initialFormState = {
-  userName: "",
-  codeToIssue: "",
-  codeLimit: "",
-  codeValue: "",
-  editUserName: "",
-  editCodeToIssue: "",
-  otpCode: ["", "", "", ""],
-  issueOtpCode: ["", "", "", ""],
-  verificationPassword: "",
-  defaultPassword: "",
-  issuePassword: "",
-  showVerificationPassword: false,
-  showDefaultPassword: false,
-  showIssuePassword: false,
-};
-
-const formReducer = (state, action) => {
-  switch (action.type) {
-    case "SET_FIELD":
-      // Early return if value hasn't changed
-      if (state[action.field] === action.value) {
-        return state;
-      }
-      return { ...state, [action.field]: action.value };
-    case "RESET_FORM":
-      return initialFormState;
-    case "RESET_2FA":
-      return {
-        ...state,
-        otpCode: ["", "", "", ""],
-        issueOtpCode: ["", "", "", ""],
-        verificationPassword: "",
-        defaultPassword: "",
-        issuePassword: "",
-      };
-    case "RESET_EDIT":
-      return {
-        ...state,
-        editUserName: "",
-        editCodeToIssue: "",
-      };
-    default:
-      return state;
-  }
-};
-
-const InviteAFriend = React.memo(() => {
-  // Core application state
-  const [isToggleOn, setIsToggleOn] = useState(true);
-  const [toggleAction, setToggleAction] = useState("");
-  const [editingCode, setEditingCode] = useState(null);
-  const [deletingCode, setDeletingCode] = useState(null);
-
-  // Reducers for complex state management
-  const [modalState, dispatchModal] = useReducer(
-    modalReducer,
-    initialModalState
-  );
-  const [formState, dispatchForm] = useReducer(formReducer, initialFormState);
-
-  // Refs for better OTP focus management
-  const otpRefsMap = useRef(new Map());
-
-  const [issuedCodes, setIssuedCodes] = useState([
-    {
-      id: 1,
-      username: "Rithik",
-      code: "RITHIK27",
-      description:
-        "Invite a friend and get additional 10% off on your 1st purchase",
-    },
-    {
-      id: 2,
-      username: "Rithik",
-      code: "RITHIK27",
-      description:
-        "Invite a friend and get additional 10% off on your 1st purchase",
-    },
-  ]);
-
-  // Optimized OTP input focus function
-  const focusOtpInput = useCallback((index, direction = "next") => {
-    const targetIndex = direction === "next" ? index + 1 : index - 1;
-    const inputRef = otpRefsMap.current.get(targetIndex);
-
-    if (inputRef && inputRef.current) {
-      inputRef.current.focus();
+  // Handle create invite code
+  const handleCreateCode = useCallback(async () => {
+    if (!formData.code || !formData.description || !formData.discountValue) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
-    // Fallback to DOM query if ref not available
-    for (const pattern of OTP_INPUT_PATTERNS) {
-      const selector = pattern.replace("{index}", targetIndex.toString());
-      const input = document.querySelector(selector);
-      if (input) {
-        input.focus();
-        break;
-      }
+    try {
+      setCurrentAction('create');
+      setShow2FAModal(true);
+    } catch (error) {
+      toast.error('Failed to create invite code');
     }
-  }, []);
+  }, [formData]);
 
-  // Memoized validation functions
-  const validateFormFields = useCallback(() => {
-    const { userName, codeToIssue, codeLimit, codeValue } = formState;
-    return userName && codeToIssue && codeLimit && codeValue;
-  }, [
-    formState.userName,
-    formState.codeToIssue,
-    formState.codeLimit,
-    formState.codeValue,
-  ]);
-
-  const validate2FAFields = useCallback(() => {
-    const otpString = formState.otpCode.join("");
-    const { verificationPassword, defaultPassword } = formState;
-    return otpString.length === 4 && verificationPassword && defaultPassword;
-  }, [
-    formState.otpCode,
-    formState.verificationPassword,
-    formState.defaultPassword,
-  ]);
-
-  // Optimized generic modal handlers
-  const showModal = useCallback((modal) => {
-    dispatchModal({ type: "SHOW_MODAL", modal });
-  }, []);
-
-  const hideModal = useCallback((modal) => {
-    dispatchModal({ type: "HIDE_MODAL", modal });
-  }, []);
-
-  const hideMultipleModals = useCallback((modals) => {
-    dispatchModal({ type: "HIDE_MULTIPLE_MODALS", modals });
-  }, []);
-
-  const resetForm = useCallback(() => {
-    dispatchForm({ type: "RESET_FORM" });
-  }, []);
-
-  const reset2FA = useCallback(() => {
-    dispatchForm({ type: "RESET_2FA" });
-  }, []);
-
-  // Optimized handlers using useCallback
-  const handleIssueCode = useCallback(() => {
-    if (validateFormFields()) {
-      showModal("showIssue2FAModal");
-    } else {
-      alert("Please fill in all fields");
+  // Handle generate random code
+  const handleGenerateCode = useCallback(async () => {
+    try {
+      const result = await dispatch(generateInviteCode({ length: 8 })).unwrap();
+      handleInputChange('code', result.data.code);
+      toast.success('Code generated successfully!');
+    } catch (error) {
+      toast.error('Failed to generate code');
     }
-  }, [validateFormFields, showModal]);
+  }, [dispatch, handleInputChange]);
 
-  const handleToggleInviteSystem = useCallback(
-    (status) => {
-      setToggleAction(status);
-      if (status === "on" && !isToggleOn) {
-        showModal("showConfirmationModal");
-      } else if (status === "off" && isToggleOn) {
-        showModal("showOffConfirmationModal");
-      }
-    },
-    [isToggleOn, showModal]
-  );
-
-  // Generic 2FA handler with optimized modal management
-  const handle2FASubmit = useCallback(
-    (nextModal, data) => {
-      // Data contains: { code: string, emailPassword: string, defaultPassword: string }
-      console.log("2FA submitted with data:", data);
-      hideMultipleModals([
-        "show2FAModal",
-        "showOff2FAModal",
-        "showEdit2FAModal",
-        "showIssue2FAModal",
-        "showDelete2FAModal",
-      ]);
-      showModal(nextModal);
-    },
-    [hideMultipleModals, showModal]
-  );
-
-  // Specific 2FA handlers
-  const handleToggle2FASubmit = useCallback(
-    (data) => {
-      handle2FASubmit("showSuccessModal", data);
-    },
-    [handle2FASubmit]
-  );
-
-  const handleToggleOff2FASubmit = useCallback(
-    (data) => {
-      handle2FASubmit("showOffSuccessModal", data);
-    },
-    [handle2FASubmit]
-  );
-
-  const handleEdit2FASubmit = useCallback(
-    (data) => {
-      handle2FASubmit("showEditSuccessModal", data);
-    },
-    [handle2FASubmit]
-  );
-
-  const handleIssue2FASubmit = useCallback(
-    (data) => {
-      handle2FASubmit("showIssueSuccessModal", data);
-    },
-    [handle2FASubmit]
-  );
-
-  const handleDelete2FASubmit = useCallback(
-    (data) => {
-      handle2FASubmit("showDeleteSuccessModal", data);
-    },
-    [handle2FASubmit]
-  );
-
-  // Confirmation handlers
-  const handleConfirmToggleOn = useCallback(() => {
-    hideModal("showConfirmationModal");
-    showModal("show2FAModal");
-  }, [hideModal, showModal]);
-
-  const handleConfirmToggleOff = useCallback(() => {
-    hideModal("showOffConfirmationModal");
-    showModal("showOff2FAModal");
-  }, [hideModal, showModal]);
-
-  // Cancel handlers with optimized modal management
-  const handleCancelToggle = useCallback(() => {
-    hideModal("showConfirmationModal");
-  }, [hideModal]);
-
-  const handleCancelOffToggle = useCallback(() => {
-    hideModal("showOffConfirmationModal");
-  }, [hideModal]);
-
-  const handleCancel2FA = useCallback(() => {
-    hideMultipleModals([
-      "show2FAModal",
-      "showOff2FAModal",
-      "showEdit2FAModal",
-      "showIssue2FAModal",
-      "showDelete2FAModal",
-    ]);
-    reset2FA();
-  }, [hideMultipleModals, reset2FA]);
-
-  // Success modal handlers
-  const handleSuccessModalDone = useCallback(() => {
-    hideModal("showSuccessModal");
-    showModal("showFinalSuccessModal");
-  }, [hideModal, showModal]);
-
-  const handleOffSuccessModalDone = useCallback(() => {
-    hideModal("showOffSuccessModal");
-    showModal("showOffFinalSuccessModal");
-  }, [hideModal, showModal]);
-
-  const handleFinalSuccessModalDone = useCallback(() => {
-    hideModal("showFinalSuccessModal");
-    setIsToggleOn(true);
-  }, [hideModal]);
-
-  const handleOffFinalSuccessModalDone = useCallback(() => {
-    hideModal("showOffFinalSuccessModal");
-    setIsToggleOn(false);
-  }, [hideModal]);
-
-  const handleCloseSuccessModal = useCallback(() => {
-    hideModal("showSuccessModal");
-    setIsToggleOn(true);
-  }, [hideModal]);
-
-  const handleCloseOffSuccessModal = useCallback(() => {
-    hideModal("showOffSuccessModal");
-    setIsToggleOn(false);
-  }, [hideModal]);
-
-  const handleCloseFinalSuccessModal = useCallback(() => {
-    hideModal("showFinalSuccessModal");
-    setIsToggleOn(true);
-  }, [hideModal]);
-
-  const handleCloseOffFinalSuccessModal = useCallback(() => {
-    hideModal("showOffFinalSuccessModal");
-    setIsToggleOn(false);
-  }, [hideModal]);
-
-  // Code management handlers
-  const handleCopyCode = useCallback((code) => {
-    navigator.clipboard.writeText(code);
-  }, []);
-
-  const handleEditCode = useCallback(
-    (code) => {
-      setEditingCode(code);
-      dispatchForm({
-        type: "SET_FIELD",
-        field: "editUserName",
-        value: code.username,
-      });
-      dispatchForm({
-        type: "SET_FIELD",
-        field: "editCodeToIssue",
-        value: code.code,
-      });
-      showModal("showEditModal");
-    },
-    [showModal]
-  );
-
-  const handleDeleteCode = useCallback(
-    (code) => {
-      setDeletingCode(code);
-      showModal("showDeleteConfirmationModal");
-    },
-    [showModal]
-  );
-
-  const handleSaveEditedCode = useCallback(() => {
-    const { editUserName, editCodeToIssue } = formState;
-    if (editUserName.trim() && editCodeToIssue.trim()) {
-      hideModal("showEditModal");
-      showModal("showEdit2FAModal");
-    } else {
-      alert("Please fill in all fields");
-    }
-  }, [formState.editUserName, formState.editCodeToIssue, hideModal, showModal]);
-
-  const handleCancelEdit = useCallback(() => {
-    hideModal("showEditModal");
-    setEditingCode(null);
-    dispatchForm({ type: "RESET_EDIT" });
-  }, [hideModal]);
-
-  const handleEditSuccessDone = useCallback(() => {
-    const { editUserName, editCodeToIssue } = formState;
-    if (editingCode && editUserName.trim() && editCodeToIssue.trim()) {
-      setIssuedCodes((prevCodes) =>
-        prevCodes.map((code) =>
-          code.id === editingCode.id
-            ? {
-                ...code,
-                username: editUserName.trim(),
-                code: editCodeToIssue.toUpperCase().trim(),
-              }
-            : code
-        )
-      );
-      setEditingCode(null);
-      dispatchForm({ type: "RESET_EDIT" });
-    }
-    hideModal("showEditSuccessModal");
-  }, [
-    editingCode,
-    formState.editUserName,
-    formState.editCodeToIssue,
-    hideModal,
-  ]);
-
-  const handleCloseEditSuccessModal = useCallback(() => {
-    hideModal("showEditSuccessModal");
-    setEditingCode(null);
-    dispatchForm({ type: "RESET_EDIT" });
-  }, [hideModal]);
-
-  const handleConfirmDelete = useCallback(() => {
-    hideModal("showDeleteConfirmationModal");
-    showModal("showDelete2FAModal");
-  }, [hideModal, showModal]);
-
-  const handleCancelDelete = useCallback(() => {
-    hideModal("showDeleteConfirmationModal");
-    setDeletingCode(null);
-  }, [hideModal]);
-
-  const handleDeleteSuccessModalDone = useCallback(() => {
-    hideModal("showDeleteSuccessModal");
-    showModal("showDeleteFinalSuccessModal");
-  }, [hideModal, showModal]);
-
-  const handleDeleteFinalSuccessModalDone = useCallback(() => {
-    hideModal("showDeleteFinalSuccessModal");
-
-    // Actually delete the code now
-    if (deletingCode) {
-      setIssuedCodes((prevCodes) =>
-        prevCodes.filter((code) => code.id !== deletingCode.id)
-      );
-      setDeletingCode(null);
-    }
-  }, [deletingCode, hideModal]);
-
-  const handleCloseDeleteSuccessModal = useCallback(() => {
-    hideModal("showDeleteSuccessModal");
-    setDeletingCode(null);
-  }, [hideModal]);
-
-  const handleCloseDeleteFinalSuccessModal = useCallback(() => {
-    hideModal("showDeleteFinalSuccessModal");
-    setDeletingCode(null);
-  }, [hideModal]);
-
-  // Issue code handlers
-  const handleIssueSuccessModalDone = useCallback(() => {
-    hideModal("showIssueSuccessModal");
-    showModal("showIssueFinalSuccessModal");
-  }, [hideModal, showModal]);
-
-  const handleIssueFinalSuccessModalDone = useCallback(() => {
-    hideModal("showIssueFinalSuccessModal");
-
-    // Actually create the code now
-    const { userName, codeToIssue, codeLimit, codeValue } = formState;
-    if (userName && codeToIssue && codeLimit && codeValue) {
-      const newCode = {
-        id: issuedCodes.length + 1,
-        username: userName,
-        code: codeToIssue.toUpperCase(),
-        description: `Invite a friend and get additional ${codeValue}% off on your 1st purchase`,
-      };
-      setIssuedCodes((prevCodes) => [...prevCodes, newCode]);
-
-      // Reset form
-      dispatchForm({ type: "RESET_FORM" });
-    }
-  }, [
-    formState.userName,
-    formState.codeToIssue,
-    formState.codeLimit,
-    formState.codeValue,
-    issuedCodes.length,
-    hideModal,
-  ]);
-
-  const handleCloseIssueSuccessModal = useCallback(() => {
-    hideModal("showIssueSuccessModal");
-  }, [hideModal]);
-
-  const handleCloseIssueFinalSuccessModal = useCallback(() => {
-    hideModal("showIssueFinalSuccessModal");
-  }, [hideModal]);
-
-  // Optimized OTP handling with refs and better performance
-  const handleOtpChange = useCallback(
-    (index, value) => {
-      if (value.length <= 1 && DIGIT_REGEX.test(value)) {
-        const newOtp = [...formState.otpCode];
-        newOtp[index] = value;
-        dispatchForm({ type: "SET_FIELD", field: "otpCode", value: newOtp });
-
-        // Auto-focus next input
-        if (value && index < 3) {
-          focusOtpInput(index, "next");
-        }
-      }
-    },
-    [formState.otpCode, focusOtpInput]
-  );
-
-  const handleOtpKeyDown = useCallback(
-    (index, e) => {
-      if (e.key === "Backspace" && !formState.otpCode[index] && index > 0) {
-        focusOtpInput(index, "prev");
-      }
-    },
-    [formState.otpCode, focusOtpInput]
-  );
-
-  // Issue OTP handling with optimized focus management
-  const handleIssueOtpChange = useCallback(
-    (index, value) => {
-      if (value.length <= 1 && DIGIT_REGEX.test(value)) {
-        const newOtp = [...formState.issueOtpCode];
-        newOtp[index] = value;
-        dispatchForm({
-          type: "SET_FIELD",
-          field: "issueOtpCode",
-          value: newOtp,
-        });
-
-        // Auto-focus next input
-        if (value && index < 3) {
-          const nextInput = document.getElementById(`issue-otp-${index + 1}`);
-          if (nextInput) nextInput.focus();
-        }
-      }
-    },
-    [formState.issueOtpCode]
-  );
-
-  const handleIssueOtpKeyDown = useCallback(
-    (index, e) => {
-      if (
-        e.key === "Backspace" &&
-        !formState.issueOtpCode[index] &&
-        index > 0
-      ) {
-        const prevInput = document.getElementById(`issue-otp-${index - 1}`);
-        if (prevInput) prevInput.focus();
-      }
-    },
-    [formState.issueOtpCode]
-  );
-
-  const handleCancelIssue2FA = useCallback(() => {
-    hideModal("showIssue2FAModal");
-    dispatchForm({
-      type: "SET_FIELD",
-      field: "issueOtpCode",
-      value: ["", "", "", ""],
+  // Handle edit invite code
+  const handleEditCode = useCallback((code) => {
+    dispatch(setCurrentInviteCode(code));
+    setFormData({
+      code: code.code,
+      description: code.description,
+      discountType: code.discountType,
+      discountValue: code.discountValue,
+      maxRedemptions: code.maxRedemptions,
+      expiryDate: code.expiryDate ? code.expiryDate.split('T')[0] : '',
+      terms: code.terms || '',
+      minOrderValue: code.minOrderValue || 0
     });
-    dispatchForm({ type: "SET_FIELD", field: "issuePassword", value: "" });
-  }, [hideModal]);
+    setShowEditModal(true);
+  }, [dispatch]);
 
-  // Optimized form field handlers
-  const handleFieldChange = useCallback((field, value) => {
-    dispatchForm({ type: "SET_FIELD", field, value });
+  // Handle update invite code
+  const handleUpdateCode = useCallback(async () => {
+    if (!currentInviteCode) return;
+
+    try {
+      setCurrentAction('update');
+      setShow2FAModal(true);
+    } catch (error) {
+      toast.error('Failed to update invite code');
+    }
+  }, [currentInviteCode]);
+
+  // Handle delete invite code
+  const handleDeleteCode = useCallback((code) => {
+    dispatch(setCurrentInviteCode(code));
+    setShowDeleteModal(true);
+  }, [dispatch]);
+
+  // Handle confirm delete
+  const handleConfirmDelete = useCallback(async () => {
+    if (!currentInviteCode) return;
+
+    try {
+      setCurrentAction('delete');
+      setShow2FAModal(true);
+    } catch (error) {
+      toast.error('Failed to delete invite code');
+    }
+  }, [currentInviteCode]);
+
+  // Handle toggle status
+  const handleToggleStatus = useCallback(async (code) => {
+    try {
+      await dispatch(toggleInviteCodeStatus(code._id)).unwrap();
+      toast.success(`Code ${code.status === 'active' ? 'deactivated' : 'activated'} successfully!`);
+    } catch (error) {
+      toast.error('Failed to toggle status');
+    }
+  }, [dispatch]);
+
+  // Handle bulk actions
+  const handleBulkAction = useCallback(async (action) => {
+    if (selectedCodes.length === 0) {
+      toast.error('Please select codes first');
+      return;
+    }
+
+    try {
+      if (action === 'delete') {
+        await dispatch(bulkDeleteInviteCodes(selectedCodes)).unwrap();
+        toast.success(`${selectedCodes.length} codes deleted successfully!`);
+      } else {
+        await dispatch(bulkUpdateStatus({ ids: selectedCodes, status: action })).unwrap();
+        toast.success(`${selectedCodes.length} codes updated successfully!`);
+      }
+      setSelectedCodes([]);
+      setShowBulkActions(false);
+    } catch (error) {
+      toast.error(`Failed to ${action} codes`);
+    }
+  }, [selectedCodes, dispatch]);
+
+  // Handle 2FA completion
+  const handle2FASuccess = useCallback(async () => {
+    try {
+      let result;
+      
+      switch (currentAction) {
+        case 'create':
+          result = await dispatch(createInviteCode(formData)).unwrap();
+          setSuccessMessage('Invite code created successfully!');
+          setFormData({
+            code: '',
+            description: '',
+            discountType: 'percentage',
+            discountValue: '',
+            maxRedemptions: 100,
+            expiryDate: '',
+            terms: '',
+            minOrderValue: 0
+          });
+          setShowCreateModal(false);
+          break;
+          
+        case 'update':
+          result = await dispatch(updateInviteCode({ 
+            id: currentInviteCode._id, 
+            updates: formData 
+          })).unwrap();
+          setSuccessMessage('Invite code updated successfully!');
+          setShowEditModal(false);
+          dispatch(clearCurrentInviteCode());
+          break;
+          
+        case 'delete':
+          result = await dispatch(deleteInviteCode(currentInviteCode._id)).unwrap();
+          setSuccessMessage('Invite code deleted successfully!');
+          setShowDeleteModal(false);
+          dispatch(clearCurrentInviteCode());
+          break;
+          
+        default:
+          return;
+      }
+      
+      setShow2FAModal(false);
+      setShowSuccessModal(true);
+    } catch (error) {
+      toast.error(error.message || 'Operation failed');
+      setShow2FAModal(false);
+    }
+  }, [currentAction, formData, currentInviteCode, dispatch]);
+
+  // Handle checkbox selection
+  const handleSelectCode = useCallback((codeId, checked) => {
+    setSelectedCodes(prev => 
+      checked 
+        ? [...prev, codeId]
+        : prev.filter(id => id !== codeId)
+    );
   }, []);
 
-  // Fixed password visibility toggle to prevent unnecessary re-renders
-  const togglePasswordVisibility = useCallback(
-    (field) => {
-      dispatchForm({
-        type: "SET_FIELD",
-        field,
-        value: !formState[field],
-      });
-    },
-    [formState]
-  );
+  // Handle select all
+  const handleSelectAll = useCallback((checked) => {
+    setSelectedCodes(checked ? filteredCodes.map(code => code._id) : []);
+  }, [filteredCodes]);
 
-  // Memoized button class names to prevent recreation
-  const getToggleButtonClass = useCallback((isActive) => {
-    return `px-4 py-2 rounded-full text-sm font-medium border ${
-      isActive
-        ? "bg-blue-600 text-white border-black"
-        : "bg-white text-black border-gray-300"
-    }`;
-  }, []);
+  // Handle refresh data
+  const handleRefresh = useCallback(() => {
+    dispatch(getAllInviteCodes({ page: pagination.currentPage, limit: 10 }));
+    dispatch(getInviteCodeStats());
+    dispatch(getDetailedInviteCodeStats());
+  }, [dispatch, pagination.currentPage]);
 
-  // Memoized issued codes components to prevent unnecessary re-renders
-  const issuedCodesElements = useMemo(() => {
-    return issuedCodes.map((code) => (
-      <div key={code.id} className="bg-gray-50 p-4 rounded-lg border">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <div className="font-semibold text-lg">{code.username}</div>
-            <div className="text-blue-600 font-mono text-lg">{code.code}</div>
-            <div className="text-gray-600 text-sm mt-1">{code.description}</div>
+  // Render stats cards
+  const renderStatsCards = () => (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <Users className="h-6 w-6 text-blue-600" />
           </div>
-          <div className="flex gap-2 ml-4">
-            <button
-              onClick={() => handleCopyCode(code.code)}
-              className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
-            >
-              Copy
-            </button>
-            <button
-              onClick={() => handleEditCode(code)}
-              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => handleDeleteCode(code)}
-              className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
-            >
-              Delete
-            </button>
+          <div className="ml-4">
+            <p className="text-sm text-gray-600">Total Codes</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {stats.totalCodes || 0}
+            </p>
           </div>
         </div>
       </div>
-    ));
-  }, [issuedCodes, handleCopyCode, handleEditCode, handleDeleteCode]);
+      
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center">
+          <div className="p-2 bg-green-100 rounded-lg">
+            <TrendingUp className="h-6 w-6 text-green-600" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm text-gray-600">Active Codes</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {stats.activeCodes || 0}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center">
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <Users className="h-6 w-6 text-purple-600" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm text-gray-600">Total Redemptions</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {stats.totalRedemptions || 0}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center">
+          <div className="p-2 bg-orange-100 rounded-lg">
+            <TrendingUp className="h-6 w-6 text-orange-600" />
+          </div>
+          <div className="ml-4">
+            <p className="text-sm text-gray-600">Utilization Rate</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {stats.utilizationRate || 0}%
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render create/edit modal
+  const renderFormModal = () => {
+    const isEdit = showEditModal;
+    const title = isEdit ? 'Edit Invite Code' : 'Create New Invite Code';
+    
+    return (
+      <div className={`fixed inset-0 bg-black bg-opacity-50 z-50 ${(showCreateModal || showEditModal) ? 'block' : 'hidden'}`}>
+        <div className="flex items-center justify-center min-h-screen p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setShowEditModal(false);
+                  dispatch(clearCurrentInviteCode());
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Code *
+                  </label>
+                  <div className="flex">
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="INVITE2024"
+                      maxLength={20}
+                    />
+                    <button
+                      onClick={handleGenerateCode}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description *
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Invite a friend and get 10% off on your first purchase"
+                  maxLength={500}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Discount Type *
+                  </label>
+                  <select
+                    value={formData.discountType}
+                    onChange={(e) => handleInputChange('discountType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="percentage">Percentage</option>
+                    <option value="fixed">Fixed Amount</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Discount Value * {formData.discountType === 'percentage' ? '(%)' : '(₹)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.discountValue}
+                    onChange={(e) => handleInputChange('discountValue', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={formData.discountType === 'percentage' ? '10' : '100'}
+                    min="0"
+                    max={formData.discountType === 'percentage' ? '100' : '10000'}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Max Redemptions
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.maxRedemptions}
+                    onChange={(e) => handleInputChange('maxRedemptions', parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="1"
+                    placeholder="100"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Expiry Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.expiryDate}
+                    onChange={(e) => handleInputChange('expiryDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Order Value (₹)
+                </label>
+                <input
+                  type="number"
+                  value={formData.minOrderValue}
+                  onChange={(e) => handleInputChange('minOrderValue', parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  placeholder="0"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Terms & Conditions
+                </label>
+                <textarea
+                  value={formData.terms}
+                  onChange={(e) => handleInputChange('terms', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Additional terms and conditions..."
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setShowEditModal(false);
+                  dispatch(clearCurrentInviteCode());
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={isEdit ? handleUpdateCode : handleCreateCode}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Processing...' : (isEdit ? 'Update Code' : 'Create Code')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-white min-h-screen p-6 text-black">
-      {/* Title */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-1">Invite a friend</h1>
-        <p className="text-base text-gray-600">
-          Invite a friend with a referral code and reward them!
-        </p>
-      </div>
-
-      {/* Toggle */}
-      <div className="flex items-center justify-between mb-10">
-        <span className="text-lg font-semibold">Referral Feature</span>
-        <div className="flex gap-3">
-          <button
-            onClick={() => handleToggleInviteSystem("on")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isToggleOn
-                ? "bg-black text-white"
-                : "bg-gray-200 text-black hover:bg-gray-300"
-            }`}
-          >
-            On
-          </button>
-          <button
-            onClick={() => handleToggleInviteSystem("off")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              !isToggleOn
-                ? "bg-black text-white"
-                : "bg-gray-200 text-black hover:bg-gray-300"
-            }`}
-          >
-            Off
-          </button>
-        </div>
-      </div>
-
-      {/* Form */}
-      <div className="max-w-4xl space-y-6 ">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-base font-medium mb-2">Username</label>
-            <input
-              type="text"
-              value={formState.userName}
-              onChange={(e) => handleFieldChange("userName", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 shadow-sm focus:outline-none focus:border-black"
-              placeholder="Enter username"
-            />
-          </div>
-
-          <div>
-            <label className="block text-base font-medium mb-2">
-              Code to Issue
-            </label>
-            <input
-              type="text"
-              value={formState.codeToIssue}
-              onChange={(e) => handleFieldChange("codeToIssue", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 shadow-sm focus:outline-none focus:border-black"
-              placeholder="Referral code (e.g. JOIN50)"
-            />
-          </div>
-
-          <div>
-            <label className="block text-base font-medium mb-2">
-              Code Limit
-            </label>
-            <input
-              type="number"
-              value={formState.codeLimit}
-              onChange={(e) => handleFieldChange("codeLimit", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 shadow-sm focus:outline-none focus:border-black"
-              placeholder="Usage limit"
-            />
-          </div>
-
-          <div>
-            <label className="block text-base font-medium mb-2">
-              Code Value (%)
-            </label>
-            <input
-              type="number"
-              value={formState.codeValue}
-              onChange={(e) => handleFieldChange("codeValue", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 shadow-sm focus:outline-none focus:border-black"
-              placeholder="Reward percentage"
-            />
-          </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Invite a Friend</h1>
+          <p className="text-gray-600">Manage invite codes and track redemptions</p>
         </div>
 
-        <button
-          onClick={handleIssueCode}
-          className="flex-1 bg-black text-white px-5 py-2 rounded-xl font-semibold hover:bg-gray-800 transition-colors shadow"
-        >
-          Issue Code
-        </button>
-      </div>
+        {/* Stats Cards */}
+        {renderStatsCards()}
 
-      {/* Issued Codes */}
-      <div className="mt-12">
-        <h2 className="text-xl font-bold mb-4">Issued Codes</h2>
-        <div className="space-y-4">{issuedCodesElements}</div>
-      </div>
-
-      {/* All Modal Components with Optimized State Management */}
-
-      {/* Confirmation Modal for turning ON */}
-      {modalState.showConfirmationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] relative w-full max-w-md mx-4 overflow-clip">
-            <button
-              onClick={handleCancelToggle}
-              className="absolute right-[33px] top-[33px] w-6 h-6 text-gray-500 hover:text-gray-700"
-            >
-              <div className="absolute bottom-[17.18%] left-[17.18%] right-[17.18%] top-[17.17%]">
-                <svg
-                  className="w-full h-full"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
+        {/* Controls */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search codes..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                </svg>
+                </div>
+                
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="expired">Expired</option>
+                </select>
               </div>
-            </button>
+              
+              <div className="flex items-center gap-3">
+                {selectedCodes.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">
+                      {selectedCodes.length} selected
+                    </span>
+                    <button
+                      onClick={() => setShowBulkActions(!showBulkActions)}
+                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                    >
+                      Bulk Actions
+                    </button>
+                  </div>
+                )}
+                
+                <button
+                  onClick={handleRefresh}
+                  disabled={loading}
+                  className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+                
+                <button
+                  onClick={() => setShowStatsModal(true)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  View Stats
+                </button>
+                
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Code
+                </button>
+              </div>
+            </div>
+            
+            {/* Bulk Actions */}
+            {showBulkActions && selectedCodes.length > 0 && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600">Bulk Actions:</span>
+                  <button
+                    onClick={() => handleBulkAction('active')}
+                    className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200"
+                  >
+                    Activate
+                  </button>
+                  <button
+                    onClick={() => handleBulkAction('inactive')}
+                    className="px-3 py-1 text-sm bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200"
+                  >
+                    Deactivate
+                  </button>
+                  <button
+                    onClick={() => handleBulkAction('delete')}
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
-            <div className="absolute top-[60px] left-1/2 transform -translate-x-1/2 w-[180px] text-center">
-              <p className="font-bold text-black text-[18px] leading-[22px] tracking-[-0.41px] font-['Montserrat']">
-                Are you sure you want to turn on invite a friend feature
+        {/* Invite Codes Table */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedCodes.length === filteredCodes.length && filteredCodes.length > 0}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Code
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Discount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Redemptions
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expiry
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredCodes.map((code) => (
+                  <tr key={code._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedCodes.includes(code._id)}
+                        onChange={(e) => handleSelectCode(code._id, e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-mono text-sm font-medium text-gray-900">
+                        {code.code}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {code.description}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {code.discountType === 'percentage' ? `${code.discountValue}%` : `₹${code.discountValue}`}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {code.redemptionCount}/{code.maxRedemptions}
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full" 
+                          style={{ width: `${(code.redemptionCount / code.maxRedemptions) * 100}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        code.status === 'active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : code.status === 'inactive'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {code.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {code.expiryDate ? new Date(code.expiryDate).toLocaleDateString() : 'No expiry'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEditCode(code)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(code)}
+                          className={`${code.status === 'active' ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'}`}
+                        >
+                          <Power className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCode(code)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {filteredCodes.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-gray-500">
+                {loading ? 'Loading invite codes...' : 'No invite codes found'}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-gray-700">
+              Showing page {pagination.currentPage} of {pagination.totalPages}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => dispatch(getAllInviteCodes({ page: pagination.currentPage - 1, limit: 10 }))}
+                disabled={!pagination.hasPrevPage}
+                className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => dispatch(getAllInviteCodes({ page: pagination.currentPage + 1, limit: 10 }))}
+                disabled={!pagination.hasNextPage}
+                className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {renderFormModal()}
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Confirm Delete
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete the invite code "{currentInviteCode?.code}"? 
+                This action cannot be undone.
               </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    dispatch(clearCurrentInviteCode());
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-
-            <div className="absolute top-[189px] left-1/2 transform -translate-x-1/2 flex gap-4">
-              <button
-                onClick={handleConfirmToggleOn}
-                className="bg-black text-white rounded-3xl w-[149px] h-12 font-semibold text-[16px] leading-[22px] font-['Montserrat'] hover:bg-gray-800 transition-colors"
-              >
-                yes
-              </button>
-
-              <button
-                onClick={handleCancelToggle}
-                className="border border-[#e4e4e4] text-black rounded-[100px] w-[209px] h-16 font-medium text-[16px] leading-[19.2px] font-['Montserrat'] hover:bg-gray-50 transition-colors flex items-center justify-center"
-              >
-                Cancel
-              </button>
-            </div>
-
-            <div className="h-[280px]"></div>
           </div>
         </div>
       )}
 
-      {/* Confirmation Modal for turning OFF */}
-      {modalState.showOffConfirmationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] relative w-full max-w-md mx-4 overflow-clip">
-            <button
-              onClick={handleCancelOffToggle}
-              className="absolute right-[33px] top-[33px] w-6 h-6 text-gray-500 hover:text-gray-700"
-            >
-              <div className="absolute bottom-[17.18%] left-[17.18%] right-[17.18%] top-[17.17%]">
-                <svg
-                  className="w-full h-full"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </div>
-            </button>
-
-            <div className="absolute top-[60px] left-1/2 transform -translate-x-1/2 w-[180px] text-center">
-              <p className="font-bold text-black text-[18px] leading-[22px] tracking-[-0.41px] font-['Montserrat']">
-                Are you sure you want to turn off invite a friend feature
-              </p>
-            </div>
-
-            <div className="absolute top-[189px] left-1/2 transform -translate-x-1/2 flex gap-4">
-              <button
-                onClick={handleConfirmToggleOff}
-                className="bg-black text-white rounded-3xl w-[149px] h-12 font-semibold text-[16px] leading-[22px] font-['Montserrat'] hover:bg-gray-800 transition-colors"
-              >
-                yes
-              </button>
-
-              <button
-                onClick={handleCancelOffToggle}
-                className="border border-[#e4e4e4] text-black rounded-[100px] w-[209px] h-16 font-medium text-[16px] leading-[19.2px] font-['Montserrat'] hover:bg-gray-50 transition-colors flex items-center justify-center"
-              >
-                Cancel
-              </button>
-            </div>
-
-            <div className="h-[280px]"></div>
-          </div>
-        </div>
-      )}
-
-      {/* 2FA Modal for turning ON */}
-      {modalState.show2FAModal && (
+      {/* 2FA Modal */}
+      {show2FAModal && (
         <TwoFactorAuth
-          onSubmit={handleToggle2FASubmit}
-          onClose={handleCancel2FA}
-          phoneNumber="+1 (555) 123-4567"
-          emailAddress="invite@friendsystem.com"
+          isOpen={show2FAModal}
+          onClose={() => setShow2FAModal(false)}
+          onSuccess={handle2FASuccess}
+          title="Verify Action"
+          description="Please verify your identity to complete this action"
         />
       )}
 
-      {/* Edit Modal */}
-      {modalState.showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold mb-4">Edit Code</h3>
-            <div className="space-y-4">
-              <input
-                type="text"
-                value={formState.editUserName}
-                onChange={(e) =>
-                  handleFieldChange("editUserName", e.target.value)
-                }
-                placeholder="Username"
-                className="w-full p-2 border rounded"
-              />
-              <input
-                type="text"
-                value={formState.editCodeToIssue}
-                onChange={(e) =>
-                  handleFieldChange("editCodeToIssue", e.target.value)
-                }
-                placeholder="Code"
-                className="w-full p-2 border rounded"
-              />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={handleSaveEditedCode}
-                className="flex-1 bg-black text-white py-2 rounded"
-              >
-                Save
-              </button>
-              <button
-                onClick={handleCancelEdit}
-                className="flex-1 bg-gray-300 py-2 rounded"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <SuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          title="Success!"
+          message={successMessage}
+        />
       )}
 
-      {/* Success Modal for turning ON */}
-      {modalState.showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] relative w-full max-w-md mx-4 overflow-clip">
+      {/* Error Display */}
+      {error && (
+        <div className="fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
+          <div className="flex items-center justify-between">
+            <span>{error}</span>
             <button
-              onClick={handleCloseSuccessModal}
-              className="absolute right-[33px] top-[33px] w-6 h-6 text-gray-500 hover:text-gray-700"
+              onClick={() => dispatch(clearError())}
+              className="ml-4 text-red-700 hover:text-red-900"
             >
-              <div className="absolute bottom-[17.18%] left-[17.18%] right-[17.18%] top-[17.17%]">
-                <svg
-                  className="w-full h-full"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </div>
-            </button>
-
-            <div className="absolute top-[61px] left-1/2 transform -translate-x-1/2 w-[242px] text-center">
-              <p className="font-bold text-black text-[18px] leading-[22px] tracking-[-0.41px] font-['Montserrat']">
-                id verified successfully!
-              </p>
-            </div>
-
-            <div
-              className="absolute top-[155px] left-1/2 transform"
-              style={{ transform: "translateX(calc(-50% + 7px))" }}
-            >
-              <button
-                onClick={handleSuccessModalDone}
-                className="bg-black text-white rounded-3xl w-[270px] h-12 font-semibold text-[16px] leading-[22px] font-['Montserrat'] hover:bg-gray-800 transition-colors"
-              >
-                Done
-              </button>
-            </div>
-
-            <div className="h-[240px]"></div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {modalState.showDeleteConfirmationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold mb-4">Confirm Delete</h3>
-            <p className="mb-4">Are you sure you want to delete this code?</p>
-            <div className="flex gap-2">
-              <button
-                onClick={handleConfirmDelete}
-                className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600"
-              >
-                Delete
-              </button>
-              <button
-                onClick={handleCancelDelete}
-                className="flex-1 bg-gray-300 py-2 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Issue Code Modal */}
-      {modalState.showIssue2FAModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div
-            className="bg-white rounded-[32px] shadow-[0px_4px_120px_2px_rgba(0,0,0,0.25)] relative"
-            style={{
-              width: "600px",
-              minHeight: "600px",
-              padding: "48px 56px",
-            }}
-          >
-            <button
-              onClick={handleCancelIssue2FA}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-
-            <div className="text-center mb-6">
-              <p className="text-lg font-bold text-black mb-4 tracking-[-0.41px] leading-[22px]">
-                If you want to change or access these settings please enter the
-                OTP send to your registered mobile no. and the password
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <h3 className="text-2xl font-bold text-black mb-2 tracking-[0.72px]">
-                Verification code
-              </h3>
-              <p className="text-sm text-black mb-4">
-                Please enter the verification code we sent to your phone number
-              </p>
-
-              <div className="flex justify-center gap-4 mb-4">
-                {formState.issueOtpCode.map((digit, index) => (
-                  <input
-                    key={index}
-                    id={`issue-otp-${index}`}
-                    type="text"
-                    value={digit}
-                    onChange={(e) =>
-                      handleIssueOtpChange(index, e.target.value)
-                    }
-                    onKeyDown={(e) => handleIssueOtpKeyDown(index, e)}
-                    className="w-12 h-12 border-2 border-gray-300 rounded-full text-center text-lg font-semibold focus:border-blue-500 focus:outline-none"
-                    maxLength={1}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-4 relative">
-              <input
-                type={formState.showIssuePassword ? "text" : "password"}
-                value={formState.issuePassword}
-                onChange={(e) =>
-                  handleFieldChange("issuePassword", e.target.value)
-                }
-                placeholder="Password"
-                className="w-full border-b border-gray-300 pb-2 text-base focus:border-blue-500 focus:outline-none bg-transparent"
-              />
-              <button
-                type="button"
-                onClick={() => togglePasswordVisibility("showIssuePassword")}
-                className="absolute right-0 top-0 text-gray-400 hover:text-gray-600"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  {formState.showIssuePassword ? (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  ) : (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
-                    />
-                  )}
-                </svg>
-              </button>
-            </div>
-
-            <button
-              onClick={handleIssue2FASubmit}
-              className="w-full bg-black text-white py-3 rounded-[26.5px] font-bold text-base uppercase hover:bg-gray-800 transition-colors"
-            >
-              SUBMIT
+              ×
             </button>
           </div>
         </div>
       )}
     </div>
   );
-});
+};
 
-InviteAFriend.displayName = "InviteAFriend";
-
-export default InviteAFriend;
+export default InviteFriend;

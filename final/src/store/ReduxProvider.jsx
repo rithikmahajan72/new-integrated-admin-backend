@@ -7,6 +7,7 @@ import { store, persistor } from './store';
 import { restoreAuthFromStorage } from './slices/authSlice';
 import { restoreCartFromStorage } from './slices/cartSlice';
 import { restoreWishlistFromStorage } from './slices/wishlistSlice';
+import { restoreSaveForLaterFromStorage } from './slices/saveForLaterSlice';
 import { restoreRecentlyViewed } from './slices/itemSlice';
 import { restoreRecentSearches } from './slices/searchSlice';
 
@@ -27,6 +28,7 @@ const StateInitializer = ({ children }) => {
     store.dispatch(restoreAuthFromStorage());
     store.dispatch(restoreCartFromStorage());
     store.dispatch(restoreWishlistFromStorage());
+    store.dispatch(restoreSaveForLaterFromStorage());
     store.dispatch(restoreRecentlyViewed());
     store.dispatch(restoreRecentSearches());
   }, []);

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔔 FCM Push Notification Test</h1>
+    
+    <div class="test-section">
+        <h3>1. Permission Test</h3>
+        <p>Test if notification permissions can be granted and FCM token can be retrieved.</p>
+        <button onclick="testPermission()">Test Permission & Get Token</button>
+        <div id="permissionResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Test Notification</h3>
+        <p>Send a test notification (requires permission first).</p>
+        <button onclick="sendTestNotification()">Send Test Notification</button>
+        <div id="notificationResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. VAPID Key Validation</h3>
+        <p>Check if VAPID key is properly configured.</p>
+        <button onclick="validateVapidKey()">Validate VAPID Key</button>
+        <div id="vapidResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Service Worker Test</h3>
+        <p>Check if service worker is registered and working.</p>
+        <button onclick="testServiceWorker()">Test Service Worker</button>
+        <div id="swResult"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCIYkTNzIrk_RugNOybriphlQ8aVTJ-KD8",
+            authDomain: "yoraa-android-ios.firebaseapp.com",
+            projectId: "yoraa-android-ios",
+            storageBucket: "yoraa-android-ios.firebasestorage.app",
+            messagingSenderId: "133733122921",
+            appId: "1:133733122921:web:2d177abff9fb94ef35b3f8",
+            measurementId: "G-HXS9N6W9D4"
+        };
+
+        // VAPID key
+        const vapidKey = "BOII1d4WyrWpOV4diW1ofHjSIaZXFWSbA4T4GytM_VEoBVy8tE5nw7J7f7iwHsauuxLz88uFnLGxFUNh5oekgs4";
+
+        // Import Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+        import { 
+            getMessaging, 
+            getToken, 
+            onMessage 
+        } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging.js';
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const messaging = getMessaging(app);
+
+        // Global functions for testing
+        window.testPermission = async function() {
+            const resultDiv = document.getElementById('permissionResult');
+            
+            try {
+                resultDiv.innerHTML = '<div class="info">Testing notification permission...</div>';
+                
+                // Request notification permission
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                    // Get FCM registration token
+                    const currentToken = await getToken(messaging, { 
+                        vapidKey: vapidKey 
+                    });
+                    
+                    if (currentToken) {
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                ✅ Permission granted and token received!<br>
+                                <strong>FCM Token:</strong><br>
+                                <textarea readonly style="width:100%;height:100px;">${currentToken}</textarea>
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = '<div class="error">❌ No registration token available.</div>';
+                    }
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Permission ${permission}. Please allow notifications.</div>`;
+                }
+            } catch (error) {
+                console.error('Permission test error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Error: ${error.message}<br>
+                        Check console for details.
+                    </div>
+                `;
+            }
+        };
+
+        window.sendTestNotification = function() {
+            const resultDiv = document.getElementById('notificationResult');
+            
+            if (Notification.permission !== 'granted') {
+                resultDiv.innerHTML = '<div class="error">❌ Permission not granted. Test permission first.</div>';
+                return;
+            }
+
+            try {
+                // Create a local notification for testing
+                const notification = new Notification('🧪 Test Notification', {
+                    body: 'This is a test notification from the FCM test page!',
+                    icon: '/favicon.ico',
+                    badge: '/favicon.ico',
+                    tag: 'fcm-test'
+                });
+
+                notification.onclick = () => {
+                    console.log('Test notification clicked');
+                    notification.close();
+                };
+
+                resultDiv.innerHTML = '<div class="success">✅ Test notification sent!</div>';
+            } catch (error) {
+                console.error('Notification error:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        window.validateVapidKey = function() {
+            const resultDiv = document.getElementById('vapidResult');
+            
+            // Check VAPID key format and length
+            if (!vapidKey) {
+                resultDiv.innerHTML = '<div class="error">❌ VAPID key not found</div>';
+                return;
+            }
+
+            // VAPID key should be base64url encoded and about 65 characters
+            const isValidFormat = /^[A-Za-z0-9_-]+$/.test(vapidKey);
+            const isValidLength = vapidKey.length >= 60 && vapidKey.length <= 90;
+            
+            if (isValidFormat && isValidLength) {
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ VAPID key format looks valid<br>
+                        <strong>Key:</strong> ${vapidKey.substring(0, 20)}...${vapidKey.substring(vapidKey.length - 10)}<br>
+                        <strong>Length:</strong> ${vapidKey.length} characters
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ VAPID key format invalid<br>
+                        Length: ${vapidKey.length}, Valid format: ${isValidFormat}
+                    </div>
+                `;
+            }
+        };
+
+        window.testServiceWorker = async function() {
+            const resultDiv = document.getElementById('swResult');
+            
+            if (!('serviceWorker' in navigator)) {
+                resultDiv.innerHTML = '<div class="error">❌ Service Worker not supported</div>';
+                return;
+            }
+
+            try {
+                resultDiv.innerHTML = '<div class="info">Testing service worker...</div>';
+                
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                
+                if (registration) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Service Worker registered successfully<br>
+                            <strong>Scope:</strong> ${registration.scope}<br>
+                            <strong>State:</strong> ${registration.active ? registration.active.state : 'inactive'}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ Service Worker registration failed</div>';
+                }
+            } catch (error) {
+                console.error('Service Worker error:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        // Listen for foreground messages
+        onMessage(messaging, (payload) => {
+            console.log('Message received in foreground:', payload);
+            
+            // Show notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const notification = new Notification(payload.notification.title, {
+                    body: payload.notification.body,
+                    icon: payload.notification.icon || '/favicon.ico'
+                });
+
+                notification.onclick = () => {
+                    console.log('FCM notification clicked');
+                    notification.close();
+                };
+            }
+        });
+
+        console.log('FCM Test page loaded successfully');
+    </script>
+</body>
+</html>

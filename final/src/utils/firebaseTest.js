@@ -1,5 +1,5 @@
 // Firebase connectivity test utility
-import { auth, db, analytics } from '../config/firebase';
+import { auth, analytics } from '../config/firebase';
 
 export const testFirebaseConnection = async () => {
   const results = {

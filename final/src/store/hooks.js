@@ -76,6 +76,76 @@ export const useWishlist = () => {
   };
 };
 
+// Save For Later hooks
+export const useSaveForLater = () => {
+  const saveForLater = useSelector((state) => state.saveForLater);
+  const dispatch = useDispatch();
+  
+  const addItem = useCallback((item) => {
+    dispatch({ type: 'saveForLater/addToSaveForLater', payload: item });
+  }, [dispatch]);
+  
+  const removeItem = useCallback((itemId) => {
+    dispatch({ type: 'saveForLater/removeFromSaveForLater', payload: itemId });
+  }, [dispatch]);
+  
+  const toggleItem = useCallback((item) => {
+    dispatch({ type: 'saveForLater/toggleSaveForLaterItem', payload: item });
+  }, [dispatch]);
+  
+  const isInSaveForLater = useCallback((itemId) => {
+    return saveForLater.items.some(item => item.id === itemId);
+  }, [saveForLater.items]);
+  
+  const clearAll = useCallback(() => {
+    dispatch({ type: 'saveForLater/clearSaveForLater' });
+  }, [dispatch]);
+  
+  const updateNote = useCallback((itemId, note) => {
+    dispatch({ type: 'saveForLater/updateSaveForLaterNote', payload: { itemId, note } });
+  }, [dispatch]);
+  
+  const sortItems = useCallback((sortBy) => {
+    dispatch({ type: 'saveForLater/sortSaveForLater', payload: sortBy });
+  }, [dispatch]);
+  
+  const setFilters = useCallback((filters) => {
+    dispatch({ type: 'saveForLater/setSaveForLaterFilters', payload: filters });
+  }, [dispatch]);
+  
+  const clearFilters = useCallback(() => {
+    dispatch({ type: 'saveForLater/clearSaveForLaterFilters' });
+  }, [dispatch]);
+  
+  const moveToCart = useCallback((itemId, cartData) => {
+    dispatch({ type: 'saveForLater/moveFromSaveForLaterToCart', payload: itemId });
+    // Also add to cart
+    dispatch({ type: 'cart/addToCart', payload: cartData });
+  }, [dispatch]);
+  
+  const moveToWishlist = useCallback((itemId, item) => {
+    dispatch({ type: 'saveForLater/moveFromSaveForLaterToWishlist', payload: itemId });
+    // Also add to wishlist
+    dispatch({ type: 'wishlist/addToWishlist', payload: item });
+  }, [dispatch]);
+  
+  return {
+    ...saveForLater,
+    addItem,
+    removeItem,
+    toggleItem,
+    isInSaveForLater,
+    clearAll,
+    updateNote,
+    sortItems,
+    setFilters,
+    clearFilters,
+    moveToCart,
+    moveToWishlist,
+    dispatch,
+  };
+};
+
 // Products hooks
 export const useProducts = () => {
   const products = useSelector((state) => state.products); // Backward compatibility
@@ -238,17 +308,141 @@ export const useSearch = () => {
   };
 };
 
+// Push Notification hooks
+export const usePushNotifications = () => {
+  const pushNotifications = useSelector((state) => state.pushNotification);
+  const dispatch = useDispatch();
+  
+  const sendNotification = useCallback((notificationData) => {
+    dispatch({ type: 'pushNotification/sendPushNotification', payload: notificationData });
+  }, [dispatch]);
+  
+  const updateNotification = useCallback((updates) => {
+    dispatch({ type: 'pushNotification/updateCurrentNotification', payload: updates });
+  }, [dispatch]);
+  
+  const resetNotification = useCallback(() => {
+    dispatch({ type: 'pushNotification/resetCurrentNotification' });
+  }, [dispatch]);
+  
+  const addToStack = useCallback((notification) => {
+    dispatch({ type: 'pushNotification/addToStack', payload: notification });
+  }, [dispatch]);
+  
+  const removeFromStack = useCallback((id) => {
+    dispatch({ type: 'pushNotification/removeFromStack', payload: id });
+  }, [dispatch]);
+  
+  return {
+    ...pushNotifications,
+    sendNotification,
+    updateNotification,
+    resetNotification,
+    addToStack,
+    removeFromStack,
+    dispatch,
+  };
+};
+
 // Combined hook for common app state
 export const useAppState = () => {
   const auth = useAuth();
   const cart = useCart();
   const wishlist = useWishlist();
+  const saveForLater = useSaveForLater();
   const ui = useUI();
+  const pushNotifications = usePushNotifications();
+  const promoCodes = usePromoCodes();
   
   return {
     auth,
     cart,
     wishlist,
+    saveForLater,
     ui,
+    pushNotifications,
+    promoCodes,
+  };
+};
+
+// Promo Codes hook
+export const usePromoCodes = () => {
+  const promoCodes = useSelector((state) => state.promoCodes);
+  const dispatch = useDispatch();
+  
+  const fetchPromoCodes = useCallback((params) => {
+    dispatch({ type: 'promoCodes/fetchPromoCodes', payload: params });
+  }, [dispatch]);
+  
+  const createPromoCode = useCallback((promoCodeData) => {
+    dispatch({ type: 'promoCodes/createPromoCode', payload: promoCodeData });
+  }, [dispatch]);
+  
+  const updatePromoCode = useCallback((id, promoCodeData) => {
+    dispatch({ type: 'promoCodes/updatePromoCode', payload: { id, promoCodeData } });
+  }, [dispatch]);
+  
+  const deletePromoCode = useCallback((id) => {
+    dispatch({ type: 'promoCodes/deletePromoCode', payload: id });
+  }, [dispatch]);
+  
+  const validatePromoCode = useCallback((code, cartTotal) => {
+    dispatch({ type: 'promoCodes/validatePromoCode', payload: { code, cartTotal } });
+  }, [dispatch]);
+  
+  const togglePromoCodeStatus = useCallback((id, isActive) => {
+    dispatch({ type: 'promoCodes/updatePromoCode', payload: { id, promoCodeData: { isActive } } });
+  }, [dispatch]);
+  
+  const bulkToggleStatus = useCallback((ids, isActive) => {
+    dispatch({ type: 'promoCodes/bulkTogglePromoCodeStatus', payload: { ids, isActive } });
+  }, [dispatch]);
+  
+  const bulkDelete = useCallback((ids) => {
+    dispatch({ type: 'promoCodes/bulkDeletePromoCodes', payload: ids });
+  }, [dispatch]);
+  
+  const setFilters = useCallback((filters) => {
+    dispatch({ type: 'promoCodes/updateFilters', payload: filters });
+  }, [dispatch]);
+  
+  const clearFilters = useCallback(() => {
+    dispatch({ type: 'promoCodes/resetFilters' });
+  }, [dispatch]);
+  
+  const clearError = useCallback(() => {
+    dispatch({ type: 'promoCodes/clearError' });
+  }, [dispatch]);
+  
+  const getPromoCodeById = useCallback((id) => {
+    return promoCodes.promoCodes.find(promo => promo._id === id);
+  }, [promoCodes.promoCodes]);
+  
+  return {
+    ...promoCodes,
+    fetchPromoCodes,
+    createPromoCode,
+    updatePromoCode,
+    deletePromoCode,
+    validatePromoCode,
+    togglePromoCodeStatus,
+    bulkToggleStatus,
+    bulkDelete,
+    setFilters,
+    clearFilters,
+    clearError,
+    getPromoCodeById,
+    dispatch,
+  };
+};
+
+// Points hooks
+export const usePoints = () => {
+  const points = useSelector((state) => state.points);
+  const dispatch = useDispatch();
+  
+  return {
+    ...points,
+    dispatch,
   };
 };

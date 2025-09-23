@@ -59,6 +59,14 @@ const Sidebar = React.memo(
           ],
         },
         {
+          title: "Customer Features",
+          titleSize: "text-xl",
+          items: [
+            { name: "Save For Later", path: "/save-for-later" },
+            { name: "Save For Later Examples", path: "/save-for-later-examples" },
+          ],
+        },
+        {
           title: "App functional area",
           titleSize: "text-xl",
           items: [

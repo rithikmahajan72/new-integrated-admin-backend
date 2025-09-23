@@ -1,11 +1,9 @@
-// Import the functions you need from the SDKs you need
+// Minimal Firebase configuration for admin panel - Auth only, no client-side Firestore
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCIYkTNzIrk_RugNOybriphlQ8aVTJ-KD8",
   authDomain: "yoraa-android-ios.firebaseapp.com",
@@ -19,14 +17,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication and get a reference to the service
+// Initialize Firebase Authentication only - no Firestore client
 export const auth = getAuth(app);
-
-// Initialize Cloud Firestore and get a reference to the service
-export const db = getFirestore(app);
-
-// Initialize Analytics
-export const analytics = getAnalytics(app);
 
 // Admin configuration
 export const ADMIN_CONFIG = {
@@ -39,4 +31,16 @@ export const isAdmin = (email, phone) => {
   return email === ADMIN_CONFIG.adminEmail || phone === ADMIN_CONFIG.adminPhone;
 };
 
+// Initialize Analytics (only in production)
+let analytics = null;
+try {
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+    analytics = getAnalytics(app);
+    console.log('✅ Firebase Analytics initialized');
+  }
+} catch (error) {
+  console.warn('⚠️ Analytics initialization failed:', error);
+}
+
+export { analytics };
 export default app;

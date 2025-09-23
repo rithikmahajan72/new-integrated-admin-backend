@@ -7,11 +7,15 @@ import storage from 'redux-persist/lib/storage';
 import authSlice from './slices/authSlice';
 import cartSlice from './slices/cartSlice';
 import wishlistSlice from './slices/wishlistSlice';
+import saveForLaterSlice from './slices/saveForLaterSlice';
+import promoCodeSlice from './slices/promoCodeSlice';
 import itemsSlice from './slices/itemSlice';
 import categoriesSlice from './slices/categoriesSlice';
 import subCategoriesSlice from './slices/subCategoriesSlice';
 import ordersSlice from './slices/ordersSlice';
 import userSlice from './slices/userSlice';
+import usersSlice from './slices/usersSlice';
+import firebaseUsersSlice from './slices/firebaseUsersSlice';
 import uiSlice from './slices/uiSlice';
 import checkoutSlice from './slices/checkoutSlice';
 import searchSlice from './slices/searchSlice';
@@ -19,12 +23,15 @@ import filtersSlice from './slices/filtersSlice';
 import productBundleSlice from './slices/productBundleSlice';
 import arrangementSlice from './slices/arrangementSlice';
 import partnerSlice from './slices/partnerSlice';
+import pushNotificationSlice from './slices/pushNotificationSlice';
+import pointsSlice from './slices/pointsSlice';
+import inviteFriendSlice from './inviteFriendSlice';
 
 // Persist configuration
 const persistConfig = {
   key: 'yoraa-root',
   storage,
-  whitelist: ['auth', 'cart', 'wishlist', 'user'], // Only persist these slices
+  whitelist: ['auth', 'cart', 'wishlist', 'saveForLater', 'user'], // Only persist these slices
   blacklist: ['ui', 'items', 'products', 'search'], // Don't persist these slices
 };
 
@@ -47,12 +54,16 @@ const rootReducer = combineReducers({
   auth: authSlice,
   cart: cartSlice,
   wishlist: wishlistSlice,
+  saveForLater: saveForLaterSlice,
+  promoCodes: promoCodeSlice,
   items: itemsSlice,
   products: itemsSlice, // Backward compatibility
   categories: categoriesSlice,
   subCategories: subCategoriesSlice,
   orders: ordersSlice,
   user: userSlice,
+  users: usersSlice,
+  firebaseUsers: firebaseUsersSlice,
   ui: uiSlice,
   checkout: checkoutSlice,
   search: searchSlice,
@@ -60,6 +71,9 @@ const rootReducer = combineReducers({
   productBundle: productBundleSlice,
   arrangement: arrangementSlice,
   partners: partnerSlice,
+  pushNotification: pushNotificationSlice,
+  points: pointsSlice,
+  inviteFriend: inviteFriendSlice,
 });
 
 // Create persisted reducer (temporarily disabled)

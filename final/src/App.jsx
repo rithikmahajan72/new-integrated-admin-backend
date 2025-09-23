@@ -60,6 +60,8 @@ import GetAutoInvoiceMailing from "./pages/get auto invoice mailing";
 import HuggingFaceApiOpenClose from "./pages/hugging face api open close";
 import Profile from "./pages/Profile";
 import EmailAndSmsTemplateManagementScreenPage from "./pages/emailandsmstempalatemanagementscreenpage";
+import SaveForLaterPage from "./pages/SaveForLaterPage";
+import SaveForLaterExamples from "./components/SaveForLaterExamples";
 
 const App = () => {
   const location = useLocation();
@@ -155,6 +157,10 @@ const App = () => {
           <Route path="/admin/products/view/:id" element={<ItemManagement />} />
 
           <Route path="/products" element={<Products />} />
+          
+          {/* ===== SAVE FOR LATER ===== */}
+          <Route path="/save-for-later" element={<SaveForLaterPage />} />
+          <Route path="/save-for-later-examples" element={<SaveForLaterExamples />} />
           <Route path="/upload-category" element={<UploadCategory />} />
           <Route path="/upload-category-simple" element={<UploadCategorySimple />} />
           <Route path="/subcategory" element={<SubCategory />} />

@@ -26,6 +26,10 @@ const ReviewRoutes = require("./src/routes/ReviewRoutes");
 const PromoCodeRoutes = require("./src/routes/PromoCodeRoutes");
 const ImageRoutes = require("./src/routes/ImageRoutes"); // Handles image URL refresh routes
 const partnerRoutes = require("./src/routes/PartnerRoutes"); // Handles partner management routes
+const firebaseRoutes = require("./src/routes/firebaseRoutes"); // Handles Firebase user management routes
+const firebaseAdminRoutes = require("./src/routes/firebaseAdmin"); // Handles Firebase Admin SDK routes
+const pointsRoutes = require("./src/routes/PointsRoutes"); // Handles points system routes
+const inviteFriendRoutes = require("./src/routes/inviteafriend"); // Handles invite a friend system routes
 const morgan = require("morgan");
 
 const app = express();
@@ -73,13 +77,17 @@ app.use("/api/razorpay", razorpayRoutes); // Payment processing routes using Raz
 app.use("/api/userProfile", userProfileRoutes); // User profile management routes
 app.use("/api/orders", orderRoutes); // Order management routes
 app.use("/api/privacyPolicy", privacyPolicyRoutes); // Privacy policy routes
-app.use("/api", notificationRoutes); // Notification-related routes (Note: Consider specifying a more specific path like /api/notifications)
+app.use("/api/notifications", notificationRoutes); // Notification-related routes
 app.use("/api/filters", filterRoutes); // Routes for filtering items (e.g., by category, price)
 app.use("/api/bulkUpload",bulkUploadRoutes );
 app.use('/api/reviews', ReviewRoutes); // Updated to distinct review path
 app.use("/api/promoCode", PromoCodeRoutes); // Mount promo code routes
 app.use("/api/images", ImageRoutes); // Mount image URL refresh routes
 app.use("/api/partners", partnerRoutes); // Mount partner management routes
+app.use("/api/firebase", firebaseRoutes); // Mount Firebase user management routes
+app.use("/api/admin/firebase", firebaseAdminRoutes); // Mount Firebase Admin SDK routes
+app.use("/api/points", pointsRoutes); // Mount points system routes
+app.use("/api/invite-friend", inviteFriendRoutes); // Mount invite a friend system routes
 
 
 // Start the server and listen on port 8080
