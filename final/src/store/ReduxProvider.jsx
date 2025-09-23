@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { store, persistor } from './index';
+import { store, persistor } from './store';
 
 // Import actions for initialization
 import { restoreAuthFromStorage } from './slices/authSlice';
 import { restoreCartFromStorage } from './slices/cartSlice';
 import { restoreWishlistFromStorage } from './slices/wishlistSlice';
-import { restoreRecentlyViewed } from './slices/productsSlice';
+import { restoreRecentlyViewed } from './slices/itemSlice';
 import { restoreRecentSearches } from './slices/searchSlice';
 
 // Loading component for PersistGate

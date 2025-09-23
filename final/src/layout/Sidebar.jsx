@@ -54,7 +54,8 @@ const Sidebar = React.memo(
           items: [
             { name: "Category", path: "/upload-category" },
             { name: "Subcategory", path: "/subcategory" },
-            { name: "Items", path: "/manage-items" },
+            { name: "Items", path: "/item-management" },
+            { name: "Upload Product", path: "/upload-product" },
           ],
         },
         {

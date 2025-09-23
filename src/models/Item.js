@@ -1,111 +1,85 @@
 const mongoose = require("mongoose");
-const { deleteFileFromS3 } = require("../utils/S3");
 
-// Platform pricing schema for different platforms
-const platformPricingSchema = new mongoose.Schema({
-    enabled: { type: Boolean, default: false },
-    price: { type: Number, default: 0 },
-    salePrice: { type: Number, default: 0 }
-}, { _id: false });
-
-// Size schema with platform-specific pricing
+// Enhanced Size schema (merged from both models)
 const sizeSchema = new mongoose.Schema({
     size: { type: String, required: true },
     quantity: { type: Number, default: 0 },
+    stock: { type: Number, default: 0 }, // For compatibility with paymentController
     hsnCode: { type: String, maxlength: 8 }, // 8 digits as requested
-    sku: { type: String, required: true }, // Format: men/tshirt/insomniac tshirt/2025/07/28/12345678
+    sku: { type: String, required: false }, // Format: men/tshirt/insomniac tshirt/2025/07/28/12345678 - auto-generated
     barcode: { type: String, maxlength: 14 }, // 14 digits as requested
-    platformPricing: {
-        yoraa: platformPricingSchema,
-        myntra: platformPricingSchema,
-        amazon: platformPricingSchema,
-        flipkart: platformPricingSchema,
-        nykaa: platformPricingSchema
-    }
-}, { _id: false });
-
-// Variant schema for different product variants
-const variantSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    images: [{ type: String }], // Array of image URLs
-    videos: [{ type: String }], // Array of video URLs
-    colors: [{ type: String }], // Array of color options
-    additionalData: { type: mongoose.Schema.Types.Mixed } // Flexible additional data
+    
+    // Pricing at size level
+    regularPrice: { type: Number, min: 0, default: 0 },
+    salePrice: { type: Number, min: 0, default: 0 },
+    
+    // Measurements in centimeters (cm)
+    fitWaistCm: { type: Number }, // fit waist (cm)
+    inseamLengthCm: { type: Number }, // inseam length (cm)
+    chestCm: { type: Number }, // chest (cm)
+    frontLengthCm: { type: Number }, // front length (cm)
+    acrossShoulderCm: { type: Number }, // across shoulder (cm)
+    
+    // Measurements in inches (in)
+    toFitWaistIn: { type: Number }, // to fit waist (in)
+    inseamLengthIn: { type: Number }, // inseam length (in)
+    chestIn: { type: Number }, // chest (in)
+    frontLengthIn: { type: Number }, // front length (in)
+    acrossShoulderIn: { type: Number }, // across shoulder (in)
+    
+    // SEO and URL fields at size level
+    metaTitle: { type: String }, // meta title
+    metaDescription: { type: String }, // meta description
+    slugUrl: { type: String }, // slug URL
 }, { _id: false });
 
 // ==============================
-// Item Schema Definition
+// Comprehensive Item Schema Definition (Merged from Item and ItemDetails)
 // ==============================
 const itemSchema = new mongoose.Schema(
   {
     productId: {
       type: String,
       required: true,
-      unique: true, // Ensure unique productId
+      unique: true,
       index: true,
     },
     
     // Basic product information
-    productName: { type: String, index: true },
+    productName: { type: String, required: true, index: true },
     title: { type: String, index: true },
-    name: { type: String, required: true, index: true }, // Legacy field
-    description: { type: String },
+    description: { type: String, required: true },
     
-    // Manufacturing and shipping details (merged from multiple parameters)
-    manufacturingDetails: { type: String, default: '' },
-    shippingAndReturns: {
-        shippingDetails: [{ type: String }],
-        returnPolicy: [{ type: String }],
-        additionalInfo: { type: String }
-    },
+    // Manufacturing and shipping details (simplified to single strings)
+    manufacturingDetails: { type: String },
+    shippingAndReturns: { type: String },
     
-    // Pricing
-    regularPrice: { type: Number, min: 0 },
-    salePrice: { type: Number, min: 0, default: 0 },
-    price: { type: Number, required: true, min: 0 }, // Legacy field
     returnable: { type: Boolean, default: true },
     
-    // Platform pricing for 5 different platforms (Yoraa as default)
-    platformPricing: {
-        yoraa: platformPricingSchema, // Default platform
-        myntra: platformPricingSchema,
-        amazon: platformPricingSchema,
-        flipkart: platformPricingSchema,
-        nykaa: platformPricingSchema
-    },
+    // Stock and size management
+    stockSizeOption: { type: String, enum: ['sizes', 'variants'], default: 'sizes' },
     
-    // Size and stock management
-    stockSizeOption: {
-        type: String,
-        enum: ['noSize', 'sizes'],
-        default: 'sizes'
-    },
+    // Product variants (for different colors, designs, etc.)
+    variants: [{
+        name: { type: String, required: true },
+        images: [{ type: String }], // Array of image URLs
+        videos: [{ type: String }], // Array of video URLs
+        colors: [{ type: String }] // Array of color codes/names
+    }],
+    
+    // Sizes directly at item level (no color variants)
     sizes: [sizeSchema],
-    stock: { type: Number, required: true, default: 0, min: 0 }, // Legacy field
     
-    // Variants with images up to 5 (can be increased)
-    variants: [variantSchema],
+    // Product images and media (moved from color variants to product level)
+    images: [{
+        url: { type: String, required: false },
+        type: { type: String, enum: ["image", "video"], default: "image" },
+        priority: { type: Number, default: 1 }
+    }],
     
-    // Size charts (uploaded as excel/image)
-    sizeChart: {
-        inchChart: { type: String }, // File URL
-        cmChart: { type: String }, // File URL
-        measurementImage: { type: String } // File URL
-    },
-    commonSizeChart: {
-        cmChart: { type: String },
-        inchChart: { type: String },
-        measurementGuide: { type: String }
-    },
-    
-    // Meta data fields
-    metaTitle: { type: String, default: '' },
-    metaDescription: { type: String, default: '' },
-    slugUrl: { type: String, default: '' },
-    
-    // Categories
-    subCategoryId: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory", required: true },
-    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true },
+    // Categories (optional for draft items, required for published items)
+    subCategoryId: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory", required: false },
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: false },
     
     // Filter assignment
     filters: [
@@ -116,18 +90,66 @@ const itemSchema = new mongoose.Schema(
       },
     ],
     
-    // Also show in options (different apps option)
-    alsoShowInOptions: {
-        youMightAlsoLike: { type: Boolean, default: false },
-        similarItems: { type: Boolean, default: false },
-        othersAlsoBought: { type: Boolean, default: false },
-        // Dynamic options can be added
-        customOptions: [{ 
-            id: String, 
-            label: String, 
-            value: Boolean 
-        }]
+    // Reviews and ratings (enhanced from both models)
+    reviews: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        rating: {
+            type: Number,
+            required: true,
+            min: 1,
+            max: 5,
+        },
+        reviewText: { type: String, trim: true },
+        createdAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date, default: Date.now },
+    }],
+    averageRating: { type: Number, default: 0, min: 0, max: 5 },
+    totalReviews: { type: Number, default: 0, min: 0 },
+    ratingDistribution: {
+        1: { type: Number, default: 0 },
+        2: { type: Number, default: 0 },
+        3: { type: Number, default: 0 },
+        4: { type: Number, default: 0 },
+        5: { type: Number, default: 0 }
     },
+    isReviewDisplayEnabled: { type: Boolean, default: true },
+    isReviewSubmissionEnabled: { type: Boolean, default: true },
+    
+    // Enhanced also show in options
+    alsoShowInOptions: {
+        similarItems: {
+            enabled: { type: Boolean, default: false },
+            placement: { type: String, default: 'default' },
+            items: [{ type: mongoose.Schema.Types.Mixed }]
+        },
+        othersAlsoBought: {
+            enabled: { type: Boolean, default: false },
+            placement: { type: String, default: 'default' },
+            items: [{ type: mongoose.Schema.Types.Mixed }]
+        },
+        youMightAlsoLike: {
+            enabled: { type: Boolean, default: false },
+            placement: { type: String, default: 'default' },
+            items: [{ type: mongoose.Schema.Types.Mixed }]
+        },
+        customOptions: [{ type: mongoose.Schema.Types.Mixed }],
+        appPlacements: { type: mongoose.Schema.Types.Mixed, default: {} }
+    },
+    
+    // Enhanced publishing and scheduling options
+    publishingOptions: {
+        action: { type: String, enum: ['draft', 'publish', 'schedule', 'save_later'], default: 'draft' },
+        scheduledDate: { type: String },
+        scheduledTime: { type: String },
+        publishAt: { type: Date },
+        autoPublish: { type: Boolean, default: false },
+        notificationSettings: { type: mongoose.Schema.Types.Mixed, default: {} }
+    },
+    publishedAt: { type: Date },
     
     // Product status
     status: {
@@ -136,53 +158,68 @@ const itemSchema = new mongoose.Schema(
         default: 'draft'
     },
     
-    // Additional fields
-    tags: [{ type: String }],
+    // Scheduling fields
+    scheduledDate: {
+        type: String, // Store as string for date in YYYY-MM-DD format
+        required: false
+    },
+    scheduledTime: {
+        type: String, // Store as string for time in HH:MM format
+        required: false
+    },
+    scheduledAt: {
+        type: Date, // Combined date-time when the product was scheduled
+        required: false
+    },
+    publishAt: {
+        type: Date, // Exact date-time when the product should go live
+        required: false
+    },
     
-    // Legacy fields (keeping for backward compatibility)
-    imageUrl: { type: String },
-    brand: { type: String, index: true },
-    style: [{ type: String, index: true }],
-    occasion: [{ type: String, index: true }],
-    fit: [{ type: String }],
-    material: [{ type: String }],
-    discountPrice: { type: Number, min: 0 },
-    averageRating: { type: Number, default: 0, min: 0, max: 5 },
-    totalReviews: { type: Number, default: 0, min: 0 },
-    discountPercentage: { type: Number, default: 0 },
-    isItemDetail: { type: Boolean, default: false },
+    // Status and flags (from ItemDetails)
+    isActive: { type: Boolean, default: true },
+    
+    // Display order for arrangement control
+    displayOrder: { type: Number, default: 0, index: true },
+    isDeleted: { type: Boolean, default: false },
   },
   {
     timestamps: true,
+    versionKey: false
   }
 );
 
 // ==============================
-// Middleware: Auto-calculate discount percentage
+// Indexes for better performance
+// ==============================
+itemSchema.index({ productId: 1 });
+itemSchema.index({ isActive: 1, isDeleted: 1 });
+itemSchema.index({ categoryId: 1 });
+itemSchema.index({ subCategoryId: 1 });
+itemSchema.index({ 'filters.key': 1, 'filters.value': 1 });
+
+// ==============================
+// Middleware: Auto-calculate average rating and sync stock/quantity
 // ==============================
 itemSchema.pre("save", function (next) {
-  if (this.discountPrice && this.price) {
-    this.discountPercentage = ((this.price - this.discountPrice) / this.price) * 100;
+  // Calculate average rating and rating distribution
+  if (this.reviews && this.reviews.length > 0) {
+    const totalRating = this.reviews.reduce((sum, review) => sum + review.rating, 0);
+    this.averageRating = parseFloat((totalRating / this.reviews.length).toFixed(2));
+    this.totalReviews = this.reviews.length;
+    
+    // Calculate rating distribution
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    this.reviews.forEach(review => {
+      distribution[review.rating]++;
+    });
+    this.ratingDistribution = distribution;
+  } else {
+    this.averageRating = 0;
+    this.totalReviews = 0;
+    this.ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   }
-  next();
-});
-
-// ==============================
-// Middleware: Cleanup on deletion
-// ==============================
-// - Deletes associated item details
-// - Deletes item image from S3 if exists
-itemSchema.pre("deleteOne", { document: true, query: false }, async function (next) {
-  const itemId = this._id;
-
-  // Delete associated ItemDetails
-  await mongoose.model("ItemDetails").deleteOne({ items: itemId });
-
-  // Delete associated image from S3
-  if (this.imageUrl) {
-    await deleteFileFromS3(this.imageUrl);
-  }
-
+  
   next();
 });
 

@@ -90,7 +90,6 @@ const initialState = {
     color: [],
     size: [],
     price: { min: 0, max: 100000 },
-    brand: [],
     category: [],
     subcategory: [],
     sortBy: 'newest', // newest, price-asc, price-desc, popularity
@@ -192,7 +191,6 @@ const filtersSlice = createSlice({
         color: [],
         size: [],
         price: { min: 0, max: 100000 },
-        brand: [],
         category: [],
         subcategory: [],
         sortBy: 'newest',

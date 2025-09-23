@@ -1,19 +1,24 @@
 // Utility function to set admin token for testing
 export const setAdminToken = () => {
-  const adminToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2OGMzYzU0ZmFhZTA4ZDRlYTcxYTAyODgiLCJuYW1lIjoiQWRtaW4gVXNlciIsInBoTm8iOiI5ODc2NTQzMjEwIiwiaXNWZXJpZmllZCI6dHJ1ZSwiaXNQaG9uZVZlcmlmaWVkIjpmYWxzZSwiaXNFbWFpbFZlcmlmaWVkIjpmYWxzZSwiaXNBZG1pbiI6dHJ1ZSwiaXNQcm9maWxlIjpmYWxzZSwiZW1haWwiOiJhZG1pbkB5b3JhYS5jb20iLCJwbGF0Zm9ybSI6bnVsbCwiX192IjowLCJpYXQiOjE3NTc2NjA1MzQsImV4cCI6MTc2MDI1MjUzNH0.JFac9CqhsadlHZX0_gtuyDNHWDzKBsEdiAo6QV5MxI4";
+  // Updated token for the correct admin user in database: 68cd71f3f31eb5d72a6c8e25
+  const adminToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2OGNkNzFmM2YzMWViNWQ3MmE2YzhlMjUiLCJuYW1lIjoiSm9oeWVlaW50ZWVldHkgcnRvZSIsInBoTm8iOiI3MDM2NTY3ODkwIiwiaXNWZXJpZmllZCI6dHJ1ZSwiaXNQaG9uZVZlcmlmaWVkIjp0cnVlLCJpc0VtYWlsVmVyaWZpZWQiOnRydWUsImlzQWRtaW4iOnRydWUsImlzUHJvZmlsZSI6dHJ1ZSwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwicGxhdGZvcm0iOm51bGwsImlhdCI6MTc1ODU4MzU3MSwiZXhwIjoxNzU5MTg4MzcxfQ.0ElD25i-I3qs09tnKSxq_gGfhhTokKR3GFVmiYbXk6U";
   
   localStorage.setItem('authToken', adminToken);
   console.log('Admin token set successfully!');
   console.log('You can now create products.');
   
-  // Also set user data
+  // Also set user data - matching the actual admin user in database
   const userData = {
-    _id: "68c3c54faae08d4ea71a0288",
-    name: "Admin User",
-    phNo: "9876543210",
+    _id: "68cd71f3f31eb5d72a6c8e25",
+    name: "Johyeeinteeety rtoe",
+    phNo: "7036567890",
     isVerified: true,
+    isPhoneVerified: true,
+    isEmailVerified: true,
     isAdmin: true,
-    email: "admin@yoraa.com"
+    isProfile: true,
+    email: "user@example.com",
+    platform: null
   };
   
   localStorage.setItem('userData', JSON.stringify(userData));

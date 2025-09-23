@@ -28,15 +28,15 @@ router.get('/public/:itemId/reviews', reviewController.getReviews);
 // Get average rating by Item ID (public)
 router.get('/public/:itemId/average-rating', reviewController.getAverageRating);
 
-// ---------- ADMIN ROUTES (Item._id and ItemDetails._id) ----------
+// ---------- ADMIN ROUTES (Item._id) ----------
 
 // Get reviews by Item ID (admin)
 router.get('/admin/:itemId/reviews', isAuthenticated, isAdmin, reviewController.getReviews);
 
-// Add a fake review using userId (admin, uses itemDetailsId)
-router.post('/admin/:itemDetailsId/reviews', isAuthenticated, isAdmin, reviewController.createFakeReview);
+// Add a fake review using userId (admin, uses itemId)
+router.post('/admin/:itemId/reviews', isAuthenticated, isAdmin, reviewController.createFakeReview);
 
-// Update review settings (admin, uses itemDetailsId)
-router.put('/admin/:itemDetailsId/review-settings', isAuthenticated, isAdmin, reviewController.updateReviewSettings);
+// Update review settings (admin, uses itemId)
+router.put('/admin/:itemId/review-settings', isAuthenticated, isAdmin, reviewController.updateReviewSettings);
 
 module.exports = router;

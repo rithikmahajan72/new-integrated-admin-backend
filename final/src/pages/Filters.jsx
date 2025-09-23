@@ -68,9 +68,7 @@ const Filters = () => {
   const FILTER_TYPES = {
     color: { label: "Color", hasColorCode: true, icon: Palette },
     size: { label: "Size", hasColorCode: false, icon: Hash },
-    brand: { label: "Brand", hasColorCode: false, icon: Hash },
     category: { label: "Category", hasColorCode: false, icon: Hash },
-    occasion: { label: "Occasion", hasColorCode: false, icon: Hash },
     material: { label: "Material", hasColorCode: false, icon: Hash },
   };
 
@@ -89,14 +87,6 @@ const Filters = () => {
     size: [
       { name: "XS" }, { name: "S" }, { name: "M" }, 
       { name: "L" }, { name: "XL" }, { name: "XXL" }
-    ],
-    brand: [
-      { name: "Yoraa Premium" }, { name: "Yoraa Casual" },
-      { name: "Yoraa Elegance" }, { name: "Yoraa Professional" }
-    ],
-    occasion: [
-      { name: "Casual" }, { name: "Formal" }, 
-      { name: "Party" }, { name: "Wedding" }, { name: "Office" }
     ],
   };
 

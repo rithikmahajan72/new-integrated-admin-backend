@@ -30,14 +30,54 @@ export const itemAPI = {
   getItemsBySubCategory: (subCategoryId) => API.get(`/api/items/subcategory/${subCategoryId}`),
   getItemStatistics: () => API.get('/api/items/statistics'),
   
-  // Item management (admin)
-  createItem: (itemData) => API.post('/api/products', itemData), // Updated to use products endpoint
-  updateItem: (itemId, itemData) => API.put(`/api/products/${itemId}`, itemData), // Updated to use products endpoint
-  deleteItem: (itemId) => API.delete(`/api/products/${itemId}`), // Updated to use products endpoint
+  // NEW SIMPLIFIED FLOW - No authentication required initially
+  createItem: (itemData) => API.post('/api/items/create-draft', itemData), // New simplified endpoint
+  updateItem: (itemId, itemData) => API.put(`/api/items/${itemId}`, itemData),
+  deleteItem: (itemId) => API.delete(`/api/items/${itemId}`),
+  
+  // Media upload endpoints
+  uploadImage: (formData) => API.post('/api/items/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  uploadVideo: (formData) => API.post('/api/items/upload-video', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  
+  // Legacy endpoints (kept for compatibility)
+  createItemWithAuth: (itemData) => API.post('/api/items/text-only', itemData), // Use text-only endpoint for authenticated workflow
+  
+  // NEW FLOW-BASED API ENDPOINTS
+  // Phase 1: Create basic product information with sizes
+  createBasicProduct: (productData) => API.post('/api/items/basic-product', productData),
+  
+  // Phase 2: Update product with draft configuration (images, filters, categories)
+  updateDraftConfiguration: (productId, draftData) => API.put(`/api/items/${productId}/draft-configuration`, draftData),
+  
+  // Phase 3: Add review to product (consumer/admin side)
+  addReview: (productId, reviewData) => API.post(`/api/items/${productId}/reviews`, reviewData),
+  
+  // Phase 4: Update also show in options (draft management)
+  updateAlsoShowInOptions: (productId, optionsData) => API.put(`/api/items/${productId}/also-show-options`, optionsData),
+  
+  // Phase 5: Update product status (draft → schedule → live)
+  updateProductStatus: (productId, statusData) => API.put(`/api/items/${productId}/status`, statusData),
+  
+  // Utility endpoints for the new flow
+  getProductById: (productId) => API.get(`/api/items/product/${productId}`), // Supports both ObjectId and productId
+  getProductsByStatus: (status, params = {}) => API.get(`/api/items/status/${status}`, { params }),
+  updateProductSizes: (productId, sizesData) => API.put(`/api/items/${productId}/sizes`, sizesData),
+  updateReviewSettings: (productId, settingsData) => API.put(`/api/items/${productId}/review-settings`, settingsData),
   
   // Item details
   getItemDetails: (itemId) => API.get(`/api/item-details/${itemId}`),
   updateItemDetails: (itemId, detailsData) => API.put(`/api/item-details/${itemId}`, detailsData),
+  
+  // Arrangement control endpoints
+  getCategoriesForArrangement: () => API.get('/api/items/categories-arrangement'),
+  getItemsForArrangement: (params = {}) => API.get('/api/items/items-arrangement', { params }),
+  updateItemsDisplayOrder: (items) => API.put('/api/items/items-display-order', { items }),
+  updateCategoriesDisplayOrder: (categories) => API.put('/api/items/categories-display-order', { categories }),
+  updateSubCategoriesDisplayOrder: (subcategories) => API.put('/api/items/subcategories-display-order', { subcategories }),
 };
 
 // Category API endpoints
@@ -197,19 +237,35 @@ export const imageAPI = {
 
 // Product API endpoints (for managing products saved from SingleProductUpload)
 export const productAPI = {
-  getAllProducts: (params = {}) => API.get('/api/products', { params }),
-  getProductById: (productId) => API.get(`/api/products/${productId}`),
-  createProduct: (productData) => API.post('/api/products', productData),
-  updateProduct: (productId, productData) => API.patch(`/api/products/${productId}`, productData),
-  deleteProduct: (productId) => API.delete(`/api/products/${productId}`),
+  getAllProducts: (params = {}) => API.get('/api/items', { params }),
+  getProductById: (productId) => API.get(`/api/items/${productId}`),
+  createProduct: (productData) => API.post('/api/items', productData),
+  updateProduct: (productId, productData) => API.patch(`/api/items/${productId}`, productData),
+  deleteProduct: (productId) => API.delete(`/api/items/${productId}`),
   // Additional methods for lifecycle management
-  publishProduct: (productId) => API.patch(`/api/products/publish/${productId}`),
-  scheduleProduct: (productId, scheduleData) => API.patch(`/api/products/schedule/${productId}`, scheduleData),
-  cancelSchedule: (productId) => API.patch(`/api/products/cancel-schedule/${productId}`),
+  publishProduct: (productId) => API.patch(`/api/items/publish/${productId}`),
+  scheduleProduct: (productId, scheduleData) => API.patch(`/api/items/schedule/${productId}`, scheduleData),
+  cancelSchedule: (productId) => API.patch(`/api/items/cancel-schedule/${productId}`),
 };// Privacy Policy API endpoints
 export const privacyAPI = {
   getPrivacyPolicy: () => API.get('/api/privacy-policy'),
   updatePrivacyPolicy: (policyData) => API.put('/api/privacy-policy', policyData),
+};
+
+// Partner Management API endpoints
+export const partnerAPI = {
+  // Admin endpoints for partner management
+  createPartner: (partnerData) => API.post('/api/partners', partnerData),
+  getAllPartners: (params = {}) => API.get('/api/partners', { params }),
+  getPartnerById: (partnerId) => API.get(`/api/partners/${partnerId}`),
+  updatePartner: (partnerId, updates) => API.put(`/api/partners/${partnerId}`, updates),
+  updatePartnerPassword: (partnerId, passwordData) => API.put(`/api/partners/${partnerId}/password`, passwordData),
+  togglePartnerStatus: (partnerId, statusData) => API.patch(`/api/partners/${partnerId}/toggle-status`, statusData),
+  deletePartner: (partnerId) => API.delete(`/api/partners/${partnerId}`),
+  getPartnerStatistics: () => API.get('/api/partners/statistics'),
+  
+  // Partner authentication endpoints
+  partnerLogin: (credentials) => API.post('/api/partners/auth/login', credentials),
 };
 
 export default API;

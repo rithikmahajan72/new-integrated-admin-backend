@@ -32,20 +32,7 @@ const userProfileSchema = new Schema({
     type: String, 
     enum: ["Male", "Female", "Other"], 
     required: false 
-  }, // Gender with predefined options
-
-  anniversary: { 
-    type: Date 
-  }, // Optional anniversary date
-
-  stylePreferences: [
-    String
-  ], // Array of user-selected style preferences
-
-  imageUrl: { 
-    type: String, 
-    required: false 
-  }, // Profile image URL
+  } // Gender with predefined options
 });
 
 // Export the UserProfile model

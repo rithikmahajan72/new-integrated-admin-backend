@@ -3,8 +3,8 @@ const crypto = require("crypto");
 const mongoose = require('mongoose');
 const Order = require("../../models/Order");
 const Item = require("../../models/Item");
-const ItemDetails = require("../../models/ItemDetails");
 const PromoCode = require("../../models/PromoCodes");
+// Note: ItemDetails functionality is now merged into Item model
 
 const razorpay = new Razorpay({
   key_id: "rzp_live_VRU7ggfYLI7DWV",
@@ -166,16 +166,14 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ error: "One or more items not found" });
     }
 
-    // Validate SKUs in ItemDetails
-    const itemDetails = await ItemDetails.find({ items: { $in: itemIds } });
+    // Validate SKUs in Items (merged model)
+    const itemDetails = await Item.find({ _id: { $in: itemIds } });
     for (const cartItem of cart) {
-      const detail = itemDetails.find(d => d.items.toString() === cartItem.itemId);
+      const detail = itemDetails.find(d => d._id.toString() === cartItem.itemId);
       if (!detail) {
-        return res.status(400).json({ error: `ItemDetails not found for item ${cartItem.itemId}` });
+        return res.status(400).json({ error: `Item not found for item ${cartItem.itemId}` });
       }
-      const skuExists = detail.colors.some(color =>
-        color.sizes.some(size => size.sku === cartItem.sku)
-      );
+      const skuExists = detail.sizes.some(size => size.sku === cartItem.sku);
       if (!skuExists) {
         return res.status(400).json({ error: `Invalid SKU ${cartItem.sku} for item ${cartItem.itemId}` });
       }
@@ -341,30 +339,26 @@ exports.verifyPayment = async (req, res) => {
       const sku = entry.sku;
       const quantity = entry.quantity;
 
-      // Fetch ItemDetails for the item
-      const itemDetails = await ItemDetails.findOne({ items: itemId });
+      // Fetch Item for the item (using merged model)
+      const itemDetails = await Item.findOne({ _id: itemId });
       if (!itemDetails) {
-        throw new Error(`ItemDetails not found for item ID: ${itemId}`);
+        throw new Error(`Item not found for item ID: ${itemId}`);
       }
 
       // Find the size entry by SKU and update stock
-      let updated = false;
-      for (const color of itemDetails.colors) {
-        const sizeEntry = color.sizes.find(s => s.sku === sku);
-        if (sizeEntry) {
-          if (sizeEntry.stock < quantity) {
-            throw new Error(
-              `Insufficient stock for SKU ${sku} of item ID: ${itemId}. Available: ${sizeEntry.stock}, Requested: ${quantity}`
-            );
-          }
-          sizeEntry.stock -= quantity;
-          updated = true;
-          break;
-        }
-      }
-      if (!updated) {
+      const sizeEntry = itemDetails.sizes.find(s => s.sku === sku);
+      if (!sizeEntry) {
         throw new Error(`SKU ${sku} not found for item ID: ${itemId}`);
       }
+      
+      if (sizeEntry.stock < quantity) {
+        throw new Error(
+          `Insufficient stock for SKU ${sku} of item ID: ${itemId}. Available: ${sizeEntry.stock}, Requested: ${quantity}`
+        );
+      }
+      
+      sizeEntry.stock -= quantity;
+      sizeEntry.quantity -= quantity; // Also update quantity field for consistency
 
       // Aggregate quantity for Item stock update
       if (itemStockUpdates.has(itemId.toString())) {

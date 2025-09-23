@@ -4,7 +4,6 @@ const Order = require("../../models/Order");
 const { uploadMultipart, deleteFileFromS3 } = require("../../utils/S3");
 const mongoose = require("mongoose");
 const Item = require("../../models/Item");
-const ItemDetails = require("../../models/ItemDetails");
 
 const razorpay = new Razorpay({
   key_id: "rzp_live_VRU7ggfYLI7DWV",
@@ -46,16 +45,14 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ error: "One or more items not found" });
     }
 
-    // Validate SKUs in ItemDetails
-    const itemDetails = await ItemDetails.find({ items: { $in: itemIds } });
+    // Validate SKUs in Items (merged model)
+    const itemDetails = await Item.find({ _id: { $in: itemIds } });
     for (const cartItem of cart) {
-      const detail = itemDetails.find(d => d.items.toString() === cartItem.itemId);
+      const detail = itemDetails.find(d => d._id.toString() === cartItem.itemId);
       if (!detail) {
-        return res.status(400).json({ error: `ItemDetails not found for item ${cartItem.itemId}` });
+        return res.status(400).json({ error: `Item not found for item ${cartItem.itemId}` });
       }
-      const skuExists = detail.colors.some(color =>
-        color.sizes.some(size => size.sku === cartItem.sku)
-      );
+      const skuExists = detail.sizes.some(size => size.sku === cartItem.sku);
       if (!skuExists) {
         return res.status(400).json({ error: `Invalid SKU ${cartItem.sku} for item ${cartItem.itemId}` });
       }
@@ -192,30 +189,26 @@ exports.verifyPayment = async (req, res) => {
       const sku = entry.sku;
       const quantity = entry.quantity;
 
-      // Fetch ItemDetails for the item
-      const itemDetails = await ItemDetails.findOne({ items: itemId });
+      // Fetch Item for the item (using merged model)
+      const itemDetails = await Item.findOne({ _id: itemId });
       if (!itemDetails) {
-        throw new Error(`ItemDetails not found for item ID: ${itemId}`);
+        throw new Error(`Item not found for item ID: ${itemId}`);
       }
 
       // Find the size entry by SKU and update stock
-      let updated = false;
-      for (const color of itemDetails.colors) {
-        const sizeEntry = color.sizes.find(s => s.sku === sku);
-        if (sizeEntry) {
-          if (sizeEntry.stock < quantity) {
-            throw new Error(
-              `Insufficient stock for SKU ${sku} of item ID: ${itemId}. Available: ${sizeEntry.stock}, Requested: ${quantity}`
-            );
-          }
-          sizeEntry.stock -= quantity; // Decrease stock in ItemDetails
-          updated = true;
-          break;
-        }
-      }
-      if (!updated) {
+      const sizeEntry = itemDetails.sizes.find(s => s.sku === sku);
+      if (!sizeEntry) {
         throw new Error(`SKU ${sku} not found for item ID: ${itemId}`);
       }
+      
+      if (sizeEntry.stock < quantity) {
+        throw new Error(
+          `Insufficient stock for SKU ${sku} of item ID: ${itemId}. Available: ${sizeEntry.stock}, Requested: ${quantity}`
+        );
+      }
+      
+      sizeEntry.stock -= quantity; // Decrease stock in Item
+      sizeEntry.quantity -= quantity; // Also update quantity field for consistency
 
       // Aggregate quantity for Item stock update
       if (itemStockUpdates.has(itemId.toString())) {
@@ -227,19 +220,22 @@ exports.verifyPayment = async (req, res) => {
       await itemDetails.save();
     }
 
-    // Update stock in Item model
+    // Update stock in Item model (if Item has a stock field)
     for (const [itemId, quantity] of itemStockUpdates) {
       const item = await Item.findById(itemId);
       if (!item) {
         throw new Error(`Item not found for ID: ${itemId}`);
       }
-      if (item.stock < quantity) {
-        throw new Error(
-          `Insufficient stock for item ID: ${itemId}. Available: ${item.stock}, Requested: ${quantity}`
-        );
+      // Only update if Item has a stock field
+      if (item.stock !== undefined) {
+        if (item.stock < quantity) {
+          throw new Error(
+            `Insufficient stock for item ID: ${itemId}. Available: ${item.stock}, Requested: ${quantity}`
+          );
+        }
+        item.stock -= quantity;
+        await item.save();
       }
-      item.stock -= quantity; // Decrease stock in Item
-      await item.save();
     }
 
     // Get Shiprocket API Token

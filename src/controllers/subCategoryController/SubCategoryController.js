@@ -60,7 +60,15 @@ exports.getSubCategoryById = async (req, res) => {
 // Get subcategories by category ID
 exports.getSubCategoriesByCategory = async (req, res) => {
   try {
+    console.log('🔍 getSubCategoriesByCategory called with categoryId:', req.params.categoryId);
+    console.log('🔍 categoryId type:', typeof req.params.categoryId);
+    
     const subCategories = await SubCategory.find({ categoryId: req.params.categoryId });
+    
+    console.log('🔍 Query result count:', subCategories.length);
+    if (subCategories.length > 0) {
+      console.log('🔍 First result:', subCategories[0].name);
+    }
 
     if (!subCategories || subCategories.length === 0) {
       return res.status(404).json(ApiResponse([], "No subcategories found.", false, 404));

@@ -78,7 +78,7 @@ export const useWishlist = () => {
 
 // Products hooks
 export const useProducts = () => {
-  const products = useSelector((state) => state.products);
+  const products = useSelector((state) => state.products); // Backward compatibility
   const dispatch = useDispatch();
   
   const setFilters = useCallback((filters) => {

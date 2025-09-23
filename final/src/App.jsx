@@ -7,7 +7,7 @@ import MobileFiltersApp from "./pages/MobileFiltersApp";
 import AdvancedMobileFiltersApp from "./pages/AdvancedMobileFiltersApp";
 
 // Import AuthFlow component and ProtectedRoute
-import AuthFlow from "./components/AuthFlow";
+import AuthFlow from "./screens/AuthFlow";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Import demo components
@@ -16,7 +16,6 @@ import SimpleModalTest from "./components/SimpleModalTest";
 
 // Import all page components
 import Dashboard from "./pages/dashboard";
-// import DatabaseDashboard from "./pages/DatabaseDashboard";
 import Orders from "./pages/Orders";
 import OrderDetails from "./pages/OrderDetails";
 import ReturnOrders from "./pages/ReturnOrders";
@@ -25,13 +24,15 @@ import Users from "./pages/Users";
 import BlockUser from "./pages/BlockUser";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
-import ManageItems from "./pages/ManageItems";
-import ManageItemsSimple from "./pages/ManageItemsSimple";
 import Products from "./pages/Products";
 import UploadCategory from "./pages/UploadCategory";
 import UploadCategorySimple from "./pages/UploadCategorySimple";
 import SubCategory from "./pages/SubCategory";
-import SingleProductUpload from "./pages/SingleProductUpload";
+import SingleProductUpload from "./components/SingleProductUpload";
+import ItemManagementSingleProductUpload from "./pages/itemmanagementsingleproductupload";
+import ItemManagementEditPage from "./pages/itemmanagementeditpage";
+import ItemManagementBulkUpload from "./pages/itemmanagementbulkupload";
+import ItemManagement from "./pages/ItemManagement";
 import ManageReviews from "./pages/ManageReviews";
 import ReviewDetails from "./pages/ReviewDetails";
 import PushNotification from "./pages/pushNotification";
@@ -46,8 +47,9 @@ import CartAbandonmentRecovery from "./pages/cartabandonmentrecovery";
 import Filters from "./pages/Filters";
 import JoinUsControl from "./pages/JoinUsControl";
 import ManageBannersOnRewards from "./pages/ManageBannersOnRewards";
-import ProductBundling from "./pages/ProductBundling";
-import ArrangementControl from "./pages/ArrangementControl";
+import ProductBundling from "./pages/itembundling";
+import APIDebugPage from "./pages/APIDebugPage";
+import ArrangementControl from "./pages/itemarrangementcontrol";
 import NewPartner from "./pages/NewPartner";
 
 import FaqManagement from "./pages/FaqManagement";
@@ -78,19 +80,25 @@ const App = () => {
     }, 100);
   }, [dispatch]);
 
+  // Show loading spinner while app is initializing
+  if (!isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Routes>
-        {/* Root route - redirect based on authentication */}
+        {/* Root route - always redirect to auth first */}
         <Route 
           path="/" 
-          element={
-            isAuthenticated && user?.isAdmin ? (
-              <Navigate to="/admin-dashboard" replace />
-            ) : (
-              <AuthFlow />
-            )
-          } 
+          element={<Navigate to="/auth" replace />}
         />
 
         {/* ===== AUTHENTICATION ROUTES (without Layout) ===== */}
@@ -120,11 +128,14 @@ const App = () => {
           </div>
         } />
 
-        {/* All other routes wrapped in Layout (with sidebar) */}
-        <Route element={<Layout />}>
+        {/* All admin routes wrapped in Layout and protected */}
+        <Route element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
           {/* ===== DASHBOARD & MAIN ===== */}
           <Route path="/admin-dashboard" element={<Dashboard />} />
-          {/* <Route path="/database" element={<DatabaseDashboard />} /> */}
 
           {/* ===== ORDER MANAGEMENT ===== */}
           <Route path="/orders" element={<Orders />} />
@@ -135,7 +146,13 @@ const App = () => {
           <Route path="/inbox" element={<Inbox />} />
 
           {/* ===== PRODUCT MANAGEMENT ===== */}
-          <Route path="/manage-items" element={<ManageItems />} />
+          <Route path="/item-management" element={<ItemManagement />} />
+          <Route path="/item-management/edit/:id" element={<ItemManagementEditPage />} />
+          <Route path="/item-management-bulk-upload" element={<ItemManagementBulkUpload />} />
+          <Route path="/admin/products" element={<ItemManagement />} />
+          <Route path="/admin/products/new" element={<ItemManagement />} />
+          <Route path="/admin/products/edit/:id" element={<ItemManagementEditPage />} />
+          <Route path="/admin/products/view/:id" element={<ItemManagement />} />
 
           <Route path="/products" element={<Products />} />
           <Route path="/upload-category" element={<UploadCategory />} />
@@ -143,6 +160,18 @@ const App = () => {
           <Route path="/subcategory" element={<SubCategory />} />
           <Route
             path="/single-product-upload"
+            element={<SingleProductUpload />}
+          />
+          <Route
+            path="/upload-product"
+            element={<ItemManagementSingleProductUpload />}
+          />
+          <Route
+            path="/upload-product/:id"
+            element={<ItemManagementSingleProductUpload />}
+          />
+          <Route
+            path="/single-product-upload-complex"
             element={<SingleProductUpload />}
           />
 
@@ -189,6 +218,7 @@ const App = () => {
             element={<ManageBannersOnRewards />}
           />
           <Route path="/bundling" element={<ProductBundling />} />
+          <Route path="/api-debug" element={<APIDebugPage />} />
           <Route path="/arrangement" element={<ArrangementControl />} />
           <Route path="/new-partner" element={<NewPartner />} />
 

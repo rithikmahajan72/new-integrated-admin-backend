@@ -23,7 +23,7 @@ const Layout = () => {
       "return and exchange requests": "/return-orders",
       "Category": "/upload-category",
       "Subcategory": "/subcategory",
-      "Items": "/manage-items",
+      "Items": "/item-management",
       "Filters": "/filters",
       "join us control screen": "/join-control",
       "Manage banners rewards": "/manage-banners-rewards",

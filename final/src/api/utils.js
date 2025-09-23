@@ -1,17 +1,38 @@
 // API response handler utility
 export const handleApiResponse = (response) => {
+  console.log('📦 handleApiResponse - raw response:', response);
+  console.log('📦 handleApiResponse - response.data:', response.data);
+  
   if (response.data) {
-    return {
-      success: true,
-      data: response.data,
-      message: response.data.message || 'Success',
-    };
+    // Check if backend response has the expected format: { data: {...}, success: true, message: "...", statusCode: 200 }
+    if (response.data.success && response.data.data) {
+      // Backend's response format - extract the nested data
+      const result = {
+        success: response.data.success,
+        data: response.data.data,
+        message: response.data.message || 'Success',
+      };
+      console.log('📦 handleApiResponse - backend format, returning:', result);
+      return result;
+    } else {
+      // Fallback - treat response.data as the actual data
+      const result = {
+        success: true,
+        data: response.data,
+        message: response.data.message || 'Success',
+      };
+      console.log('📦 handleApiResponse - fallback format, returning:', result);
+      return result;
+    }
   }
-  return {
+  
+  const failResult = {
     success: false,
     data: null,
     message: 'No data received',
   };
+  console.log('📦 handleApiResponse - no data, returning:', failResult);
+  return failResult;
 };
 
 // API error handler utility
@@ -20,10 +41,14 @@ export const handleApiError = (error) => {
   
   if (error.response) {
     // Server responded with error status
+    // Check if backend error response has the expected format: { success: false, message: "...", statusCode: 4xx }
+    const errorData = error.response.data;
+    const errorMessage = errorData?.message || `Error: ${error.response.status}`;
+    
     return {
       success: false,
       data: null,
-      message: error.response.data?.message || `Error: ${error.response.status}`,
+      message: errorMessage,
       status: error.response.status,
     };
   } else if (error.request) {
@@ -48,9 +73,14 @@ export const handleApiError = (error) => {
 // Generic API call wrapper
 export const apiCall = async (apiFunction, ...args) => {
   try {
+    console.log('🌐 apiCall starting with function:', apiFunction.name, 'args:', args);
     const response = await apiFunction(...args);
-    return handleApiResponse(response);
+    console.log('🌐 apiCall response received:', response);
+    const result = handleApiResponse(response);
+    console.log('🌐 apiCall processed result:', result);
+    return result;
   } catch (error) {
+    console.error('🌐 apiCall error:', error);
     return handleApiError(error);
   }
 };

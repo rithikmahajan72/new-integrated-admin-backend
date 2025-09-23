@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { createProduct, updateFormField, resetFormData } from '../store/slices/productSlice';
+import { createItem, updateFormField, resetFormData } from '../store/slices/itemSlice';
 
 const SingleProductUpload = () => {
     const dispatch = useDispatch();
@@ -11,7 +11,7 @@ const SingleProductUpload = () => {
         operationStatus, 
         lastUploadResponse,
         currentProduct 
-    } = useSelector(state => state.products);
+    } = useSelector(state => state.products); // Using products for backward compatibility
 
     const [showResponseDetails, setShowResponseDetails] = useState(false);
     const [imageFiles, setImageFiles] = useState([]);
@@ -110,7 +110,7 @@ const SingleProductUpload = () => {
         }
         
         try {
-            const result = await dispatch(createProduct(submitData)).unwrap();
+            const result = await dispatch(createItem(submitData)).unwrap();
             setNotification({ type: 'success', message: 'Product created successfully!' });
             setShowResponseDetails(true);
         } catch (error) {

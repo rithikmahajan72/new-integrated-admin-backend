@@ -17,7 +17,6 @@ const userRoutes = require("./src/routes/UserRoutes"); // Handles user-related r
 const addressRoutes = require("./src/routes/AddressRoutes"); // Handles address-related routes
 const razorpayRoutes = require("./src/routes/paymentRoutes"); // Handles payment processing with Razorpay
 const userProfileRoutes = require("./src/routes/UserProfileRoutes"); // Handles user profile routes
-const itemDetailsRoutes = require("./src/routes/ItemDetailsRoutes"); // Handles item details routes
 const orderRoutes = require("./src/routes/OrderRoutes"); // Handles order-related routes
 const privacyPolicyRoutes = require("./src/routes/PrivacyPolicyRoutes"); // Handles privacy policy routes
 const notificationRoutes = require("./src/routes/NotificationRoutes"); // Handles notification routes
@@ -26,7 +25,7 @@ const bulkUploadRoutes = require("./src/routes/BulkUploadRoutes"); // Handles fi
 const ReviewRoutes = require("./src/routes/ReviewRoutes");
 const PromoCodeRoutes = require("./src/routes/PromoCodeRoutes");
 const ImageRoutes = require("./src/routes/ImageRoutes"); // Handles image URL refresh routes
-const ProductRouter = require("./src/routes/Product"); // Handles product-related routes
+const partnerRoutes = require("./src/routes/PartnerRoutes"); // Handles partner management routes
 const morgan = require("morgan");
 
 const app = express();
@@ -67,7 +66,6 @@ app.use("/api/user", userRoutes); // User management routes (e.g., update user i
 app.use("/api/categories", CategoryRouter); // Category management routes
 app.use("/api/subcategories", SubCategoryRouter); // Subcategory management routes
 app.use("/api/items", itemRouter); // Item management routes (e.g., products)
-app.use("/api/itemDetails", itemDetailsRoutes); // Routes for detailed item information
 app.use("/api/wishlist", wishlistRouter); // Wishlist management routes
 app.use("/api/cart", cartRoutes); // Shopping cart management routes
 app.use("/api/address", addressRoutes); // User address management routes
@@ -81,7 +79,7 @@ app.use("/api/bulkUpload",bulkUploadRoutes );
 app.use('/api/reviews', ReviewRoutes); // Updated to distinct review path
 app.use("/api/promoCode", PromoCodeRoutes); // Mount promo code routes
 app.use("/api/images", ImageRoutes); // Mount image URL refresh routes
-app.use("/api/products", ProductRouter); // Mount product routes
+app.use("/api/partners", partnerRoutes); // Mount partner management routes
 
 
 // Start the server and listen on port 8080

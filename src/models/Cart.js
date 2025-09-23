@@ -12,10 +12,11 @@ const cartSchema = new Schema(
     // Reference to the main item/product
     item: { type: Schema.Types.ObjectId, ref: "Item", required: true },
 
-    // Reference to item details (e.g., color, size variations)
-    itemDetails: { type: Schema.Types.ObjectId, ref: "ItemDetails", required: true },
+    // Size from the item's sizes
+    size: { type: String, required: true },
 
-    // SKU (Stock Keeping Unit) representing a unique variation (e.g., color-size combination)
+    // SKU (Stock Keeping Unit) representing a unique variation (size combination)
+    // This corresponds to the SKU at the size level in Item.sizes.sku
     sku: { type: String, required: true },
 
     // Quantity of the item in the cart (must be at least 1)
@@ -30,22 +31,22 @@ const cartSchema = new Schema(
 // ==============================
 // Validation Middleware
 // ==============================
-// Before saving, validate that the SKU exists within the associated ItemDetails
+// Before saving, validate that the SKU and size exist within the associated Item
 cartSchema.pre("save", async function (next) {
-  const itemDetails = await mongoose.model("ItemDetails").findById(this.itemDetails);
+  const item = await mongoose.model("Item").findById(this.item);
 
-  // Check if itemDetails is valid
-  if (!itemDetails) {
-    return next(new Error("Invalid ItemDetails reference"));
+  // Check if item is valid
+  if (!item) {
+    return next(new Error("Invalid Item reference"));
   }
 
-  // Check if the provided SKU exists in any of the color/size combinations
-  const skuExists = itemDetails.colors.some((color) =>
-    color.sizes.some((size) => size.sku === this.sku)
+  // Check if the provided size and SKU exist in the item's sizes
+  const sizeVariant = item.sizes.find(size => 
+    size.size === this.size && size.sku === this.sku
   );
 
-  if (!skuExists) {
-    return next(new Error("Invalid SKU provided"));
+  if (!sizeVariant) {
+    return next(new Error("Invalid size or SKU provided"));
   }
 
   next();

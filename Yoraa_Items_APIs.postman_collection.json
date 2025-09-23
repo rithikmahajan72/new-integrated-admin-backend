@@ -65,30 +65,6 @@
 									"type": "text"
 								},
 								{
-									"key": "brand",
-									"value": "Nike",
-									"description": "Brand name (optional)",
-									"type": "text"
-								},
-								{
-									"key": "style",
-									"value": "casual,formal,sporty",
-									"description": "Comma-separated styles (optional)",
-									"type": "text"
-								},
-								{
-									"key": "occasion",
-									"value": "daily,party,work",
-									"description": "Comma-separated occasions (optional)",
-									"type": "text"
-								},
-								{
-									"key": "fit",
-									"value": "slim,regular,loose",
-									"description": "Comma-separated fit types (optional)",
-									"type": "text"
-								},
-								{
 									"key": "material",
 									"value": "cotton,polyester",
 									"description": "Comma-separated materials (optional)",

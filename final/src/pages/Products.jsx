@@ -1,327 +1,271 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Search, Plus, Edit, Trash2, Eye, Filter } from 'lucide-react';
-import { useResponsive } from '../hooks/useResponsive';
-import { getTailwindClasses } from '../constants/styleUtils';
-
-// Move static data and functions outside component to prevent recreation
-const INITIAL_PRODUCTS = [
-  {
-    id: 1,
-    name: 'Wireless Headphones',
-    category: 'Electronics',
-    price: 299.99,
-    stock: 45,
-    status: 'Active',
-    image: 'WH',
-    created: '2024-01-15'
-  },
-  {
-    id: 2,
-    name: 'Running Shoes',
-    category: 'Sports',
-    price: 129.99,
-    stock: 23,
-    status: 'Active',
-    image: 'RS',
-    created: '2024-02-10'
-  },
-  {
-    id: 3,
-    name: 'Coffee Maker',
-    category: 'Kitchen',
-    price: 89.99,
-    stock: 0,
-    status: 'Out of Stock',
-    image: 'CM',
-    created: '2024-03-05'
-  },
-  {
-    id: 4,
-    name: 'Smartphone Case',
-    category: 'Electronics',
-    price: 24.99,
-    stock: 156,
-    status: 'Active',
-    image: 'SC',
-    created: '2024-01-20'
-  },
-  {
-    id: 5,
-    name: 'Yoga Mat',
-    category: 'Sports',
-    price: 39.99,
-    stock: 78,
-    status: 'Active',
-    image: 'YM',
-    created: '2024-02-28'
-  }
-];
-
-// Memoized status color mapping
-const STATUS_COLORS = {
-  'Active': 'bg-green-100 text-green-800',
-  'Out of Stock': 'bg-red-100 text-red-800',
-  'Inactive': 'bg-gray-100 text-gray-800'
-};
-
-const getStatusColor = (status) => STATUS_COLORS[status] || 'bg-gray-100 text-gray-800';
-
-const getStockColor = (stock) => {
-  if (stock === 0) return 'text-red-600';
-  if (stock < 20) return 'text-yellow-600';
-  return 'text-green-600';
-};
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { itemAPI } from '../api/endpoints';
+import { Search, Filter, ShoppingCart, Eye, Heart, Star } from 'lucide-react';
 
 const Products = () => {
-  const responsive = useResponsive();
-  const [products] = useState(INITIAL_PRODUCTS);
+  const navigate = useNavigate();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Memoize filtered products to prevent recalculation on every render
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm) return products;
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    return products.filter(product =>
-      product.name.toLowerCase().includes(lowerSearchTerm) ||
-      product.category.toLowerCase().includes(lowerSearchTerm)
-    );
-  }, [products, searchTerm]);
+  // Fetch products
+  useEffect(() => {
+    fetchProducts();
+  }, [currentPage, selectedCategory, sortBy]);
 
-  // Memoize statistics calculations
-  const stats = useMemo(() => ({
-    total: products.length,
-    active: products.filter(p => p.status === 'Active').length,
-    outOfStock: products.filter(p => p.stock === 0).length,
-    lowStock: products.filter(p => p.stock > 0 && p.stock < 20).length
-  }), [products]);
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const params = {
+        page: currentPage,
+        limit: 12,
+        category: selectedCategory,
+        sort: sortBy,
+        search: searchTerm
+      };
 
-  // Use useCallback for event handlers to prevent child re-renders
-  const handleSearchChange = useCallback((e) => {
-    setSearchTerm(e.target.value);
-  }, []);
+      const response = await itemAPI.getAllItems(params);
+      if (response.data?.success) {
+        setProducts(response.data.data.items || response.data.data || []);
+        setTotalPages(response.data.data.totalPages || 1);
+      } else {
+        setError('Failed to fetch products');
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setError(error.response?.data?.message || 'Failed to fetch products');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Memoized table row component
-  const TableRow = React.memo(({ product }) => (
-    <tr className="hover:bg-gray-50">
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-200 rounded-lg flex items-center justify-center text-gray-600 font-bold text-xs sm:text-sm">
-            {product.image}
-          </div>
-          <div className="ml-3 sm:ml-4">
-            <div className="text-sm font-medium text-gray-900">{product.name}</div>
-            <div className="text-xs sm:text-sm text-gray-500">Created: {product.created}</div>
-          </div>
-        </div>
-      </td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-        <div className="text-sm text-gray-900">{product.category}</div>
-      </td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-        <div className="text-sm font-medium text-gray-900">${product.price}</div>
-      </td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-        <div className={`text-sm font-medium ${getStockColor(product.stock)}`}>
-          {product.stock} units
-        </div>
-      </td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(product.status)}`}>
-          {product.status}
-        </span>
-      </td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-        <div className="flex space-x-1 sm:space-x-2">
-          <button className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50">
-            <Eye size={16} />
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchProducts();
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  const ProductCard = ({ product }) => (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+      <div className="relative">
+        <img
+          src={product.images?.[0] || '/api/placeholder/300/300'}
+          alt={product.productName || product.title}
+          className="w-full h-64 object-cover"
+          onError={(e) => {
+            e.target.src = '/api/placeholder/300/300';
+          }}
+        />
+        <div className="absolute top-2 right-2 flex gap-2">
+          <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50">
+            <Heart className="w-4 h-4 text-gray-600" />
           </button>
-          <button className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50">
-            <Edit size={16} />
-          </button>
-          <button className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50">
-            <Trash2 size={16} />
+          <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50">
+            <Eye className="w-4 h-4 text-gray-600" />
           </button>
         </div>
-      </td>
-    </tr>
-  ));
-
-  // Memoized card component
-  const ProductCard = React.memo(({ product }) => (
-    <div className="p-4 hover:bg-gray-50">
-      <div className="flex items-start space-x-3">
-        <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-gray-600 font-bold flex-shrink-0">
-          {product.image}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-gray-900 truncate">{product.name}</h3>
-              <p className="text-xs text-gray-500 mt-1">{product.category}</p>
-              <div className="flex items-center space-x-4 mt-2">
-                <span className="text-sm font-medium text-gray-900">${product.price}</span>
-                <span className={`text-xs font-medium ${getStockColor(product.stock)}`}>
-                  {product.stock} units
-                </span>
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(product.status)}`}>
-                  {product.status}
-                </span>
-              </div>
-            </div>
-            <div className="flex space-x-1">
-              <button className="text-blue-600 hover:text-blue-900 p-1.5 rounded hover:bg-blue-50">
-                <Eye size={16} />
-              </button>
-              <button className="text-green-600 hover:text-green-900 p-1.5 rounded hover:bg-green-50">
-                <Edit size={16} />
-              </button>
-              <button className="text-red-600 hover:text-red-900 p-1.5 rounded hover:bg-red-50">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  ));
-
-  return (
-  <div className={`${getTailwindClasses.spacing.container} mt-14 space-y-4 sm:space-y-6`}>
-      {/* Page header */}
-      <div className={`${getTailwindClasses.flex.responsive}`}>
-        <div>
-          <h1 className={getTailwindClasses.heading.h1}>Products</h1>
-          <p className={`${getTailwindClasses.text.body} text-gray-600 mt-3`}>Manage your product inventory</p>
-        </div>
-        <button className={`${getTailwindClasses.button.primary} flex items-center space-x-2`}>
-          <Plus size={responsive.isMobile ? 16 : 20} />
-          {!responsive.isMobile && <span>Add Product</span>}
-        </button>
-      </div>
-
-      {/* Stats cards */}
-      <div className={`${getTailwindClasses.grid.responsive4} ${getTailwindClasses.grid.gap}`}>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h3 className={`${getTailwindClasses.text.small} font-medium text-gray-500`}>Total Products</h3>
-          <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h3 className={`${getTailwindClasses.text.small} font-medium text-gray-500`}>Active Products</h3>
-          <p className="text-xl sm:text-2xl font-bold text-green-600 mt-1">{stats.active}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h3 className={`${getTailwindClasses.text.small} font-medium text-gray-500`}>Out of Stock</h3>
-          <p className="text-xl sm:text-2xl font-bold text-red-600 mt-1">{stats.outOfStock}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h3 className={`${getTailwindClasses.text.small} font-medium text-gray-500`}>Low Stock</h3>
-          <p className="text-xl sm:text-2xl font-bold text-yellow-600 mt-1">{stats.lowStock}</p>
-        </div>
-      </div>
-
-      {/* Search and filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-        <div className={`${getTailwindClasses.flex.responsiveRow} gap-3 sm:gap-4`}>
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={responsive.isMobile ? 16 : 20} />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className={`pl-8 sm:pl-10 w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-            />
-          </div>
-          {!responsive.isMobile && (
-            <>
-              <select className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">All Categories</option>
-                <option value="electronics">Electronics</option>
-                <option value="sports">Sports</option>
-                <option value="kitchen">Kitchen</option>
-              </select>
-              <select className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="out-of-stock">Out of Stock</option>
-              </select>
-              <button className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 flex items-center space-x-2 hover:bg-gray-50 text-sm sm:text-base">
-                <Filter size={responsive.isMobile ? 16 : 20} />
-                <span>More Filters</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Products table/cards */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {responsive.isDesktop ? (
-          // Desktop table view
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Product
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stock
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id} product={product} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          // Mobile/Tablet card view
-          <div className="divide-y divide-gray-200">
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+        {product.salePrice && product.salePrice < product.regularPrice && (
+          <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-sm font-medium">
+            Sale
           </div>
         )}
       </div>
+      
+      <div className="p-4">
+        <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+          {product.productName || product.title}
+        </h3>
+        
+        <div className="flex items-center gap-1 mb-2">
+          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+          <span className="text-sm text-gray-600">4.5 (120 reviews)</span>
+        </div>
 
-      {/* Pagination */}
-      <div className="bg-white px-4 py-3 border border-gray-200 rounded-lg">
-        <div className={`${getTailwindClasses.flex.responsive} text-sm`}>
-          <div className="text-gray-700 mb-2 sm:mb-0">
-            Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredProducts.length}</span> of{' '}
-            <span className="font-medium">{products.length}</span> results
+        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+          {product.description}
+        </p>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {product.salePrice ? (
+              <>
+                <span className="text-lg font-bold text-green-600">
+                  ₹{product.salePrice}
+                </span>
+                <span className="text-sm text-gray-500 line-through">
+                  ₹{product.regularPrice}
+                </span>
+              </>
+            ) : (
+              <span className="text-lg font-bold text-gray-900">
+                ₹{product.regularPrice || product.sizes?.[0]?.regularPrice || 'N/A'}
+              </span>
+            )}
           </div>
-          <div className="flex space-x-1 sm:space-x-2">
-            <button className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50">
-              Previous
-            </button>
-            <button className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md">
-              1
-            </button>
-            <button className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50">
-              2
-            </button>
-            <button className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-50">
-              Next
+          
+          <button className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition-colors">
+            <ShoppingCart className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="mt-3 flex gap-2 text-xs text-gray-500">
+          {product.category && (
+            <span className="bg-gray-100 px-2 py-1 rounded">
+              {product.category}
+            </span>
+          )}
+          {product.brand && (
+            <span className="bg-gray-100 px-2 py-1 rounded">
+              {product.brand}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
+          <p className="text-gray-600 mt-2">Discover our latest collection</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Category Filter */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All Categories</option>
+              <option value="shirts">Shirts</option>
+              <option value="jeans">Jeans</option>
+              <option value="dresses">Dresses</option>
+              <option value="accessories">Accessories</option>
+            </select>
+
+            {/* Sort By */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="newest">Newest First</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
+              <option value="popular">Most Popular</option>
+            </select>
+
+            {/* Search Button */}
+            <button
+              onClick={handleSearch}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <Filter className="w-4 h-4" />
+              Filter
             </button>
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
+
+        {/* Products Grid */}
+        {products.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <ProductCard key={product._id || product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-6xl mb-4">📦</div>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No products found</h3>
+            <p className="text-gray-500">Try adjusting your search or filters</p>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-8">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i + 1}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`px-4 py-2 border rounded-lg ${
+                    currentPage === i + 1
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

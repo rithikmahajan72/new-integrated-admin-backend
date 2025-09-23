@@ -7,6 +7,8 @@ export const fetchCategories = createAsyncThunk(
   'categories/fetchCategories',
   async (_, { rejectWithValue }) => {
     try {
+      console.log('fetchCategories: Starting API call...');
+      
       // Direct API call for better debugging
       const response = await categoryAPI.getAllCategories();
       console.log('fetchCategories response:', response);
@@ -15,12 +17,20 @@ export const fetchCategories = createAsyncThunk(
       console.log('fetchCategories result:', result);
       
       if (result.success || response.status === 200) {
+        console.log('fetchCategories: Success, returning data:', result.data || result || []);
         return result.data || result || [];
       } else {
+        console.log('fetchCategories: API returned error:', result.message);
         return rejectWithValue(result.message || 'Failed to fetch categories');
       }
     } catch (error) {
       console.error('fetchCategories error:', error);
+      console.error('fetchCategories error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config?.url
+      });
       const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch categories';
       return rejectWithValue(errorMessage);
     }

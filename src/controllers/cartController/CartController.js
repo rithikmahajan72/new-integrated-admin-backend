@@ -6,7 +6,7 @@ const Item = require("../../models/Item"); // Model for the item being added to 
 exports.create = async (req, res) => {
   try {
     console.log("req.body", req.body);
-    const { itemId, itemDetailsId, sku, quantity } = req.body; // Extract relevant data from request body
+    const { itemId, size, sku, quantity } = req.body; // Extract relevant data from request body
     console.log("sku", sku);
     const userId = req.user._id; // Get current user's ID from authenticated request
 
@@ -14,6 +14,12 @@ exports.create = async (req, res) => {
     const itemExists = await Item.findById(itemId);
     if (!itemExists) {
       return res.status(404).json(ApiResponse(null, "Item not found", false, 404));
+    }
+
+    // Validate that the size and sku exist in the item
+    const sizeVariant = itemExists.sizes.find(s => s.size === size && s.sku === sku);
+    if (!sizeVariant) {
+      return res.status(400).json(ApiResponse(null, "Invalid size or SKU", false, 400));
     }
 
     // If item with same SKU already exists in cart, just update its quantity
@@ -28,7 +34,7 @@ exports.create = async (req, res) => {
     const newCartItem = new Cart({
       user: userId,
       item: itemId,
-      itemDetails: itemDetailsId, // Reference to variant details (e.g. size/color)
+      size, // Size from the item's sizes
       sku, // Stock Keeping Unit, uniquely identifies the item variant
       quantity,
     });
@@ -46,10 +52,9 @@ exports.getByUserId = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Fetch all cart items for this user, and populate item and itemDetails fields
+    // Fetch all cart items for this user, and populate item field
     const result = await Cart.find({ user: userId })
-      .populate("item") // Fetch full item details
-      .populate("itemDetails", "colors"); // Fetch selected item variant info (like colors, sizes)
+      .populate("item"); // Fetch full item details including sizes
 
     res.status(200).json(ApiResponse(result, "Cart retrieved successfully", true, 200));
   } catch (error) {
@@ -58,18 +63,24 @@ exports.getByUserId = async (req, res) => {
   }
 };
 
-// ✅ Update cart item quantity or SKU
+// ✅ Update cart item quantity, size, or SKU
 exports.updateById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { quantity, sku } = req.body;
+    const { quantity, size, sku } = req.body;
 
-    // Find cart item by ID and update its quantity or SKU
+    // Build update object with only provided fields
+    const updateData = {};
+    if (quantity !== undefined) updateData.quantity = quantity;
+    if (size !== undefined) updateData.size = size;
+    if (sku !== undefined) updateData.sku = sku;
+
+    // Find cart item by ID and update it
     const updated = await Cart.findByIdAndUpdate(
       id,
-      { quantity, sku },
+      updateData,
       { new: true }
-    ).populate("item itemDetails");
+    ).populate("item");
 
     if (!updated) {
       return res.status(404).json(ApiResponse(null, "Cart item not found", false, 404));

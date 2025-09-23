@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const ItemDetails = mongoose.model("ItemDetails");
-const User = mongoose.model("User");
+const Item = require("../models/Item");
+const User = require("../models/User");
 
 // Create Review
 exports.createReview = async (req, res) => {
@@ -24,14 +24,14 @@ exports.createReview = async (req, res) => {
       return res.status(400).json({ message: "Rating must be between 1 and 5" });
     }
 
-    const itemDetail = await ItemDetails.findOne({ items: itemId });
+    const itemDetail = await Item.findById(itemId);
     if (!itemDetail) {
-      console.warn(`[createReview] ItemDetails not found for itemId: ${itemId}`);
-      return res.status(404).json({ message: "Item details not found for this item" });
+      console.warn(`[createReview] Item not found for itemId: ${itemId}`);
+      return res.status(404).json({ message: "Item not found" });
     }
 
     if (!itemDetail.isReviewSubmissionEnabled) {
-      console.warn(`[createReview] Review submission disabled for itemDetailsId: ${itemDetail._id}`);
+      console.warn(`[createReview] Review submission disabled for itemId: ${itemDetail._id}`);
       return res.status(403).json({ message: "Review submission is disabled for this item" });
     }
 
@@ -69,12 +69,12 @@ exports.createReview = async (req, res) => {
     await itemDetail.save();
 
     console.log(
-      `[createReview] Review added successfully - reviewId: ${review._id}, itemDetailsId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
+      `[createReview] Review added successfully - reviewId: ${review._id}, itemId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
     );
     res.status(201).json({
       message: "Review added",
       review,
-      itemDetailId: itemDetail._id,
+      itemId: itemDetail._id,
       averageRating: itemDetail.averageRating,
     });
   } catch (error) {
@@ -98,19 +98,19 @@ exports.getReviews = async (req, res) => {
       return res.status(400).json({ message: "Invalid Item ID format" });
     }
 
-    const itemDetail = await ItemDetails.findOne({ items: itemId }).populate("reviews.user", "name email");
+    const itemDetail = await Item.findById(itemId).populate("reviews.user", "name email");
     if (!itemDetail) {
-      console.warn(`[getReviews] ItemDetails not found for itemId: ${itemId}`);
-      return res.status(404).json({ message: "Item details not found for this item" });
+      console.warn(`[getReviews] Item not found for itemId: ${itemId}`);
+      return res.status(404).json({ message: "Item not found" });
     }
 
     if (!itemDetail.isReviewDisplayEnabled) {
-      console.warn(`[getReviews] Review display disabled for itemDetailsId: ${itemDetail._id}`);
+      console.warn(`[getReviews] Review display disabled for itemId: ${itemDetail._id}`);
       return res.status(403).json({ message: "Reviews are not displayed for this item" });
     }
 
-    console.log(`[getReviews] Retrieved ${itemDetail.reviews.length} reviews for itemDetailsId: ${itemDetail._id}`);
-    res.status(200).json({ itemDetailId: itemDetail._id, reviews: itemDetail.reviews });
+    console.log(`[getReviews] Retrieved ${itemDetail.reviews.length} reviews for itemId: ${itemDetail._id}`);
+    res.status(200).json({ itemId: itemDetail._id, reviews: itemDetail.reviews });
   } catch (error) {
     console.error(`[getReviews] Server error: ${error.message}`, { stack: error.stack });
     res.status(500).json({ message: "Server error", error: error.message });
@@ -143,10 +143,10 @@ exports.updateReview = async (req, res) => {
       return res.status(400).json({ message: "Rating must be between 1 and 5" });
     }
 
-    const itemDetail = await ItemDetails.findOne({ items: itemId });
+    const itemDetail = await Item.findById(itemId);
     if (!itemDetail) {
-      console.warn(`[updateReview] ItemDetails not found for itemId: ${itemId}`);
-      return res.status(404).json({ message: "Item details not found for this item" });
+      console.warn(`[updateReview] Item not found for itemId: ${itemId}`);
+      return res.status(404).json({ message: "Item not found" });
     }
 
     const review = itemDetail.reviews.id(reviewId);
@@ -175,12 +175,12 @@ exports.updateReview = async (req, res) => {
     await itemDetail.save();
 
     console.log(
-      `[updateReview] Review updated successfully - reviewId: ${reviewId}, itemDetailsId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
+      `[updateReview] Review updated successfully - reviewId: ${reviewId}, itemId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
     );
     res.status(200).json({
       message: "Review updated",
       review,
-      itemDetailId: itemDetail._id,
+      itemId: itemDetail._id,
       averageRating: itemDetail.averageRating,
     });
   } catch (error) {
@@ -209,14 +209,14 @@ exports.deleteReview = async (req, res) => {
       return res.status(400).json({ message: "Invalid Item ID or Review ID format" });
     }
 
-    const itemDetail = await ItemDetails.findOne({ items: itemId });
+    const itemDetail = await Item.findById(itemId);
     if (!itemDetail) {
-      console.warn(`[deleteReview] ItemDetails not found for itemId: ${itemId}`);
-      return res.status(404).json({ message: "Item details not found for this item" });
+      console.warn(`[deleteReview] Item not found for itemId: ${itemId}`);
+      return res.status(404).json({ message: "Item not found" });
     }
 
     if (!itemDetail.isReviewSubmissionEnabled) {
-      console.warn(`[deleteReview] Review submission disabled for itemDetailsId: ${itemDetail._id}`);
+      console.warn(`[deleteReview] Review submission disabled for itemId: ${itemDetail._id}`);
       return res.status(403).json({ message: "Review submission is disabled for this item" });
     }
 
@@ -243,11 +243,11 @@ exports.deleteReview = async (req, res) => {
     await itemDetail.save();
 
     console.log(
-      `[deleteReview] Review deleted successfully - reviewId: ${reviewId}, itemDetailsId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
+      `[deleteReview] Review deleted successfully - reviewId: ${reviewId}, itemId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
     );
     res.status(200).json({
       message: "Review deleted",
-      itemDetailId: itemDetail._id,
+      itemId: itemDetail._id,
       averageRating: itemDetail.averageRating,
     });
   } catch (error) {
@@ -271,46 +271,46 @@ exports.getAverageRating = async (req, res) => {
       return res.status(400).json({ message: "Invalid Item ID format" });
     }
 
-    const itemDetail = await ItemDetails.findOne({ items: itemId }).select("averageRating isReviewDisplayEnabled");
+    const itemDetail = await Item.findById(itemId).select("averageRating isReviewDisplayEnabled");
     if (!itemDetail) {
-      console.warn(`[getAverageRating] ItemDetails not found for itemId: ${itemId}`);
-      return res.status(404).json({ message: "Item details not found for this item" });
+      console.warn(`[getAverageRating] Item not found for itemId: ${itemId}`);
+      return res.status(404).json({ message: "Item not found" });
     }
 
     if (!itemDetail.isReviewDisplayEnabled) {
-      console.warn(`[getAverageRating] Rating display disabled for itemDetailsId: ${itemDetail._id}`);
+      console.warn(`[getAverageRating] Rating display disabled for itemId: ${itemDetail._id}`);
       return res.status(403).json({ message: "Ratings are not displayed for this item" });
     }
 
     console.log(
-      `[getAverageRating] Average rating retrieved: ${itemDetail.averageRating} for itemDetailsId: ${itemDetail._id}`
+      `[getAverageRating] Average rating retrieved: ${itemDetail.averageRating} for itemId: ${itemDetail._id}`
     );
-    res.status(200).json({ itemDetailId: itemDetail._id, averageRating: itemDetail.averageRating });
+    res.status(200).json({ itemId: itemDetail._id, averageRating: itemDetail.averageRating });
   } catch (error) {
     console.error(`[getAverageRating] Server error: ${error.message}`, { stack: error.stack });
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Create Fake Review (Admin, uses itemDetailsId)
+// Create Fake Review (Admin, uses itemId)
 exports.createFakeReview = async (req, res) => {
   try {
-    const { itemDetailsId } = req.params;
+    const { itemId } = req.params;
     const { rating, reviewText, userId } = req.body;
 
-    console.log(`[createFakeReview] Processing request - itemDetailsId: ${itemDetailsId}, userId: ${userId}`);
+    console.log(`[createFakeReview] Processing request - itemId: ${itemId}, userId: ${userId}`);
 
-    if (!itemDetailsId || !userId) {
+    if (!itemId || !userId) {
       console.warn(
-        `[createFakeReview] Validation failed: itemDetailsId or userId is undefined - itemDetailsId: ${itemDetailsId}, userId: ${userId}`
+        `[createFakeReview] Validation failed: itemId or userId is undefined - itemId: ${itemId}, userId: ${userId}`
       );
-      return res.status(400).json({ message: "ItemDetails ID and User ID are required" });
+      return res.status(400).json({ message: "Item ID and User ID are required" });
     }
-    if (!mongoose.Types.ObjectId.isValid(itemDetailsId) || !mongoose.Types.ObjectId.isValid(userId)) {
+    if (!mongoose.Types.ObjectId.isValid(itemId) || !mongoose.Types.ObjectId.isValid(userId)) {
       console.warn(
-        `[createFakeReview] Validation failed: Invalid ID format - itemDetailsId: ${itemDetailsId}, userId: ${userId}`
+        `[createFakeReview] Validation failed: Invalid ID format - itemId: ${itemId}, userId: ${userId}`
       );
-      return res.status(400).json({ message: "Invalid ItemDetails ID or User ID format" });
+      return res.status(400).json({ message: "Invalid Item ID or User ID format" });
     }
 
     if (!rating || rating < 1 || rating > 5) {
@@ -318,10 +318,10 @@ exports.createFakeReview = async (req, res) => {
       return res.status(400).json({ message: "Rating must be between 1 and 5" });
     }
 
-    const itemDetail = await ItemDetails.findById(itemDetailsId);
+    const itemDetail = await Item.findById(itemId);
     if (!itemDetail) {
-      console.warn(`[createFakeReview] ItemDetails not found: ${itemDetailsId}`);
-      return res.status(404).json({ message: "Item details not found" });
+      console.warn(`[createFakeReview] Item not found: ${itemId}`);
+      return res.status(404).json({ message: "Item not found" });
     }
 
     const user = await User.findById(userId);
@@ -350,12 +350,12 @@ exports.createFakeReview = async (req, res) => {
     await itemDetail.save();
 
     console.log(
-      `[createFakeReview] Fake review added successfully - reviewId: ${review._id}, itemDetailsId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
+      `[createFakeReview] Fake review added successfully - reviewId: ${review._id}, itemId: ${itemDetail._id}, averageRating: ${itemDetail.averageRating}`
     );
     res.status(201).json({
       message: "Fake review added",
       review,
-      itemDetailId: itemDetail._id,
+      itemId: itemDetail._id,
       averageRating: itemDetail.averageRating,
     });
   } catch (error) {
@@ -364,21 +364,21 @@ exports.createFakeReview = async (req, res) => {
   }
 };
 
-// Update Review Settings (Admin, uses itemDetailsId)
+// Update Review Settings (Admin, uses itemId)
 exports.updateReviewSettings = async (req, res) => {
   try {
-    const { itemDetailsId } = req.params;
+    const { itemId } = req.params;
     const { isReviewDisplayEnabled, isReviewSubmissionEnabled } = req.body;
 
-    console.log(`[updateReviewSettings] Processing request - itemDetailsId: ${itemDetailsId}`);
+    console.log(`[updateReviewSettings] Processing request - itemId: ${itemId}`);
 
-    if (!itemDetailsId) {
-      console.warn(`[updateReviewSettings] Validation failed: itemDetailsId is undefined`);
-      return res.status(400).json({ message: "ItemDetails ID is required" });
+    if (!itemId) {
+      console.warn(`[updateReviewSettings] Validation failed: itemId is undefined`);
+      return res.status(400).json({ message: "Item ID is required" });
     }
-    if (!mongoose.Types.ObjectId.isValid(itemDetailsId)) {
-      console.warn(`[updateReviewSettings] Validation failed: Invalid itemDetailsId format - ${itemDetailsId}`);
-      return res.status(400).json({ message: "Invalid ItemDetails ID format" });
+    if (!mongoose.Types.ObjectId.isValid(itemId)) {
+      console.warn(`[updateReviewSettings] Validation failed: Invalid itemId format - ${itemId}`);
+      return res.status(400).json({ message: "Invalid Item ID format" });
     }
 
     const updateFields = {};
@@ -391,19 +391,19 @@ exports.updateReviewSettings = async (req, res) => {
       return res.status(400).json({ message: "No valid settings provided" });
     }
 
-    const itemDetail = await ItemDetails.findByIdAndUpdate(
-      itemDetailsId,
+    const itemDetail = await Item.findByIdAndUpdate(
+      itemId,
       { $set: updateFields },
       { new: true }
     );
 
     if (!itemDetail) {
-      console.warn(`[updateReviewSettings] ItemDetails not found: ${itemDetailsId}`);
-      return res.status(404).json({ message: "Item details not found" });
+      console.warn(`[updateReviewSettings] Item not found: ${itemId}`);
+      return res.status(404).json({ message: "Item not found" });
     }
 
     console.log(
-      `[updateReviewSettings] Review settings updated successfully - itemDetailsId: ${itemDetail._id}, updateFields: ${JSON.stringify(updateFields)}`
+      `[updateReviewSettings] Review settings updated successfully - itemId: ${itemDetail._id}, updateFields: ${JSON.stringify(updateFields)}`
     );
     res.status(200).json({ message: "Review settings updated", item: itemDetail });
   } catch (error) {
