@@ -32,7 +32,6 @@ const Layout = () => {
       "new admin partner": "/new-partner",
       "users /block user": "/block-user",
       "send notification in app(inbuilt)": "/in-app-notification",
-      "Send Promo Notification": "/send-promo-notification",
       "push notification": "/push-notification",
       "manage and post reviews": "/manage-reviews",
       "Promo codes": "/promo-code-management",

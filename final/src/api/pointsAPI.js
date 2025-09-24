@@ -3,11 +3,11 @@ import API from './axiosConfig';
 // Points System API endpoints
 export const pointsAPI = {
   // System configuration
-  getSystemConfig: () => API.get('/api/points/config'),
-  updateSystemConfig: (configData) => API.put('/api/points/config', configData),
+  getSystemConfig: () => API.get('/points/config'),
+  updateSystemConfig: (configData) => API.put('/points/config', configData),
   
   // Users with points
-  getAllUsersWithPoints: (params = {}) => API.get('/api/points/users', { params }),
+  getAllUsersWithPoints: (params = {}) => API.get('/points/users', { params }),
   getUserPoints: (userId) => API.get(`/api/points/user/${userId}`),
   getUserPointsHistory: (userId, params = {}) => API.get(`/api/points/user/${userId}/history`, { params }),
   
@@ -18,7 +18,7 @@ export const pointsAPI = {
   deleteUserPoints: (userId) => API.delete(`/api/points/user/${userId}`),
   
   // Summary and statistics
-  getPointsSummary: () => API.get('/api/points/summary'),
+  getPointsSummary: () => API.get('/points/summary'),
 };
 
 export default pointsAPI;

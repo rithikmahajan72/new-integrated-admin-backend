@@ -91,10 +91,6 @@ const Sidebar = React.memo(
           items: [
             { name: "Cart Abandonment Recovery", path: "/cart-recovery" },
             {
-              name: "Send Promo Notification",
-              path: "/send-promo-notification",
-            },
-            {
               name: "Send Notification In App",
               path: "/send-notification-in-app",
             },

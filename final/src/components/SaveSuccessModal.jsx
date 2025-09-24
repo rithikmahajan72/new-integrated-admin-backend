@@ -1,12 +1,8 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 
 const SaveSuccessModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
-
-  // Figma assets
-  const checkIcon = "http://localhost:3845/assets/e5678a3b8326a52250be1683e841fedf9f641617.svg";
-  const closeIcon = "http://localhost:3845/assets/74400e78448b85fb9710d100c8cbcbe664fe30de.svg";
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -16,16 +12,14 @@ const SaveSuccessModal = ({ isOpen, onClose }) => {
           onClick={onClose}
           className="absolute right-[33px] top-[33px] w-6 h-6 flex items-center justify-center"
         >
-          <img src={closeIcon} alt="Close" className="w-4 h-4" />
+          <X className="w-4 h-4" />
         </button>
 
         {/* Success Check Icon */}
-        <div className="absolute left-1/2 top-[45px] transform -translate-x-1/2 w-[74px] h-[74px]">
-          <img
-            src={checkIcon}
-            alt="Success check"
-            className="w-full h-full"
-          />
+        <div className="absolute left-1/2 top-[45px] transform -translate-x-1/2 w-[74px] h-[74px] flex items-center justify-center">
+          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+            <Check className="w-8 h-8 text-green-600" />
+          </div>
         </div>
 
         {/* Title */}

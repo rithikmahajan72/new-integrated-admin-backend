@@ -8,7 +8,7 @@ export const createPartner = createAsyncThunk(
   'partners/createPartner',
   async (partnerData, { rejectWithValue }) => {
     try {
-      const response = await api.post('/api/partners', partnerData);
+      const response = await api.post('/partners', partnerData);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -42,7 +42,7 @@ export const fetchPartners = createAsyncThunk(
       if (status) queryParams.append('status', status);
       if (search) queryParams.append('search', search);
 
-      const response = await api.get(`/api/partners?${queryParams}`);
+      const response = await api.get(`/partners?${queryParams}`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -57,7 +57,7 @@ export const fetchPartnerById = createAsyncThunk(
   'partners/fetchPartnerById',
   async (partnerId, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/api/partners/${partnerId}`);
+      const response = await api.get(`/partners/${partnerId}`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -72,7 +72,7 @@ export const updatePartner = createAsyncThunk(
   'partners/updatePartner',
   async ({ partnerId, updates }, { rejectWithValue }) => {
     try {
-      const response = await api.put(`/api/partners/${partnerId}`, updates);
+      const response = await api.put(`/partners/${partnerId}`, updates);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -87,7 +87,7 @@ export const updatePartnerPassword = createAsyncThunk(
   'partners/updatePartnerPassword',
   async ({ partnerId, passwordData }, { rejectWithValue }) => {
     try {
-      const response = await api.put(`/api/partners/${partnerId}/password`, passwordData);
+      const response = await api.put(`/partners/${partnerId}/password`, passwordData);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -102,7 +102,7 @@ export const togglePartnerStatus = createAsyncThunk(
   'partners/togglePartnerStatus',
   async ({ partnerId, action, reason }, { rejectWithValue }) => {
     try {
-      const response = await api.patch(`/api/partners/${partnerId}/toggle-status`, {
+      const response = await api.patch(`/partners/${partnerId}/toggle-status`, {
         reason: reason || 'Admin action'
       });
       return response.data;
@@ -119,7 +119,7 @@ export const deletePartner = createAsyncThunk(
   'partners/deletePartner',
   async (partnerId, { rejectWithValue }) => {
     try {
-      const response = await api.delete(`/api/partners/${partnerId}`);
+      const response = await api.delete(`/partners/${partnerId}`);
       return response.data;
       return { partnerId, response: response.data };
     } catch (error) {
@@ -135,7 +135,7 @@ export const fetchPartnerStatistics = createAsyncThunk(
   'partners/fetchPartnerStatistics',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get('/api/partners/statistics');
+      const response = await api.get('/partners/statistics');
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -150,7 +150,7 @@ export const partnerLogin = createAsyncThunk(
   'partners/partnerLogin',
   async (credentials, { rejectWithValue }) => {
     try {
-      const response = await api.post('/api/partners/auth/login', credentials);
+      const response = await api.post('/partners/auth/login', credentials);
       return response.data;
     } catch (error) {
       return rejectWithValue(

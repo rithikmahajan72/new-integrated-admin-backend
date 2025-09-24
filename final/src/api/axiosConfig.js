@@ -10,7 +10,7 @@ console.log('Environment variables:', {
 });
 
 // Create axios instance with base configuration
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 console.log('🚀 AXIOS CONFIG: Using baseURL:', baseURL);
 
 const API = axios.create({

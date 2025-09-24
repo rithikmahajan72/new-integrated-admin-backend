@@ -38,7 +38,6 @@ import ReviewDetails from "./pages/ReviewDetails";
 import PushNotification from "./pages/pushNotification";
 import NotificationPreview from "./pages/notificationPreview";
 import SendNotificationInApp from "./pages/sendnotificationinapp";
-import SendPromoNotification from "./pages/sendpromonotification";
 import BulkSMS from "./pages/BulkSMS";
 import InviteAFriend from "./pages/inviteafriend";
 import Points from "./pages/points";
@@ -49,6 +48,7 @@ import JoinUsControl from "./pages/JoinUsControl";
 import ManageBannersOnRewards from "./pages/ManageBannersOnRewards";
 import ProductBundling from "./pages/itembundling";
 import APIDebugPage from "./pages/APIDebugPage";
+import APIDebugTest from "./pages/APIDebugTest";
 import ArrangementControl from "./pages/itemarrangementcontrol";
 import NewPartner from "./pages/NewPartner";
 
@@ -184,9 +184,8 @@ const App = () => {
 
           {/* ===== REVIEWS & RATINGS ===== */}
           <Route path="/manage-reviews" element={<ManageReviews />} />
-          <Route path="/review-details/:reviewId" element={<ReviewDetails />} />
-
-          {/* ===== USER MANAGEMENT ===== */}
+          <Route path="/api-debug-test" element={<APIDebugTest />} />
+          <Route path="/review-details" element={<ReviewDetails />} />          {/* ===== USER MANAGEMENT ===== */}
           <Route path="/users" element={<Users />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/block-user" element={<BlockUser />} />
@@ -200,10 +199,6 @@ const App = () => {
           <Route
             path="/in-app-notification"
             element={<SendNotificationInApp />}
-          />
-          <Route
-            path="/send-promo-notification"
-            element={<SendPromoNotification />}
           />
           <Route path="/bulk-messages" element={<BulkSMS />} />
 

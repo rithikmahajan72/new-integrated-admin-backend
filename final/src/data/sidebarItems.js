@@ -31,7 +31,6 @@ const sidebarItems = [
     title: "App promotional area",
     items: [
       "send notification in app(inbuilt)",
-      "Send Promo Notification",
       "push notification",
       "manage and post reviews",
       "Promo codes",

@@ -11,7 +11,7 @@ export const fetchCategoriesForArrangement = createAsyncThunk(
   'arrangement/fetchCategoriesForArrangement',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await API.get('/api/items/categories-arrangement');
+      const response = await API.get('/items/categories-arrangement');
       if (response.data?.success) {
         return response.data.data;
       } else {
@@ -53,7 +53,7 @@ export const updateItemsDisplayOrder = createAsyncThunk(
   'arrangement/updateItemsDisplayOrder',
   async (items, { rejectWithValue }) => {
     try {
-      const response = await API.put('/api/items/items-display-order', { items });
+      const response = await API.put('/items/items-display-order', { items });
       if (response.data?.success) {
         return response.data.data;
       } else {
@@ -70,7 +70,7 @@ export const updateCategoriesDisplayOrder = createAsyncThunk(
   'arrangement/updateCategoriesDisplayOrder',
   async (categories, { rejectWithValue }) => {
     try {
-      const response = await API.put('/api/items/categories-display-order', { categories });
+      const response = await API.put('/items/categories-display-order', { categories });
       if (response.data?.success) {
         return response.data.data;
       } else {
@@ -87,7 +87,7 @@ export const updateSubCategoriesDisplayOrder = createAsyncThunk(
   'arrangement/updateSubCategoriesDisplayOrder',
   async (subcategories, { rejectWithValue }) => {
     try {
-      const response = await API.put('/api/items/subcategories-display-order', { subcategories });
+      const response = await API.put('/items/subcategories-display-order', { subcategories });
       if (response.data?.success) {
         return response.data.data;
       } else {

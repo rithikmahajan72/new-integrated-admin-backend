@@ -160,7 +160,7 @@ class FCMService {
       const platform = this.getPlatform();
       
       // Send token to your backend
-      const response = await fetch('/api/users/update-fcm-token', {
+      const response = await fetch('/users/update-fcm-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
