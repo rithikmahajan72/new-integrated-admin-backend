@@ -439,6 +439,31 @@ export const inviteFriendAPI = {
   getUserRedeemed: () => API.get('/invite-friend/my-redeemed')
 };
 
+// Inbox/Messaging API endpoints
+export const inboxAPI = {
+  // User endpoints
+  getFolderCounts: () => API.get('/inbox/user/counts'),
+  getMessages: (folder) => API.get(`/inbox/user/${folder}`),
+  getMessage: (messageId) => API.get(`/inbox/user/message/${messageId}`),
+  sendMessage: (messageData) => API.post('/inbox/user/send', messageData),
+  replyToMessage: (messageId) => API.post(`/inbox/user/reply/${messageId}`),
+  updateMessageStatus: (messageId) => API.patch(`/inbox/user/message/${messageId}`),
+  bulkUpdateMessages: (data) => API.patch('/inbox/user/bulk-update', data),
+  deleteMessage: (messageId) => API.delete(`/inbox/user/message/${messageId}`),
+  getThreadMessages: (threadId) => API.get(`/inbox/user/thread/${threadId}`),
+  
+  // External endpoints
+  createExternalMessage: (data) => API.post('/inbox/external/create', data),
+  
+  // Admin endpoints
+  getAllMessages: (params) => API.get('/inbox/admin/all', { params }),
+  getUserMessages: (userId, folder) => API.get(`/inbox/admin/user/${userId}/${folder}`),
+  adminReply: (messageId, data) => API.post(`/inbox/admin/reply/${messageId}`, data),
+  adminUpdateMessage: (messageId, data) => API.patch(`/inbox/admin/message/${messageId}`, data),
+  adminDeleteMessage: (messageId) => API.delete(`/inbox/admin/message/${messageId}`),
+  getAdminStats: () => API.get('/inbox/admin/stats'),
+};
+
 // Create endpoints object for easier access
 export const endpoints = {
   inviteFriend: {

@@ -32,6 +32,7 @@ const firebaseAdminRoutes = require("./src/routes/firebaseAdmin"); // Handles Fi
 const cartAbandonmentRoutes = require("./src/routes/cartAbandonmentRoutes"); // Handles cart abandonment recovery routes
 const pointsRoutes = require("./src/routes/PointsRoutes"); // Handles points system routes
 const inviteFriendRoutes = require("./src/routes/inviteafriend"); // Handles invite a friend system routes
+const inboxRoutes = require("./src/routes/InboxRoutes"); // Handles inbox/messaging system routes
 const morgan = require("morgan");
 
 const app = express();
@@ -91,6 +92,7 @@ app.use("/api/firebase", firebaseRoutes); // Mount Firebase user management rout
 app.use("/api/admin/firebase", firebaseAdminRoutes); // Mount Firebase Admin SDK routes
 app.use("/api/points", pointsRoutes); // Mount points system routes
 app.use("/api/invite-friend", inviteFriendRoutes); // Mount invite a friend system routes
+app.use("/api/inbox", inboxRoutes); // Mount inbox/messaging system routes
 app.use("/api/cart-abandonment", cartAbandonmentRoutes); // Mount cart abandonment recovery routes
 
 

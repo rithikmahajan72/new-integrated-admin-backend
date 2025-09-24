@@ -4,6 +4,17 @@ const sidebarItems = [
     items: ["Dashboard"],
   },
   {
+    title: "Dashboard Analytics",
+    items: [
+      "Dashboard Overview", 
+      "Analytics Reports", 
+      "Marketplace Sync", 
+      "User Management", 
+      "Order Management", 
+      "Product Data"
+    ],
+  },
+  {
     title: "App inbox area",
     items: ["Inbox"],
   },

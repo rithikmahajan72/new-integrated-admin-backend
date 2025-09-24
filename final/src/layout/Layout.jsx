@@ -18,6 +18,12 @@ const Layout = () => {
     const routeMap = {
       "Dashboard": "/",
       "Database Dashboard": "/database",
+      "Dashboard Overview": "/dashboard-overview",
+      "Analytics Reports": "/analytics-reports", 
+      "Marketplace Sync": "/marketplace-sync",
+      "User Management": "/user-management",
+      "Order Management": "/order-management", 
+      "Product Data": "/product-data",
       "orders": "/orders",
       "Inbox": "/inbox",
       "return orders": "/return-orders",

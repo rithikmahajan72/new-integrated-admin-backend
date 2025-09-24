@@ -15,7 +15,13 @@ import ProfileModalDemo from "./components/ProfileModalDemo";
 import SimpleModalTest from "./components/SimpleModalTest";
 
 // Import all page components
-import Dashboard from "./pages/dashboard";
+import MainDashboard from "./pages/MainDashboard";
+import DashboardView from "./pages/dashboardview";
+import DashboardAnalyticsGoogleReport from "./pages/dashboardanalyticsgooglereport";
+import DashboardMarketplaceSync from "./pages/dashboardmarketplacesync";
+import DashboardUsers from "./pages/dashboardusers";
+import DashboardOrders from "./pages/dashboardorders";
+import DashboardProductData from "./pages/dashboardproductdata";
 import Orders from "./pages/Orders"; // Old Orders component (fallback)
 import OrdersNew from "./pages/OrdersNew"; // New Redux Orders component
 import OrderDetails from "./pages/OrderDetails"; // Old OrderDetails component (fallback)
@@ -130,7 +136,7 @@ const App = () => {
           <div style={{ padding: '20px' }}>
             <h1>Admin Dashboard</h1>
             <p>Welcome to the admin panel!</p>
-            <Dashboard />
+            <MainDashboard />
           </div>
         } />
 
@@ -141,7 +147,16 @@ const App = () => {
           </ProtectedRoute>
         }>
           {/* ===== DASHBOARD & MAIN ===== */}
-          <Route path="/admin-dashboard" element={<Dashboard />} />
+          <Route path="/admin-dashboard" element={<MainDashboard />} />
+          <Route path="/database" element={<MainDashboard activeTab="databaseDashboard" />} />
+          
+          {/* ===== NEW DASHBOARD COMPONENTS ===== */}
+          <Route path="/dashboard-overview" element={<DashboardView />} />
+          <Route path="/analytics-reports" element={<DashboardAnalyticsGoogleReport />} />
+          <Route path="/marketplace-sync" element={<DashboardMarketplaceSync />} />
+          <Route path="/user-management" element={<DashboardUsers />} />
+          <Route path="/order-management" element={<DashboardOrders />} />
+          <Route path="/product-data" element={<DashboardProductData />} />
 
           {/* ===== ORDER MANAGEMENT ===== */}
           <Route path="/orders" element={<OrdersNew />} />
