@@ -26,6 +26,7 @@ import partnerSlice from './slices/partnerSlice';
 import pushNotificationSlice from './slices/pushNotificationSlice';
 import pointsSlice from './slices/pointsSlice';
 import inviteFriendSlice from './inviteFriendSlice';
+import cartAbandonmentSlice from './slices/cartAbandonmentSlice';
 
 // Persist configuration
 const persistConfig = {
@@ -74,6 +75,7 @@ const rootReducer = combineReducers({
   pushNotification: pushNotificationSlice,
   points: pointsSlice,
   inviteFriend: inviteFriendSlice,
+  cartAbandonment: cartAbandonmentSlice,
 });
 
 // Create persisted reducer (temporarily disabled)

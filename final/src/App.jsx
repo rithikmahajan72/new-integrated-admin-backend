@@ -43,7 +43,7 @@ import BulkSMS from "./pages/BulkSMS";
 import InviteAFriend from "./pages/inviteafriend";
 import Points from "./pages/points";
 import PromoCodeManagement from "./pages/PromoCodeManagement";
-import CartAbandonmentRecovery from "./pages/cartabandonmentrecovery";
+import CartAbandonmentRecovery from "./pages/CartAbandonmentRecovery";
 import Filters from "./pages/Filters";
 import JoinUsControl from "./pages/JoinUsControl";
 import ManageBannersOnRewards from "./pages/ManageBannersOnRewards";

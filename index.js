@@ -28,6 +28,7 @@ const ImageRoutes = require("./src/routes/ImageRoutes"); // Handles image URL re
 const partnerRoutes = require("./src/routes/PartnerRoutes"); // Handles partner management routes
 const firebaseRoutes = require("./src/routes/firebaseRoutes"); // Handles Firebase user management routes
 const firebaseAdminRoutes = require("./src/routes/firebaseAdmin"); // Handles Firebase Admin SDK routes
+const cartAbandonmentRoutes = require("./src/routes/cartAbandonmentRoutes"); // Handles cart abandonment recovery routes
 const pointsRoutes = require("./src/routes/PointsRoutes"); // Handles points system routes
 const inviteFriendRoutes = require("./src/routes/inviteafriend"); // Handles invite a friend system routes
 const morgan = require("morgan");
@@ -88,6 +89,7 @@ app.use("/api/firebase", firebaseRoutes); // Mount Firebase user management rout
 app.use("/api/admin/firebase", firebaseAdminRoutes); // Mount Firebase Admin SDK routes
 app.use("/api/points", pointsRoutes); // Mount points system routes
 app.use("/api/invite-friend", inviteFriendRoutes); // Mount invite a friend system routes
+app.use("/api/cart-abandonment", cartAbandonmentRoutes); // Mount cart abandonment recovery routes
 
 
 // Start the server and listen on port 8080
