@@ -18,6 +18,7 @@ const addressRoutes = require("./src/routes/AddressRoutes"); // Handles address-
 const razorpayRoutes = require("./src/routes/paymentRoutes"); // Handles payment processing with Razorpay
 const userProfileRoutes = require("./src/routes/UserProfileRoutes"); // Handles user profile routes
 const orderRoutes = require("./src/routes/OrderRoutes"); // Handles order-related routes
+const adminOrderRoutes = require("./src/routes/AdminOrderRoutes"); // Handles admin order management routes
 const privacyPolicyRoutes = require("./src/routes/PrivacyPolicyRoutes"); // Handles privacy policy routes
 const notificationRoutes = require("./src/routes/NotificationRoutes"); // Handles notification routes
 const filterRoutes = require("./src/routes/FilterRoutes"); // Handles filter-related routes
@@ -77,6 +78,7 @@ app.use("/api/address", addressRoutes); // User address management routes
 app.use("/api/razorpay", razorpayRoutes); // Payment processing routes using Razorpay
 app.use("/api/userProfile", userProfileRoutes); // User profile management routes
 app.use("/api/orders", orderRoutes); // Order management routes
+app.use("/api/admin", adminOrderRoutes); // Admin order management routes
 app.use("/api/privacyPolicy", privacyPolicyRoutes); // Privacy policy routes
 app.use("/api/notifications", notificationRoutes); // Notification-related routes
 app.use("/api/filters", filterRoutes); // Routes for filtering items (e.g., by category, price)

@@ -9,7 +9,7 @@ const sidebarItems = [
   },
   {
     title: "App order area",
-    items: ["orders"],
+    items: ["orders", "return orders", "exchange orders"],
   },
   {
     title: "App uploading area",

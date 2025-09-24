@@ -1402,3 +1402,763 @@ exports.getOrderStatusCounts = async (req, res) => {
     });
   }
 };
+
+// ============= ADMIN ORDER MANAGEMENT ENDPOINTS =============
+
+// Get all orders for admin with filters and pagination
+exports.adminGetAllOrders = async (req, res) => {
+  try {
+    console.log('🔍 adminGetAllOrders called with query:', req.query);
+    
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      paymentStatus,
+      vendorAssigned,
+      courierStatus,
+      searchQuery,
+      dateFrom,
+      dateTo,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const skip = (page - 1) * limit;
+    let query = {};
+
+    // Build query filters
+    if (status) {
+      query.order_status = status;
+    }
+    
+    if (paymentStatus) {
+      query.payment_status = paymentStatus;
+    }
+    
+    if (vendorAssigned !== undefined) {
+      query.vendorAllotted = vendorAssigned === 'true';
+    }
+    
+    if (courierStatus) {
+      query.shipping_status = courierStatus;
+    }
+    
+    if (searchQuery) {
+      // Search in order fields and populated user fields
+      query.$or = [
+        { razorpay_order_id: { $regex: searchQuery, $options: 'i' } },
+        { razorpay_payment_id: { $regex: searchQuery, $options: 'i' } },
+        { invoice_no: { $regex: searchQuery, $options: 'i' } },
+        { awb_code: { $regex: searchQuery, $options: 'i' } },
+      ];
+    }
+    
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Execute queries
+    const [orders, totalOrders] = await Promise.all([
+      Order.find(query)
+        .populate('items', 'productName category subCategory price image')
+        .populate('item_quantities.item_id', 'productName category subCategory price image')
+        .populate('user', 'displayName email phoneNumber')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Order.countDocuments(query)
+    ]);
+
+    const totalPages = Math.ceil(totalOrders / limit);
+
+    console.log('✅ adminGetAllOrders success:', {
+      ordersCount: orders.length,
+      totalOrders,
+      totalPages,
+      currentPage: page
+    });
+
+    res.status(200).json({
+      success: true,
+      orders,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: totalOrders,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error("❌ Error fetching admin orders:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+      error: error.message
+    });
+  }
+};
+
+// Get order statistics for admin dashboard
+exports.adminGetOrderStatistics = async (req, res) => {
+  try {
+    const stats = await Order.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          pendingOrders: {
+            $sum: { $cond: [{ $eq: ["$order_status", "Pending"] }, 1, 0] }
+          },
+          acceptedOrders: {
+            $sum: { $cond: [{ $eq: ["$order_status", "Accepted"] }, 1, 0] }
+          },
+          rejectedOrders: {
+            $sum: { $cond: [{ $eq: ["$order_status", "Rejected"] }, 1, 0] }
+          },
+          shippedOrders: {
+            $sum: { $cond: [{ $eq: ["$shipping_status", "Shipped"] }, 1, 0] }
+          },
+          deliveredOrders: {
+            $sum: { $cond: [{ $eq: ["$shipping_status", "Delivered"] }, 1, 0] }
+          },
+          returnRequests: {
+            $sum: { $cond: [{ $ne: ["$refund.status", null] }, 1, 0] }
+          },
+          exchangeRequests: {
+            $sum: { $cond: [{ $ne: ["$exchange.status", null] }, 1, 0] }
+          },
+          totalRevenue: { $sum: "$totalAmount" }
+        }
+      }
+    ]);
+
+    const statistics = stats[0] || {
+      totalOrders: 0,
+      pendingOrders: 0,
+      acceptedOrders: 0,
+      rejectedOrders: 0,
+      shippedOrders: 0,
+      deliveredOrders: 0,
+      returnRequests: 0,
+      exchangeRequests: 0,
+      totalRevenue: 0
+    };
+
+    res.status(200).json({
+      success: true,
+      ...statistics
+    });
+  } catch (error) {
+    console.error("Error fetching order statistics:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch order statistics",
+      error: error.message
+    });
+  }
+};
+
+// Update order status
+exports.adminUpdateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, notes } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    // Update order status
+    order.order_status = status;
+    if (notes) {
+      order.adminNotes = notes;
+    }
+    order.lastUpdated = new Date();
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Order status updated successfully",
+      order
+    });
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update order status",
+      error: error.message
+    });
+  }
+};
+
+// Accept order
+exports.adminAcceptOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { notes } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    order.order_status = "Accepted";
+    order.acceptedAt = new Date();
+    if (notes) {
+      order.adminNotes = notes;
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Order accepted successfully",
+      order
+    });
+  } catch (error) {
+    console.error("Error accepting order:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to accept order",
+      error: error.message
+    });
+  }
+};
+
+// Reject order
+exports.adminRejectOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason, notes } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    order.order_status = "Rejected";
+    order.rejectedAt = new Date();
+    order.rejectionReason = reason;
+    if (notes) {
+      order.adminNotes = notes;
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Order rejected successfully",
+      order
+    });
+  } catch (error) {
+    console.error("Error rejecting order:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject order",
+      error: error.message
+    });
+  }
+};
+
+// Allot vendor to order
+exports.adminAllotVendor = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { vendorId, notes } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    order.vendorId = vendorId;
+    order.vendorAllotted = true;
+    order.vendorAllottedAt = new Date();
+    if (notes) {
+      order.vendorNotes = notes;
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Vendor allotted successfully",
+      order
+    });
+  } catch (error) {
+    console.error("Error allotting vendor:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to allot vendor",
+      error: error.message
+    });
+  }
+};
+
+// Update courier status
+exports.adminUpdateCourierStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { courierStatus, trackingId } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    order.shipping_status = courierStatus;
+    if (trackingId) {
+      order.trackingId = trackingId;
+    }
+    order.courierUpdatedAt = new Date();
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Courier status updated successfully",
+      order
+    });
+  } catch (error) {
+    console.error("Error updating courier status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update courier status",
+      error: error.message
+    });
+  }
+};
+
+// Get return requests
+exports.adminGetReturnRequests = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    const skip = (page - 1) * limit;
+    let query = { "refund.status": { $exists: true, $ne: null } };
+
+    if (status) {
+      query["refund.status"] = status;
+    }
+
+    if (dateFrom || dateTo) {
+      query["refund.initiatedAt"] = {};
+      if (dateFrom) query["refund.initiatedAt"].$gte = new Date(dateFrom);
+      if (dateTo) query["refund.initiatedAt"].$lte = new Date(dateTo);
+    }
+
+    const [returns, totalReturns] = await Promise.all([
+      Order.find(query)
+        .populate('cart.itemId', 'productName image')
+        .sort({ "refund.initiatedAt": -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Order.countDocuments(query)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      returns,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalReturns / limit),
+        totalItems: totalReturns,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching return requests:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch return requests",
+      error: error.message
+    });
+  }
+};
+
+// Process return request
+exports.adminProcessReturnRequest = async (req, res) => {
+  try {
+    const { orderId, returnId } = req.params;
+    const { action, reason, notes } = req.body; // action: 'accept' or 'reject'
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    if (action === 'accept') {
+      order.refund.status = "Accepted";
+      order.refund.acceptedAt = new Date();
+    } else if (action === 'reject') {
+      order.refund.status = "Rejected";
+      order.refund.rejectedAt = new Date();
+      order.refund.rejectionReason = reason;
+    }
+
+    if (notes) {
+      order.refund.adminNotes = notes;
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Return request ${action}ed successfully`,
+      order
+    });
+  } catch (error) {
+    console.error("Error processing return request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process return request",
+      error: error.message
+    });
+  }
+};
+
+// Get exchange requests
+exports.adminGetExchangeRequests = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    const skip = (page - 1) * limit;
+    let query = { "exchange.status": { $exists: true, $ne: null } };
+
+    if (status) {
+      query["exchange.status"] = status;
+    }
+
+    if (dateFrom || dateTo) {
+      query["exchange.initiatedAt"] = {};
+      if (dateFrom) query["exchange.initiatedAt"].$gte = new Date(dateFrom);
+      if (dateTo) query["exchange.initiatedAt"].$lte = new Date(dateTo);
+    }
+
+    const [exchanges, totalExchanges] = await Promise.all([
+      Order.find(query)
+        .populate('cart.itemId', 'productName image')
+        .sort({ "exchange.initiatedAt": -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Order.countDocuments(query)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      exchanges,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalExchanges / limit),
+        totalItems: totalExchanges,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching exchange requests:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch exchange requests",
+      error: error.message
+    });
+  }
+};
+
+// Process exchange request
+exports.adminProcessExchangeRequest = async (req, res) => {
+  try {
+    const { orderId, exchangeId } = req.params;
+    const { action, reason, notes } = req.body; // action: 'accept' or 'reject'
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    if (action === 'accept') {
+      order.exchange.status = "Accepted";
+      order.exchange.acceptedAt = new Date();
+    } else if (action === 'reject') {
+      order.exchange.status = "Rejected";
+      order.exchange.rejectedAt = new Date();
+      order.exchange.rejectionReason = reason;
+    }
+
+    if (notes) {
+      order.exchange.adminNotes = notes;
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Exchange request ${action}ed successfully`,
+      order
+    });
+  } catch (error) {
+    console.error("Error processing exchange request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process exchange request",
+      error: error.message
+    });
+  }
+};
+
+// Get return statistics
+exports.adminGetReturnStats = async (req, res) => {
+  try {
+    const returnStats = await Order.aggregate([
+      {
+        $match: {
+          "refund.status": { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: "$refund.status",
+          count: { $sum: 1 },
+          totalAmount: { 
+            $sum: { 
+              $cond: { 
+                if: { $ifNull: ["$refund.amount", false] }, 
+                then: "$refund.amount", 
+                else: "$totalAmount" 
+              } 
+            } 
+          }
+        }
+      }
+    ]);
+
+    const totalReturns = await Order.countDocuments({
+      "refund.status": { $exists: true, $ne: null }
+    });
+
+    const processedStats = {
+      total: totalReturns,
+      pending: 0,
+      accepted: 0,
+      rejected: 0,
+      processing: 0,
+      completed: 0,
+      totalAmount: 0
+    };
+
+    returnStats.forEach(stat => {
+      const status = stat._id?.toLowerCase() || 'pending';
+      processedStats[status] = stat.count;
+      processedStats.totalAmount += stat.totalAmount || 0;
+    });
+
+    res.status(200).json({
+      success: true,
+      stats: processedStats
+    });
+  } catch (error) {
+    console.error("Error fetching return stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch return statistics",
+      error: error.message
+    });
+  }
+};
+
+// Get exchange statistics
+exports.adminGetExchangeStats = async (req, res) => {
+  try {
+    const exchangeStats = await Order.aggregate([
+      {
+        $match: {
+          "exchange.status": { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: "$exchange.status",
+          count: { $sum: 1 },
+          totalAmount: { 
+            $sum: { 
+              $cond: { 
+                if: { $ifNull: ["$exchange.amount", false] }, 
+                then: "$exchange.amount", 
+                else: "$totalAmount" 
+              } 
+            } 
+          }
+        }
+      }
+    ]);
+
+    const totalExchanges = await Order.countDocuments({
+      "exchange.status": { $exists: true, $ne: null }
+    });
+
+    const processedStats = {
+      total: totalExchanges,
+      pending: 0,
+      accepted: 0,
+      rejected: 0,
+      processing: 0,
+      completed: 0,
+      totalAmount: 0
+    };
+
+    exchangeStats.forEach(stat => {
+      const status = stat._id?.toLowerCase() || 'pending';
+      processedStats[status] = stat.count;
+      processedStats.totalAmount += stat.totalAmount || 0;
+    });
+
+    res.status(200).json({
+      success: true,
+      stats: processedStats
+    });
+  } catch (error) {
+    console.error("Error fetching exchange stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch exchange statistics",
+      error: error.message
+    });
+  }
+};
+
+// Get available vendors
+exports.adminGetAvailableVendors = async (req, res) => {
+  try {
+    // For now, return mock vendor data
+    // In a real implementation, you would have a Vendor model
+    const vendors = [
+      { _id: "vendor1", name: "Vendor 1", location: "Delhi", active: true },
+      { _id: "vendor2", name: "Vendor 2", location: "Mumbai", active: true },
+      { _id: "vendor3", name: "Vendor 3", location: "Bangalore", active: true },
+    ];
+
+    res.status(200).json({
+      success: true,
+      vendors
+    });
+  } catch (error) {
+    console.error("Error fetching vendors:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch vendors",
+      error: error.message
+    });
+  }
+};
+
+// Bulk update orders
+exports.adminBulkUpdateOrders = async (req, res) => {
+  try {
+    const { orderIds, action, ...data } = req.body;
+
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Order IDs are required"
+      });
+    }
+
+    let updateData = {};
+    
+    switch (action) {
+      case 'accept':
+        updateData = {
+          order_status: "Accepted",
+          acceptedAt: new Date()
+        };
+        break;
+      case 'reject':
+        updateData = {
+          order_status: "Rejected",
+          rejectedAt: new Date(),
+          rejectionReason: data.reason || "Bulk rejection"
+        };
+        break;
+      case 'updateStatus':
+        updateData = {
+          order_status: data.status,
+          lastUpdated: new Date()
+        };
+        break;
+      case 'allotVendor':
+        updateData = {
+          vendorId: data.vendorId,
+          vendorAllotted: true,
+          vendorAllottedAt: new Date()
+        };
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: "Invalid action"
+        });
+    }
+
+    const result = await Order.updateMany(
+      { _id: { $in: orderIds } },
+      { $set: updateData }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk operation completed. ${result.modifiedCount} orders updated.`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error("Error performing bulk operation:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to perform bulk operation",
+      error: error.message
+    });
+  }
+};

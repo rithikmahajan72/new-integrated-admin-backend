@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Filter,
   Calendar,
@@ -20,7 +21,16 @@ import {
   User,
   FileText,
   ArrowLeft,
+  Search,
+  CheckSquare,
+  Square,
+  Users,
+  TrendingUp,
+  Clock,
+  ShoppingBag,
+  DollarSign
 } from "lucide-react";
+import useOrderManagement from "../hooks/useOrderManagement";
 
 /**
  * InvoiceTemplate Component

@@ -16,9 +16,13 @@ import SimpleModalTest from "./components/SimpleModalTest";
 
 // Import all page components
 import Dashboard from "./pages/dashboard";
-import Orders from "./pages/Orders";
-import OrderDetails from "./pages/OrderDetails";
-import ReturnOrders from "./pages/ReturnOrders";
+import Orders from "./pages/Orders"; // Old Orders component (fallback)
+import OrdersNew from "./pages/OrdersNew"; // New Redux Orders component
+import OrderDetails from "./pages/OrderDetails"; // Old OrderDetails component (fallback)
+import OrderDetailsNew from "./pages/OrderDetailsNew"; // New Redux OrderDetails component
+import ReturnOrders from "./pages/ReturnOrders"; // Old ReturnOrders component (fallback)
+import ReturnOrdersNew from "./pages/ReturnOrdersNew"; // New Redux ReturnOrders component
+import ExchangeOrders from "./pages/ExchangeOrders"; // New Exchange Orders component
 import Inbox from "./pages/Inbox";
 import Users from "./pages/Users";
 import BlockUser from "./pages/BlockUser";
@@ -140,9 +144,13 @@ const App = () => {
           <Route path="/admin-dashboard" element={<Dashboard />} />
 
           {/* ===== ORDER MANAGEMENT ===== */}
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/order-details/:orderId" element={<OrderDetails />} />
-          <Route path="/return-orders" element={<ReturnOrders />} />
+          <Route path="/orders" element={<OrdersNew />} />
+          <Route path="/orders-old" element={<Orders />} /> {/* Fallback to old component */}
+          <Route path="/order-details/:orderId" element={<OrderDetailsNew />} />
+          <Route path="/order-details-old/:orderId" element={<OrderDetails />} /> {/* Fallback to old component */}
+          <Route path="/return-orders" element={<ReturnOrdersNew />} />
+          <Route path="/return-orders-old" element={<ReturnOrders />} /> {/* Fallback to old component */}
+          <Route path="/exchange-orders" element={<ExchangeOrders />} /> {/* New Exchange Orders */}
 
           {/* Chat Messages */}
           <Route path="/inbox" element={<Inbox />} />

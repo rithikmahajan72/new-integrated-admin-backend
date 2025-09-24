@@ -186,6 +186,42 @@ export const orderAPI = {
   getUserOrders: () => API.get('/orders/user'),
 };
 
+// Admin Order Management API endpoints
+export const adminOrderAPI = {
+  // Order management
+  getAllOrders: (params = {}) => API.get('/admin/orders', { params }),
+  getOrderById: (orderId) => API.get(`/admin/orders/${orderId}`),
+  getOrderStatistics: () => API.get('/admin/orders/statistics'),
+  
+  // Order status management
+  updateOrderStatus: (orderId, data) => API.put(`/admin/orders/${orderId}/status`, data),
+  acceptOrder: (orderId, data) => API.put(`/admin/orders/${orderId}/accept`, data),
+  rejectOrder: (orderId, data) => API.put(`/admin/orders/${orderId}/reject`, data),
+  
+  // Vendor management
+  allotVendor: (orderId, data) => API.put(`/admin/orders/${orderId}/vendor`, data),
+  getAvailableVendors: () => API.get('/admin/vendors'),
+  
+  // Courier management
+  updateCourierStatus: (orderId, data) => API.put(`/admin/orders/${orderId}/courier`, data),
+  
+  // Return management
+  getReturnRequests: (params = {}) => API.get('/admin/returns', { params }),
+  processReturnRequest: (orderId, returnId, data) => API.put(`/admin/orders/${orderId}/returns/${returnId}`, data),
+  
+  // Exchange management
+  getExchangeRequests: (params = {}) => API.get('/admin/exchanges', { params }),
+  processExchangeRequest: (orderId, exchangeId, data) => API.put(`/admin/orders/${orderId}/exchanges/${exchangeId}`, data),
+  
+  // Bulk operations
+  bulkUpdateOrders: (data) => API.put('/admin/orders/bulk', data),
+  
+  // Shiprocket integration
+  createShipment: (orderId, data) => API.post(`/admin/orders/${orderId}/shipment`, data),
+  trackShipment: (orderId) => API.get(`/admin/orders/${orderId}/tracking`),
+  cancelShipment: (orderId) => API.delete(`/admin/orders/${orderId}/shipment`),
+};
+
 // Address API endpoints
 export const addressAPI = {
   getAllAddresses: () => API.get('/addresses'),

@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   Calendar, 
   ChevronDown, 
@@ -9,9 +10,16 @@ import {
   User,
   Package,
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  Edit,
+  Check,
+  X,
+  Truck,
+  AlertCircle,
+  Clock,
+  DollarSign
 } from 'lucide-react';
-import InvoiceTemplate from '../components/InvoiceTemplate';
+import useOrderManagement from '../hooks/useOrderManagement';
 
 /**
  * OrderDetails Component

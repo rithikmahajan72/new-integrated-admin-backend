@@ -28,6 +28,7 @@ import pointsSlice from './slices/pointsSlice';
 import inviteFriendSlice from './inviteFriendSlice';
 import cartAbandonmentSlice from './slices/cartAbandonmentSlice';
 import reviewSlice from './slices/reviewSlice';
+import orderManagementSlice from './slices/orderManagementSlice';
 
 // Persist configuration
 const persistConfig = {
@@ -78,6 +79,7 @@ const rootReducer = combineReducers({
   inviteFriend: inviteFriendSlice,
   cartAbandonment: cartAbandonmentSlice,
   reviews: reviewSlice,
+  orderManagement: orderManagementSlice,
 });
 
 // Create persisted reducer (temporarily disabled)
