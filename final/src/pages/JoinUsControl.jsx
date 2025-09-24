@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import JoinUsService from '../services/joinUsService';
 
 // Constants - Frozen for better performance
 const SECTIONS = Object.freeze({
@@ -47,16 +48,16 @@ const PostItem = memo(({ post, index, onEdit, onDelete, onPriorityUpdate, sectio
   // Stable references to prevent re-renders
   const handlePriorityChange = useCallback((e) => {
     const newPriority = parseInt(e.target.value) || 1;
-    onPriorityUpdate(post.id, newPriority);
-  }, [post.id, onPriorityUpdate]);
+    onPriorityUpdate(post._id, newPriority);
+  }, [post._id, onPriorityUpdate]);
 
   const handleEditClick = useCallback(() => {
     onEdit(post);
   }, [post, onEdit]);
 
   const handleDeleteClick = useCallback(() => {
-    onDelete(post.id);
-  }, [post.id, onDelete]);
+    onDelete(post._id);
+  }, [post._id, onDelete]);
 
   // Memoize the post content to prevent recalculations
   const postContent = useMemo(() => DEFAULT_POST_CONTENT, []);
@@ -84,10 +85,10 @@ const PostItem = memo(({ post, index, onEdit, onDelete, onPriorityUpdate, sectio
             <div className="flex flex-col items-center">
               <h5 className="text-xs font-bold text-black mb-2">uploaded image</h5>
               <div className="w-24 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
-                {post.image ? (
+                {post.image?.url ? (
                   <img 
-                    src={post.image} 
-                    alt="Uploaded"
+                    src={post.image.url} 
+                    alt={post.image.alt || "Uploaded"}
                     className="w-full h-full object-cover rounded"
                   />
                 ) : (
@@ -117,20 +118,18 @@ const PostItem = memo(({ post, index, onEdit, onDelete, onPriorityUpdate, sectio
               <h5 className="text-xs font-bold text-black mb-2">Preview</h5>
               <div className="w-32 h-24 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                 <img 
-                  src={post.image || PREVIEW_IMAGE_URL}
-                  alt={post.image ? "Preview" : "Default preview"}
+                  src={post.image?.url || PREVIEW_IMAGE_URL}
+                  alt={post.image?.url ? "Preview" : "Default preview"}
                   className="w-full h-full object-cover rounded-lg"
                   loading="lazy"
                   decoding="async"
                 />
               </div>
               <div className="mt-2 text-center space-y-1">
-                {postContent.map((item, idx) => (
-                  <div key={`preview-${item.title}-${idx}`}>
-                    <h6 className="font-semibold text-[10px] text-black">{item.title}</h6>
-                    <p className="text-gray-500 text-[9px] leading-tight">{item.description}</p>
-                  </div>
-                ))}
+                <div>
+                  <h6 className="font-semibold text-[10px] text-black">{post.title}</h6>
+                  <p className="text-gray-500 text-[9px] leading-tight">{post.detail}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -360,10 +359,11 @@ const FormSection = memo(({
   isDragging,
   dragHandlers,
   uploadId,
-  buttonText 
+  buttonText,
+  isLoading = false
 }) => {
   // Memoize the button disabled state to prevent unnecessary re-renders
-  const isButtonDisabled = useMemo(() => !formState.detail, [formState.detail]);
+  const isButtonDisabled = useMemo(() => !formState.detail || isLoading, [formState.detail, isLoading]);
   
   return (
     <div className="mb-16">
@@ -407,10 +407,11 @@ const FormSection = memo(({
       <div className="mt-8 flex justify-center gap-4">
         <button
           onClick={onCreatePost}
-          className="bg-black text-white px-12 py-3 rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-black text-white px-12 py-3 rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           disabled={isButtonDisabled}
           type="button"
         >
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
           {buttonText}
         </button>
         <button 
@@ -448,7 +449,7 @@ const PostsSection = memo(({ title, posts, onEdit, onDelete, onPriorityUpdate, s
 
       {posts.map((post, index) => (
         <PostItem
-          key={`${post.id}-${post.priority}`} // More stable key including priority
+          key={`${post._id}-${post.priority}`} // More stable key including priority
           post={post}
           index={index}
           onEdit={onEdit}
@@ -634,74 +635,104 @@ const JoinUsControl = memo(() => {
     editSection: SECTIONS.POSTING
   }));
 
-  // Posts data with sections - optimized initial state
-  const [posts, setPosts] = useState(() => [
-    Object.freeze({
-      id: 1,
-      title: 'Welcome reward',
-      detail: 'Enjoy a welcome reward to spend in your first month.',
-      priority: 1,
-      section: SECTIONS.HEAD,
-      image: null,
-      textPosition: { ...DEFAULT_TEXT_POSITION }
-    }),
-    Object.freeze({
-      id: 2,
-      title: 'Birthday reward', 
-      detail: 'Celebrate your birthday month with a special discount',
-      priority: 1,
-      section: SECTIONS.POSTING,
-      image: null,
-      textPosition: { ...DEFAULT_TEXT_POSITION }
-    }),
-    Object.freeze({
-      id: 3,
-      title: 'Private members sale', 
-      detail: 'Unlocked after your first order',
-      priority: 2,
-      section: SECTIONS.POSTING,
-      image: null,
-      textPosition: { ...DEFAULT_TEXT_POSITION }
-    }),
-    Object.freeze({
-      id: 4,
-      title: 'Bottom reward',
-      detail: 'Special bottom section promotional content',
-      priority: 1,
-      section: SECTIONS.BOTTOM,
-      image: null,
-      textPosition: { ...DEFAULT_TEXT_POSITION }
-    })
-  ]);
+  // Posts data with API integration
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState({});
+
+  // Set loading state for specific actions
+  const setActionLoadingState = useCallback((actionId, isLoading) => {
+    setActionLoading(prev => ({ ...prev, [actionId]: isLoading }));
+  }, []);
+
+  // Clear error after some time
+  const clearError = useCallback(() => {
+    setTimeout(() => setError(null), 5000);
+  }, []);
+
+  // Show error with auto-clear
+  const showError = useCallback((message) => {
+    setError(message);
+    clearError();
+  }, [clearError]);
+
+  // Load all posts from API
+  const loadPosts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await JoinUsService.getAllPosts({
+        sortBy: 'priority',
+        sortOrder: 'asc',
+        limit: 100
+      });
+
+      if (response.success) {
+        setPosts(response.data || []);
+      } else {
+        showError(response.message || 'Failed to load posts');
+      }
+    } catch (error) {
+      console.error('Load posts error:', error);
+      showError('Failed to load posts from server');
+    } finally {
+      setLoading(false);
+    }
+  }, [showError]);
+
+  // Load posts on component mount
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
 
   /**
-   * Optimized Post creation handlers with stable references
+   * API-integrated Post creation handlers with stable references
    */
-  const createPost = useCallback((formState, section, textPosition, resetForm, resetPosition) => {
+  const createPost = useCallback(async (formState, section, textPosition, resetForm, resetPosition) => {
     if (!formState.detail) return;
 
-    const newPost = Object.freeze({
-      id: Date.now() + Math.random(),
-      title: `${section.charAt(0).toUpperCase() + section.slice(1)} Post`,
-      detail: formState.detail,
-      priority: 1,
-      section,
-      image: formState.selectedImage,
-      textPosition: { ...textPosition }
-    });
-    
-    setPosts(prevPosts => [...prevPosts, newPost]);
-    resetForm();
-    resetPosition();
-  }, []);
+    const actionId = `create-${section}`;
+    setActionLoadingState(actionId, true);
+
+    try {
+      const postData = JoinUsService.formatPostData({
+        title: `${section.charAt(0).toUpperCase() + section.slice(1)} Post`,
+        detail: formState.detail,
+        section,
+        textPosition: { ...textPosition },
+        image: formState.selectedImage ? { url: formState.selectedImage } : undefined,
+        isActive: true,
+        isPublished: false
+      });
+
+      const response = await JoinUsService.createPost(postData);
+
+      if (response.success) {
+        // Reload posts to get the updated list
+        await loadPosts();
+        resetForm();
+        resetPosition();
+        // Post created successfully - could show a success message here
+      } else {
+        showError(response.message || 'Failed to create post');
+      }
+    } catch (error) {
+      console.error('Create post error:', error);
+      showError('Failed to create post');
+    } finally {
+      setActionLoadingState(actionId, false);
+    }
+  }, [loadPosts, showError, setActionLoadingState]);
 
   // Memoized creation handlers to prevent unnecessary re-renders
   const postCreationHandlers = useMemo(() => ({
-    handleCreateHeaderPost: () => {
-      createPost(headerForm.state, SECTIONS.HEAD, headerDrag.position, headerForm.resetForm, headerDrag.resetPosition);
+    handleCreateHeaderPost: async () => {
+      await createPost(headerForm.state, SECTIONS.HEAD, headerDrag.position, headerForm.resetForm, headerDrag.resetPosition);
     },
-    handleCreateBottomPost: () => {
-      createPost(bottomForm.state, SECTIONS.BOTTOM, bottomDrag.position, bottomForm.resetForm, bottomDrag.resetPosition);
+    handleCreateBottomPost: async () => {
+      await createPost(bottomForm.state, SECTIONS.BOTTOM, bottomDrag.position, bottomForm.resetForm, bottomDrag.resetPosition);
     }
   }), [
     createPost,
@@ -712,20 +743,56 @@ const JoinUsControl = memo(() => {
   ]);
 
   /**
-   * Optimized Post management handlers with stable references
+   * API-integrated Post management handlers with stable references
    */
   const postManagementHandlers = useMemo(() => ({
-    handleDeletePost: (id) => {
-      setPosts(prevPosts => prevPosts.filter(post => post.id !== id));
-      openModal('isDeleteSuccessModalOpen');
+    handleDeletePost: async (id) => {
+      const actionId = `delete-${id}`;
+      setActionLoadingState(actionId, true);
+
+      try {
+        const response = await JoinUsService.deletePost(id);
+        
+        if (response.success) {
+          // Reload posts to get the updated list
+          await loadPosts();
+          openModal('isDeleteSuccessModalOpen');
+        } else {
+          showError(response.message || 'Failed to delete post');
+        }
+      } catch (error) {
+        console.error('Delete post error:', error);
+        showError('Failed to delete post');
+      } finally {
+        setActionLoadingState(actionId, false);
+      }
     },
-    handlePriorityUpdate: (id, newPriority) => {
-      setPosts(prevPosts => 
-        prevPosts.map(post => 
-          post.id === id ? Object.freeze({ ...post, priority: newPriority }) : post
-        )
-      );
+    
+    handlePriorityUpdate: async (id, newPriority) => {
+      const actionId = `priority-${id}`;
+      setActionLoadingState(actionId, true);
+
+      try {
+        const response = await JoinUsService.updatePost(id, { priority: newPriority });
+        
+        if (response.success) {
+          // Update local state for immediate feedback
+          setPosts(prevPosts => 
+            prevPosts.map(post => 
+              post._id === id ? { ...post, priority: newPriority } : post
+            )
+          );
+        } else {
+          showError(response.message || 'Failed to update priority');
+        }
+      } catch (error) {
+        console.error('Update priority error:', error);
+        showError('Failed to update priority');
+      } finally {
+        setActionLoadingState(actionId, false);
+      }
     },
+    
     handleEditClick: (post) => {
       setEditState({
         editingPost: post,
@@ -736,36 +803,53 @@ const JoinUsControl = memo(() => {
       });
       openModal('isEditModalOpen');
     }
-  }), [openModal]);
+  }), [openModal, loadPosts, showError, setActionLoadingState]);
 
   /**
-   * Optimized Edit handlers with stable references
+   * API-integrated Edit handlers with stable references
    */
   const editHandlers = useMemo(() => ({
-    handleSaveEdit: () => {
+    handleSaveEdit: async () => {
       const { editingPost, editTitle, editDetail, editPriority } = editState;
       
-      if (editingPost) {
-        setPosts(prevPosts => 
-          prevPosts.map(post => 
-            post.id === editingPost.id 
-              ? Object.freeze({ ...post, title: editTitle, detail: editDetail, priority: editPriority })
-              : post
-          )
-        );
+      if (!editingPost) return;
+
+      const actionId = `edit-${editingPost._id}`;
+      setActionLoadingState(actionId, true);
+
+      try {
+        const updateData = {
+          title: editTitle,
+          detail: editDetail,
+          priority: editPriority
+        };
+
+        const response = await JoinUsService.updatePost(editingPost._id, updateData);
         
-        closeModal('isEditModalOpen');
-        openModal('isSuccessModalOpen');
-        
-        setEditState({
-          editingPost: null,
-          editTitle: '',
-          editDetail: '',
-          editPriority: 1,
-          editSection: SECTIONS.POSTING
-        });
+        if (response.success) {
+          // Reload posts to get the updated list
+          await loadPosts();
+          closeModal('isEditModalOpen');
+          openModal('isSuccessModalOpen');
+          
+          setEditState({
+            editingPost: null,
+            editTitle: '',
+            editDetail: '',
+            editPriority: 1,
+            editSection: SECTIONS.POSTING
+          });
+        } else {
+          showError(response.message || 'Failed to update post');
+        }
+      } catch (error) {
+        console.error('Save edit error:', error);
+        showError('Failed to save changes');
+      } finally {
+        setActionLoadingState(actionId, false);
       }
     },
+    
     handleCancelEdit: () => {
       closeModal('isEditModalOpen');
       setEditState({
@@ -776,7 +860,7 @@ const JoinUsControl = memo(() => {
         editSection: SECTIONS.POSTING
       });
     }
-  }), [editState, closeModal, openModal]);
+  }), [editState, closeModal, openModal, loadPosts, showError, setActionLoadingState]);
 
   /**
    * Optimized Form input handlers with stable references
@@ -814,9 +898,11 @@ const JoinUsControl = memo(() => {
   }), [openModal, closeModal]);
 
   /**
-   * Optimized Computed values with deep comparison prevention
+   * API-integrated Computed values with deep comparison prevention
    */
   const sectionPosts = useMemo(() => {
+    if (!Array.isArray(posts)) return { head: [], posting: [], bottom: [] };
+    
     const headPosts = posts.filter(post => post.section === SECTIONS.HEAD).sort((a, b) => a.priority - b.priority);
     const postingPosts = posts.filter(post => post.section === SECTIONS.POSTING).sort((a, b) => a.priority - b.priority);
     const bottomPosts = posts.filter(post => post.section === SECTIONS.BOTTOM).sort((a, b) => a.priority - b.priority);
@@ -842,6 +928,21 @@ const JoinUsControl = memo(() => {
         {/* Main Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-black mb-6">join us control screen</h1>
+          
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+          
+          {/* Loading Indicator */}
+          {loading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <span className="ml-2 text-gray-600">Loading posts...</span>
+            </div>
+          )}
         </div>
 
         {/* Add Header Details Section */}
@@ -858,6 +959,7 @@ const JoinUsControl = memo(() => {
           dragHandlers={headerDrag.dragHandlers}
           uploadId="header-image-upload"
           buttonText="Post to head"
+          isLoading={actionLoading['create-head']}
         />
 
         {/* Add Bottom Details Section */}
@@ -874,6 +976,7 @@ const JoinUsControl = memo(() => {
           dragHandlers={bottomDrag.dragHandlers}
           uploadId="bottom-image-upload"
           buttonText="Post to bottom"
+          isLoading={actionLoading['create-bottom']}
         />
 
         {/* Posts Management Section with CRUD */}
@@ -991,9 +1094,11 @@ const JoinUsControl = memo(() => {
               <div className="flex justify-center gap-4 mt-8 pt-6 border-t">
                 <button
                   onClick={editHandlers.handleSaveEdit}
-                  className="bg-black text-white px-16 py-3 rounded-full hover:bg-gray-800 transition-colors font-medium"
+                  className="bg-black text-white px-16 py-3 rounded-full hover:bg-gray-800 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
                   type="button"
+                  disabled={actionLoading[`edit-${editState.editingPost?._id}`]}
                 >
+                  {actionLoading[`edit-${editState.editingPost?._id}`] && <Loader2 className="w-4 h-4 animate-spin" />}
                   save
                 </button>
                 <button

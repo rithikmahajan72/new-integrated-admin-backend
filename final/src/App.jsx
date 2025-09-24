@@ -63,11 +63,21 @@ import ArrangementControl from "./pages/itemarrangementcontrol";
 import NewPartner from "./pages/NewPartner";
 
 import FaqManagement from "./pages/FaqManagement";
-import CollectCommunicationPreferences from "./pages/Collect communication preferences";
-import CollectProfileVisibilityData from "./pages/collect Profile visibility data";
-import CollectLocationData from "./pages/collectlocationdata";
-import GetAutoInvoiceMailing from "./pages/get auto invoice mailing";
-import HuggingFaceApiOpenClose from "./pages/hugging face api open close";
+import CollectCommunicationPreferences from "./pages/settingscommunicationpreferences";
+import CollectProfileVisibilityData from "./pages/settingsprofilevisibility";
+import CollectLocationData from "./pages/settingslocationdata";
+import GetAutoInvoiceMailing from "./pages/settingsautoinvoice";
+import HuggingFaceApiOpenClose from "./pages/settingshuggingfaceapi";
+
+// New separated setting components
+import SettingsOnlineDiscount from "./pages/settingsonlinediscount";
+import SettingsShippingCharges from "./pages/settingsshippingcharges";
+import SettingsHsnCode from "./pages/settingshsncode";
+import SettingsUserLimit from "./pages/settingsuserlimit";
+import SettingsLanguageCountryRegion from "./pages/settingslanguagecountryregion";
+import SettingsDynamicPricing from "./pages/settingsdynamicpricing";
+import SettingsAutoNotifications from "./pages/settingsautonotifications";
+import SettingsWebhook from "./pages/settingswebhook";
 import Profile from "./pages/Profile";
 import EmailAndSmsTemplateManagementScreenPage from "./pages/emailandsmstempalatemanagementscreenpage";
 import SaveForLaterPage from "./pages/SaveForLaterPage";
@@ -273,9 +283,10 @@ const App = () => {
           <Route path="/analytics" element={<Analytics />} />
 
           {/* ===== SETTINGS & CONFIGURATION ===== */}
+          {/* Main Settings Dashboard */}
           <Route path="/settings" element={<Settings />} />
-
-          {/* ===== SETTINGS SUB-ROUTES ===== */}
+          
+          {/* Original settings sub-routes */}
           <Route
             path="/settings/communication-preferences"
             element={<CollectCommunicationPreferences />}
@@ -299,6 +310,40 @@ const App = () => {
           <Route
             path="/settings/email-sms-templates"
             element={<EmailAndSmsTemplateManagementScreenPage />}
+          />
+          
+          {/* New separated settings components */}
+          <Route
+            path="/settings/online-discount"
+            element={<SettingsOnlineDiscount />}
+          />
+          <Route
+            path="/settings/shipping-charges"
+            element={<SettingsShippingCharges />}
+          />
+          <Route
+            path="/settings/hsn-code"
+            element={<SettingsHsnCode />}
+          />
+          <Route
+            path="/settings/user-limit"
+            element={<SettingsUserLimit />}
+          />
+          <Route
+            path="/settings/language-country-region"
+            element={<SettingsLanguageCountryRegion />}
+          />
+          <Route
+            path="/settings/dynamic-pricing"
+            element={<SettingsDynamicPricing />}
+          />
+          <Route
+            path="/settings/auto-notifications"
+            element={<SettingsAutoNotifications />}
+          />
+          <Route
+            path="/settings/webhook"
+            element={<SettingsWebhook />}
           />
         </Route>
       </Routes>

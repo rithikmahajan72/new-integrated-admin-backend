@@ -492,4 +492,126 @@ export const endpoints = {
   }
 };
 
+// Google Analytics API endpoints
+export const googleAnalyticsAPI = {
+  // Real-time data
+  getRealTimeData: (params = {}) => API.get('/analytics/realtime', { params }),
+  
+  // Audience data
+  getAudienceData: (params = {}) => API.get('/analytics/audience', { params }),
+  getUsersByDate: (params = {}) => API.get('/analytics/audience/users-by-date', { params }),
+  getSessionData: (params = {}) => API.get('/analytics/audience/sessions', { params }),
+  
+  // Acquisition data (traffic sources)
+  getAcquisitionData: (params = {}) => API.get('/analytics/acquisition', { params }),
+  getTrafficSources: (params = {}) => API.get('/analytics/acquisition/sources', { params }),
+  getCampaignData: (params = {}) => API.get('/analytics/acquisition/campaigns', { params }),
+  
+  // Behavior data
+  getBehaviorData: (params = {}) => API.get('/analytics/behavior', { params }),
+  getPageViews: (params = {}) => API.get('/analytics/behavior/pageviews', { params }),
+  getTopPages: (params = {}) => API.get('/analytics/behavior/top-pages', { params }),
+  getUserFlow: (params = {}) => API.get('/analytics/behavior/user-flow', { params }),
+  
+  // Conversion data (e-commerce)
+  getConversionData: (params = {}) => API.get('/analytics/conversions', { params }),
+  getEcommerceData: (params = {}) => API.get('/analytics/ecommerce', { params }),
+  getGoalData: (params = {}) => API.get('/analytics/goals', { params }),
+  getFunnelData: (params = {}) => API.get('/analytics/funnel', { params }),
+  
+  // Demographics
+  getDemographics: (params = {}) => API.get('/analytics/demographics', { params }),
+  getAgeGroups: (params = {}) => API.get('/analytics/demographics/age', { params }),
+  getGenderBreakdown: (params = {}) => API.get('/analytics/demographics/gender', { params }),
+  getInterests: (params = {}) => API.get('/analytics/demographics/interests', { params }),
+  
+  // Technology data
+  getTechnologyData: (params = {}) => API.get('/analytics/technology', { params }),
+  getBrowserData: (params = {}) => API.get('/analytics/technology/browsers', { params }),
+  getDeviceData: (params = {}) => API.get('/analytics/technology/devices', { params }),
+  getOperatingSystemData: (params = {}) => API.get('/analytics/technology/os', { params }),
+  
+  // Custom events
+  getCustomEvents: (params = {}) => API.get('/analytics/events', { params }),
+  getEventsByName: (eventName, params = {}) => API.get(`/analytics/events/${eventName}`, { params }),
+  getTopEvents: (params = {}) => API.get('/analytics/events/top', { params }),
+  
+  // Geographic data
+  getGeographicData: (params = {}) => API.get('/analytics/geography', { params }),
+  getCountryData: (params = {}) => API.get('/analytics/geography/countries', { params }),
+  getCityData: (params = {}) => API.get('/analytics/geography/cities', { params }),
+  
+  // Custom reports
+  createCustomReport: (reportConfig) => API.post('/analytics/custom-reports', reportConfig),
+  getCustomReport: (reportId, params = {}) => API.get(`/analytics/custom-reports/${reportId}`, { params }),
+  
+  // Configuration
+  getConfiguration: () => API.get('/analytics/config'),
+  updateConfiguration: (config) => API.put('/analytics/config', config),
+  testConnection: () => API.get('/analytics/test-connection'),
+};
+
+// Settings API endpoints
+export const settingsAPI = {
+  // Get all user settings
+  getAllSettings: () => API.get('/settings'),
+  
+  // Get specific setting category
+  getSettingCategory: (category) => API.get(`/settings/category/${category}`),
+  
+  // Update specific setting category
+  updateSettingCategory: (category, settingsData) => API.put(`/settings/category/${category}`, settingsData),
+  
+  // Update full settings
+  updateSettings: (settingsData) => API.put('/settings', settingsData),
+  
+  // Toggle specific setting
+  toggleSetting: (category, settingKey, value) => API.patch('/settings/toggle', { category, settingKey, value }),
+  
+  // Reset settings to default
+  resetSettings: () => API.post('/settings/reset'),
+  
+  // Get settings history
+  getSettingsHistory: () => API.get('/settings/history'),
+  
+  // Export settings
+  exportSettings: () => API.get('/settings/export'),
+  
+  // Bulk update settings
+  bulkUpdateSettings: (updates) => API.put('/settings/bulk', { updates }),
+  
+  // Communication preferences specific endpoints
+  getCommunicationPreferences: () => API.get('/settings/category/communicationPreferences'),
+  updateCommunicationPreferences: (preferences) => API.put('/settings/category/communicationPreferences', preferences),
+  toggleCommunicationSetting: (settingKey, enabled) => API.patch('/settings/toggle', { 
+    category: 'communicationPreferences', 
+    settingKey, 
+    value: enabled 
+  }),
+
+  // Webhook-specific endpoints
+  getWebhookSettings: () => API.get('/settings/category/webhooks'),
+  updateWebhookSettings: (webhookSettings) => API.put('/settings/category/webhooks', webhookSettings),
+  
+  // Individual webhook management
+  getWebhooks: (params = {}) => API.get('/settings/webhooks', { params }),
+  createWebhook: (webhookData) => API.post('/settings/webhooks/create', webhookData),
+  getWebhookById: (webhookId) => API.get(`/settings/webhooks/${webhookId}`),
+  updateWebhook: (webhookId, webhookData) => API.put(`/settings/webhooks/${webhookId}`, webhookData),
+  deleteWebhook: (webhookId) => API.delete(`/settings/webhooks/${webhookId}`),
+  toggleWebhook: (webhookId) => API.patch(`/settings/webhooks/${webhookId}/toggle`),
+  testWebhook: (webhookId, testData = {}) => API.post(`/settings/webhooks/${webhookId}/test`, testData),
+  getWebhookLogs: (webhookId, params = {}) => API.get(`/settings/webhooks/${webhookId}/logs`, { params }),
+  getWebhookStats: (webhookId) => API.get(`/settings/webhooks/${webhookId}/stats`),
+
+  // Shipping-specific endpoints
+  getShippingCharges: (params = {}) => API.get('/settings/shipping/charges', { params }),
+  createShippingCharge: (chargeData) => API.post('/settings/shipping/charges', chargeData),
+  getShippingChargeById: (chargeId) => API.get(`/settings/shipping/charges/${chargeId}`),
+  updateShippingCharge: (chargeId, chargeData) => API.put(`/settings/shipping/charges/${chargeId}`, chargeData),
+  deleteShippingCharge: (chargeId) => API.delete(`/settings/shipping/charges/${chargeId}`),
+  updateShippingSettings: (shippingSettings) => API.put('/settings/shipping/general', shippingSettings),
+  getShippingChargeByLocation: (locationData) => API.post('/settings/shipping/charges/lookup', locationData),
+};
+
 export default API;

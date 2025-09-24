@@ -368,7 +368,7 @@ TabButton.displayName = "TabButton";
 // Main Dashboard View Component
 const DashboardView = memo(({ activeTab: propActiveTab, onTabChange: propOnTabChange }) => {
   // State management for UI interactions
-  const [internalActiveTab, setInternalActiveTab] = useState("dashboard");
+  const [internalActiveTab, setInternalActiveTab] = useState("sync");
   const [selectedDateRange, setSelectedDateRange] = useState({
     label: "Last 7 Days",
     value: "7days",
@@ -422,11 +422,6 @@ const DashboardView = memo(({ activeTab: propActiveTab, onTabChange: propOnTabCh
 
         {/* Tab Navigation */}
         <div className="flex flex-wrap space-x-4 gap-2">
-          <TabButton
-            active={activeTab === "dashboard"}
-            onClick={() => handleTabChange("dashboard")}
-            label="Dashboard"
-          />
           <TabButton
             active={activeTab === "sync"}
             onClick={() => handleTabChange("sync")}

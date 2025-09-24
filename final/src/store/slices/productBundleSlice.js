@@ -1,8 +1,10 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { getApiURL } from '../../config/apiConfig.js';
 
 // API base URL - adjust this according to your backend configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+const API_BASE_URL = getApiURL();
 
 // ==============================
 // ASYNC THUNKS (API CALLS)

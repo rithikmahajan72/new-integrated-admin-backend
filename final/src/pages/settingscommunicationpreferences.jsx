@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useMemo, memo } from "react";
+import React, { useState, useCallback, useMemo, memo, useEffect } from "react";
 import TwoFactorAuth from "../components/TwoFactorAuth";
+import { useCommunicationPreferences, useUI } from "../store/hooks";
 
 // Constants moved outside component to prevent recreation on each render
 const INITIAL_MODAL_STATE = {
@@ -89,14 +90,54 @@ XIcon.displayName = "XIcon";
 
 const CollectCommunicationPreferences = () => {
   // ==============================
-  // STATE MANAGEMENT
+  // REDUX STATE MANAGEMENT
   // ==============================
 
-  // Communication preferences setting
-  const [communicationPrefs, setCommunicationPrefs] = useState(true);
+  // Communication preferences from Redux
+  const { 
+    preferences, 
+    loading, 
+    error, 
+    enabled: communicationPrefsEnabled,
+    fetchPreferences, 
+    updatePreferences, 
+    toggleMainSetting,
+    clearError 
+  } = useCommunicationPreferences();
+  
+  // UI state for notifications
+  const { addNotification } = useUI();
 
-  // Modal states for communication preferences - using constant reference
+  // Local modal states - using constant reference
   const [modals, setModals] = useState(INITIAL_MODAL_STATE);
+  
+  // Authentication data for 2FA
+  const [authData, setAuthData] = useState(null);
+
+  // ==============================
+  // EFFECTS
+  // ==============================
+
+  // Fetch preferences on component mount
+  useEffect(() => {
+    fetchPreferences().catch((error) => {
+      console.error('Failed to fetch communication preferences:', error);
+      addNotification({
+        type: 'error',
+        message: 'Failed to load communication preferences',
+        duration: 5000
+      });
+    });
+  }, [fetchPreferences, addNotification]);
+
+  // Clear error when component unmounts
+  useEffect(() => {
+    return () => {
+      if (error) {
+        clearError();
+      }
+    };
+  }, [error, clearError]);
 
   // ==============================
   // MEMOIZED VALUES
@@ -106,16 +147,16 @@ const CollectCommunicationPreferences = () => {
   const statusIndicator = useMemo(
     () => ({
       className: `w-3 h-3 rounded-full ${
-        communicationPrefs ? "bg-green-500" : "bg-red-500"
+        communicationPrefsEnabled ? "bg-green-500" : "bg-red-500"
       }`,
       text: `Communication preferences collection is ${
-        communicationPrefs ? "enabled" : "disabled"
+        communicationPrefsEnabled ? "enabled" : "disabled"
       }`,
-      description: communicationPrefs
+      description: communicationPrefsEnabled
         ? "User communication preferences are being collected and stored securely."
         : "Communication preferences collection is currently disabled.",
     }),
-    [communicationPrefs]
+    [communicationPrefsEnabled]
   );
 
   // ==============================
@@ -168,19 +209,53 @@ const CollectCommunicationPreferences = () => {
   // ==============================
 
   const handle2FASubmit = useCallback(
-    (settingKey, action, data) => {
+    async (settingKey, action, data) => {
       if (
         data?.verificationCode &&
         data?.emailPassword &&
         data?.defaultPassword
       ) {
-        updateModal(`${settingKey}2FA${action}`, false);
-        updateModal(`${settingKey}Success${action}`, true);
+        try {
+          // Set authentication data
+          setAuthData(data);
+          
+          // Close 2FA modal
+          updateModal(`${settingKey}2FA${action}`, false);
+          
+          // Make API call to toggle the setting
+          const enabled = action === "On";
+          await toggleMainSetting(enabled, data);
+          
+          // Show success modal
+          updateModal(`${settingKey}Success${action}`, true);
+          
+          // Show success notification
+          addNotification({
+            type: 'success',
+            message: `Communication preferences ${enabled ? 'enabled' : 'disabled'} successfully`,
+            duration: 3000
+          });
+          
+        } catch (error) {
+          console.error('Failed to toggle communication preferences:', error);
+          addNotification({
+            type: 'error',
+            message: 'Failed to update communication preferences. Please try again.',
+            duration: 5000
+          });
+          
+          // Close 2FA modal on error
+          updateModal(`${settingKey}2FA${action}`, false);
+        }
       } else {
-        alert("Please fill in all fields");
+        addNotification({
+          type: 'error',
+          message: 'Please fill in all required fields',
+          duration: 3000
+        });
       }
     },
-    [updateModal]
+    [updateModal, toggleMainSetting, addNotification]
   );
 
   const handleCancel2FA = useCallback(
@@ -205,7 +280,7 @@ const CollectCommunicationPreferences = () => {
   const handleFinalSuccessModalDone = useCallback(
     (settingKey, action) => {
       updateModal(`${settingKey}FinalSuccess${action}`, false);
-      setCommunicationPrefs(action === "On");
+      // State is already updated by Redux, no need to manually set
     },
     [updateModal]
   );
@@ -213,7 +288,7 @@ const CollectCommunicationPreferences = () => {
   const handleCloseSuccessModal = useCallback(
     (settingKey, action) => {
       updateModal(`${settingKey}Success${action}`, false);
-      setCommunicationPrefs(action === "On");
+      // State is already updated by Redux, no need to manually set
     },
     [updateModal]
   );
@@ -221,7 +296,7 @@ const CollectCommunicationPreferences = () => {
   const handleCloseFinalSuccessModal = useCallback(
     (settingKey, action) => {
       updateModal(`${settingKey}FinalSuccess${action}`, false);
-      setCommunicationPrefs(action === "On");
+      // State is already updated by Redux, no need to manually set
     },
     [updateModal]
   );
@@ -477,7 +552,7 @@ const CollectCommunicationPreferences = () => {
         {/* Communication Preferences Toggle */}
         <div className="bg-gray-50 rounded-lg p-6 mb-6">
           <ToggleSwitch
-            enabled={communicationPrefs}
+            enabled={communicationPrefsEnabled}
             label="Collect communication preferences"
             settingKey="communicationPrefs"
           />
@@ -485,6 +560,36 @@ const CollectCommunicationPreferences = () => {
             When enabled, the system will collect user communication preferences
             including email, SMS, and notification settings.
           </p>
+          
+          {/* Loading indicator */}
+          {loading && (
+            <div className="flex items-center mt-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="ml-2 text-sm text-gray-500">Updating preferences...</span>
+            </div>
+          )}
+          
+          {/* Error display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 mt-2">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                  <button
+                    onClick={clearError}
+                    className="mt-2 text-sm text-red-600 underline hover:text-red-500"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Current Status */}

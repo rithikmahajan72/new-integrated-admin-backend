@@ -6,6 +6,7 @@ import React, {
   useRef,
   useEffect,
 } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Search,
   Filter,
@@ -38,6 +39,64 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { DateRangePicker, calculateDateRange, formatDateRange } from "./dashboardview";
+
+// Import Redux actions and selectors
+import {
+  fetchAllOrders,
+  fetchOrderStatistics,
+  updateOrderStatus,
+  acceptOrder,
+  rejectOrder,
+  allotVendor,
+  updateCourierStatus,
+  clearErrors,
+  selectOrders,
+  selectOrderStatistics,
+  selectOrderLoading,
+  selectOrderErrors,
+  selectOrderFilters,
+  selectOrderSorting,
+} from "../store/slices/orderManagementSlice";
+
+// Simple Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Order Dashboard Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center space-x-2 text-red-800 mb-2">
+            <AlertCircle className="h-5 w-5" />
+            <h3 className="font-medium">Something went wrong</h3>
+          </div>
+          <p className="text-red-700 text-sm mb-4">
+            There was an error loading the order dashboard. Please try refreshing the page.
+          </p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 // Mock orders data generator
 const generateMockOrders = () => [
@@ -198,95 +257,219 @@ const generateMockOrders = () => [
   },
 ];
 
-// Order management hooks
+// Enhanced Redux-based Order management hooks
 const useOrderData = () => {
-  const [orders, setOrders] = useState(generateMockOrders);
-  const [loading, setLoading] = useState(false);
+  const dispatch = useDispatch();
+  const orders = useSelector(selectOrders);
+  const orderStatistics = useSelector(selectOrderStatistics);
+  const loading = useSelector(selectOrderLoading);
+  const error = useSelector(selectOrderErrors);
+  const orderFilter = useSelector(selectOrderFilters);
+  const orderSort = useSelector(selectOrderSorting);
+
+  // Fallback mock data in case API fails
+  const mockFallbackOrders = useMemo(() => generateMockOrders(), []);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Redux Orders State:', orders);
+    console.log('Is Array:', Array.isArray(orders));
+    console.log('Orders Type:', typeof orders);
+  }, [orders]);
+
+  // Fetch orders on mount and set up real-time updates
+  useEffect(() => {
+    const fetchOrders = () => {
+      dispatch(fetchAllOrders({ 
+        page: 1, 
+        limit: 100,
+        ...orderFilter 
+      }));
+      dispatch(fetchOrderStatistics());
+    };
+
+    fetchOrders();
+    
+    // Set up real-time updates every 30 seconds
+    const interval = setInterval(fetchOrders, 30000);
+    
+    return () => clearInterval(interval);
+  }, [dispatch, orderFilter]);
 
   const refreshOrders = useCallback(async () => {
-    setLoading(true);
-    setTimeout(() => {
-      setOrders(generateMockOrders());
-      setLoading(false);
-    }, 1000);
+    await dispatch(fetchAllOrders({ 
+      page: 1, 
+      limit: 100,
+      ...orderFilter 
+    }));
+    await dispatch(fetchOrderStatistics());
+  }, [dispatch, orderFilter]);
+
+  const handleUpdateOrderStatus = useCallback(async (orderId, newStatus, notes = '') => {
+    try {
+      await dispatch(updateOrderStatus({ orderId, status: newStatus, notes })).unwrap();
+      // Refresh orders to get updated data
+      dispatch(fetchAllOrders({ page: 1, limit: 100, ...orderFilter }));
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      throw error;
+    }
+  }, [dispatch, orderFilter]);
+
+  const handleAcceptOrder = useCallback(async (orderId, notes = '') => {
+    try {
+      await dispatch(acceptOrder({ orderId, notes })).unwrap();
+      dispatch(fetchAllOrders({ page: 1, limit: 100, ...orderFilter }));
+    } catch (error) {
+      console.error('Failed to accept order:', error);
+      throw error;
+    }
+  }, [dispatch, orderFilter]);
+
+  const handleRejectOrder = useCallback(async (orderId, reason, notes = '') => {
+    try {
+      await dispatch(rejectOrder({ orderId, reason, notes })).unwrap();
+      dispatch(fetchAllOrders({ page: 1, limit: 100, ...orderFilter }));
+    } catch (error) {
+      console.error('Failed to reject order:', error);
+      throw error;
+    }
+  }, [dispatch, orderFilter]);
+
+  const handleAllotVendor = useCallback(async (orderId, vendorId, notes = '') => {
+    try {
+      await dispatch(allotVendor({ orderId, vendorId, notes })).unwrap();
+      dispatch(fetchAllOrders({ page: 1, limit: 100, ...orderFilter }));
+    } catch (error) {
+      console.error('Failed to allot vendor:', error);
+      throw error;
+    }
+  }, [dispatch, orderFilter]);
+
+  const handleUpdateCourierStatus = useCallback(async (orderId, courierStatus, trackingId) => {
+    try {
+      await dispatch(updateCourierStatus({ orderId, courierStatus, trackingId })).unwrap();
+      dispatch(fetchAllOrders({ page: 1, limit: 100, ...orderFilter }));
+    } catch (error) {
+      console.error('Failed to update courier status:', error);
+      throw error;
+    }
+  }, [dispatch, orderFilter]);
+
+  // Legacy compatibility - keeping original function names
+  const updatePaymentStatus = useCallback(async (orderId, newPaymentStatus) => {
+    // This would need to be implemented in the backend if payment status updates are needed
+    console.warn('Payment status update not implemented in Redux slice');
   }, []);
 
-  const updateOrderStatus = useCallback((orderId, newStatus) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
-  }, []);
-
-  const updatePaymentStatus = useCallback((orderId, newPaymentStatus) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, paymentStatus: newPaymentStatus } : order
-      )
-    );
-  }, []);
+  // Ensure we always return a valid array
+  const safeOrders = useMemo(() => {
+    if (Array.isArray(orders)) {
+      return orders;
+    }
+    if (orders && Array.isArray(orders.data)) {
+      return orders.data;
+    }
+    if (error && mockFallbackOrders) {
+      return mockFallbackOrders;
+    }
+    return [];
+  }, [orders, error, mockFallbackOrders]);
 
   return {
-    orders,
+    orders: safeOrders,
+    orderStatistics,
     loading,
+    error,
     refreshOrders,
-    updateOrderStatus,
+    updateOrderStatus: handleUpdateOrderStatus,
     updatePaymentStatus,
+    acceptOrder: handleAcceptOrder,
+    rejectOrder: handleRejectOrder,
+    allotVendor: handleAllotVendor,
+    updateCourierStatus: handleUpdateCourierStatus,
+    orderFilter,
+    orderSort,
   };
 };
 
 // Order Statistics Component
-const OrderStats = memo(({ orders, dateRange }) => {
+const OrderStats = memo(({ orders, dateRange, orderStatistics }) => {
   const stats = useMemo(() => {
+    // Use Redux statistics if available, otherwise calculate from local orders
+    if (orderStatistics) {
+      return {
+        totalOrders: orderStatistics.totalOrders || 0,
+        totalRevenue: orderStatistics.totalRevenue || 0,
+        pendingOrders: orderStatistics.pendingCount || 0,
+        deliveredOrders: orderStatistics.deliveredCount || 0,
+        processingOrders: orderStatistics.processingCount || 0,
+        shippedOrders: orderStatistics.shippedCount || 0,
+        cancelledOrders: orderStatistics.cancelledCount || 0,
+      };
+    }
+    
+    // Fallback to local calculation
     const totalOrders = orders.length;
-    const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     const pendingOrders = orders.filter((order) => order.status === "pending").length;
     const deliveredOrders = orders.filter((order) => order.status === "delivered").length;
+    const processingOrders = orders.filter((order) => order.status === "processing").length;
+    const shippedOrders = orders.filter((order) => order.status === "shipped").length;
 
-    return [
-      {
-        title: "Total Orders",
-        value: totalOrders.toLocaleString(),
-        icon: ShoppingCart,
-        change: "+15.2%",
-        trending: "up",
-        bgColor: "bg-blue-50",
-        iconColor: "text-blue-600",
-      },
-      {
-        title: "Total Revenue",
-        value: `₹${totalRevenue.toFixed(2)}`,
-        icon: DollarSign,
-        change: "+12.8%",
-        trending: "up",
-        bgColor: "bg-green-50",
-        iconColor: "text-green-600",
-      },
-      {
-        title: "Pending Orders",
-        value: pendingOrders.toLocaleString(),
-        icon: Clock,
-        change: "-3.1%",
-        trending: "down",
-        bgColor: "bg-yellow-50",
-        iconColor: "text-yellow-600",
-      },
-      {
-        title: "Delivered Orders",
-        value: deliveredOrders.toLocaleString(),
-        icon: CheckCircle,
-        change: "+8.5%",
-        trending: "up",
-        bgColor: "bg-purple-50",
-        iconColor: "text-purple-600",
-      },
-    ];
-  }, [orders]);
+    return {
+      totalOrders,
+      totalRevenue,
+      pendingOrders,
+      deliveredOrders,
+      processingOrders,
+      shippedOrders,
+    };
+  }, [orders, orderStatistics]);
+
+  // Create display array from stats
+  const statsDisplay = useMemo(() => [
+    {
+      title: "Total Orders",
+      value: stats.totalOrders?.toLocaleString() || '0',
+      icon: ShoppingCart,
+      change: "+15.2%",
+      trending: "up",
+      bgColor: "bg-blue-50",
+      iconColor: "text-blue-600",
+    },
+    {
+      title: "Total Revenue",
+      value: `₹${(stats.totalRevenue || 0).toLocaleString()}`,
+      icon: DollarSign,
+      change: "+12.8%",
+      trending: "up",
+      bgColor: "bg-green-50",
+      iconColor: "text-green-600",
+    },
+    {
+      title: "Pending Orders",
+      value: (stats.pendingOrders || 0).toLocaleString(),
+      icon: Clock,
+      change: "-3.1%",
+      trending: "down",
+      bgColor: "bg-yellow-50",
+      iconColor: "text-yellow-600",
+    },
+    {
+      title: "Delivered Orders",
+      value: (stats.deliveredOrders || 0).toLocaleString(),
+      icon: CheckCircle,
+      change: "+8.5%",
+      trending: "up",
+      bgColor: "bg-purple-50",
+      iconColor: "text-purple-600",
+    },
+  ], [stats]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-      {stats.map((stat, index) => (
+      {statsDisplay.map((stat, index) => (
         <div
           key={index}
           className="bg-white p-6 rounded-xl shadow-sm border-2 border-gray-200"
@@ -589,6 +772,7 @@ OrderTable.displayName = "OrderTable";
 
 // Main Dashboard Orders Component
 const DashboardOrders = memo(() => {
+  const dispatch = useDispatch();
   const [selectedDateRange, setSelectedDateRange] = useState({
     label: "Last 30 Days",
     value: "30days",
@@ -599,17 +783,53 @@ const DashboardOrders = memo(() => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [showErrorAlert, setShowErrorAlert] = useState(false);
   const exportDropdownRef = useRef(null);
 
-  const { orders, loading, refreshOrders, updateOrderStatus, updatePaymentStatus } = useOrderData();
+  const { 
+    orders, 
+    orderStatistics, 
+    loading, 
+    error, 
+    refreshOrders, 
+    updateOrderStatus, 
+    updatePaymentStatus,
+    acceptOrder,
+    rejectOrder,
+    allotVendor,
+    updateCourierStatus
+  } = useOrderData();
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      setShowErrorAlert(true);
+      setTimeout(() => setShowErrorAlert(false), 5000);
+    }
+  }, [error]);
+
+  // Update last updated timestamp
+  useEffect(() => {
+    if (orders?.length > 0) {
+      setLastUpdated(new Date());
+    }
+  }, [orders]);
 
   // Filter orders based on search and filters
   const filteredOrders = useMemo(() => {
+    if (!Array.isArray(orders)) {
+      console.warn('Orders is not an array:', orders);
+      return [];
+    }
+    
     return orders.filter((order) => {
+      if (!order) return false;
+      
       const matchesSearch =
-        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.orderNumber && order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (order.customerName && order.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (order.customerEmail && order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (order.trackingNumber && order.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesStatus = statusFilter === "all" || order.status === statusFilter;
@@ -755,6 +975,52 @@ const DashboardOrders = memo(() => {
 
   return (
     <div className="space-y-6">
+      {/* Error Alert */}
+      {showErrorAlert && error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+            <div>
+              <p className="text-red-800 font-medium">Error loading orders</p>
+              <p className="text-red-700 text-sm">{typeof error === 'string' ? error : JSON.stringify(error)}</p>
+            </div>
+            <button
+              onClick={() => {
+                setShowErrorAlert(false);
+                dispatch(clearErrors());
+              }}
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Status Indicator */}
+      <div className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg">
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`}></div>
+          <span className="text-sm text-gray-600">
+            {loading ? 'Syncing...' : 'Live data'}
+          </span>
+          {lastUpdated && (
+            <span className="text-xs text-gray-500">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center space-x-4 text-sm text-gray-600">
+          <span>Total Orders: <strong>{Array.isArray(orders) ? orders.length : 0}</strong></span>
+          {orderStatistics && (
+            <>
+              <span>Revenue: <strong>₹{(orderStatistics.totalRevenue || 0).toLocaleString()}</strong></span>
+              <span>Pending: <strong>{orderStatistics.pendingCount || 0}</strong></span>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Orders Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -833,7 +1099,7 @@ const DashboardOrders = memo(() => {
       </div>
 
       {/* Order Statistics */}
-      <OrderStats orders={filteredOrders} dateRange={dateRange} />
+      <OrderStats orders={filteredOrders} dateRange={dateRange} orderStatistics={orderStatistics} />
 
       {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border-2 border-gray-200">
@@ -904,5 +1170,12 @@ const DashboardOrders = memo(() => {
 
 DashboardOrders.displayName = "DashboardOrders";
 
-export default DashboardOrders;
+// Wrapped component with error boundary
+const SafeDashboardOrders = () => (
+  <ErrorBoundary>
+    <DashboardOrders />
+  </ErrorBoundary>
+);
+
+export default SafeDashboardOrders;
 export { useOrderData, OrderStats, OrderTable };

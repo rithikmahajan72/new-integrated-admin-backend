@@ -15,7 +15,9 @@ import {
 // Backend-only approach - no client-side Firestore
 
 // Base API URL - adjust this to match your backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { getApiURL } from '../config/apiConfig.js';
+
+const API_BASE_URL = getApiURL();
 
 // Create axios instance with default config
 const apiClient = axios.create({

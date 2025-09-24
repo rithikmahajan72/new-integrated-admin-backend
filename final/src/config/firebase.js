@@ -23,7 +23,8 @@ export const auth = getAuth(app);
 // Admin configuration
 export const ADMIN_CONFIG = {
   adminEmail: "rithikmahajan27@gmail.com",
-  adminPhone: "7006114695"
+  adminPhone: "7006114695",
+  adminPassword: "R@2727thik"
 };
 
 // Check if user is admin

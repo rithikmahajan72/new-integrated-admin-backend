@@ -1,13 +1,12 @@
 // API Configuration for Product Bundling
 import axios from 'axios';
+import { getApiURL, AXIOS_CONFIG } from '../config/apiConfig.js';
 
 // Create an axios instance with base configuration
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  baseURL: getApiURL(),
   timeout: 30000, // 30 seconds timeout
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  ...AXIOS_CONFIG,
 });
 
 // Request interceptor to add auth token

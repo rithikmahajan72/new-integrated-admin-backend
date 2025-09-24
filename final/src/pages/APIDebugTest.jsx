@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { getApiURL } from '../config/apiConfig.js';
 
 const APIDebugTest = () => {
   const [results, setResults] = useState({});
@@ -8,7 +9,7 @@ const APIDebugTest = () => {
   const testAPI = async (endpoint, name) => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://localhost:8080/api/${endpoint}`);
+      const response = await axios.get(`${getApiURL()}/${endpoint}`);
       setResults(prev => ({
         ...prev,
         [name]: {

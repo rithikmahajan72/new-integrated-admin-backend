@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getApiURL, AXIOS_CONFIG } from '../config/apiConfig.js';
 
 console.log('🔧 AXIOS CONFIG FILE LOADING...');
 
@@ -6,19 +7,15 @@ console.log('🔧 AXIOS CONFIG FILE LOADING...');
 console.log('Environment variables:', {
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   NODE_ENV: import.meta.env.NODE_ENV,
-  all: import.meta.env
 });
 
-// Create axios instance with base configuration
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+// Create axios instance with base configuration using centralized config
+const baseURL = getApiURL();
 console.log('🚀 AXIOS CONFIG: Using baseURL:', baseURL);
 
 const API = axios.create({
   baseURL: baseURL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  ...AXIOS_CONFIG,
 });
 
 // Request interceptor to add auth token to requests

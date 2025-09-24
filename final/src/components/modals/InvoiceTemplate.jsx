@@ -243,7 +243,7 @@ Thank you for your business!
         <p className="mt-1">Thank you for your business!</p>
       </div>
 
-      <style jsx>{`
+      <style jsx="true">{`
         @media print {
           @page { 
             size: A4; 

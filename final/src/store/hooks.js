@@ -1,5 +1,31 @@
 import { useSelector, useDispatch } from 'react-redux';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { 
+  fetchUserSettings, 
+  updateUserSettings, 
+  fetchCommunicationPreferences, 
+  updateCommunicationPreferences, 
+  toggleCommunicationSetting,
+  fetchWebhookSettings,
+  updateWebhookSettings,
+  createWebhook,
+  updateWebhook,
+  deleteWebhook,
+  toggleWebhook,
+  testWebhook,
+  fetchWebhookLogs,
+  fetchShippingCharges,
+  createShippingCharge,
+  updateShippingCharge,
+  deleteShippingCharge,
+  updateShippingSettings,
+  getShippingChargeByLocation,
+  initializeShipping,
+  selectShippingCharges,
+  selectShippingGeneralSettings,
+  selectShippingLoading,
+  selectShippingErrors
+} from './slices/settingsSlice';
 
 // Custom hooks for Redux store
 
@@ -443,6 +469,258 @@ export const usePoints = () => {
   
   return {
     ...points,
+    dispatch,
+  };
+};
+
+// Settings hooks
+export const useSettings = () => {
+  const settings = useSelector((state) => state.settings);
+  const dispatch = useDispatch();
+  
+  const fetchSettings = useCallback(() => {
+    return dispatch(fetchUserSettings());
+  }, [dispatch]);
+  
+  const updateSettings = useCallback((settingsData) => {
+    return dispatch(updateUserSettings(settingsData));
+  }, [dispatch]);
+  
+  const setLocalSetting = useCallback((category, setting, value) => {
+    dispatch({ type: 'settings/setLocalSetting', payload: { category, setting, value } });
+  }, [dispatch]);
+  
+  const clearError = useCallback(() => {
+    dispatch({ type: 'settings/clearError' });
+  }, [dispatch]);
+  
+  return {
+    ...settings,
+    fetchSettings,
+    updateSettings,
+    setLocalSetting,
+    clearError,
+    dispatch,
+  };
+};
+
+// Communication Preferences specific hooks
+export const useCommunicationPreferences = () => {
+  const communicationPreferences = useSelector((state) => state.settings.settings.communicationPreferences);
+  const loading = useSelector((state) => state.settings.categoryLoading.communicationPreferences || false);
+  const error = useSelector((state) => state.settings.categoryErrors.communicationPreferences);
+  const dispatch = useDispatch();
+  
+  const fetchPreferences = useCallback(() => {
+    return dispatch(fetchCommunicationPreferences());
+  }, [dispatch]);
+  
+  const updatePreferences = useCallback((preferences) => {
+    return dispatch(updateCommunicationPreferences(preferences));
+  }, [dispatch]);
+  
+  const toggleSetting = useCallback((settingKey, enabled, requiresAuth = false, authData = null) => {
+    return dispatch(toggleCommunicationSetting({ settingKey, enabled, requiresAuth, authData }));
+  }, [dispatch]);
+  
+  const toggleMainSetting = useCallback((enabled, authData = null) => {
+    return toggleSetting('enabled', enabled, true, authData);
+  }, [toggleSetting]);
+  
+  const clearError = useCallback(() => {
+    dispatch({ type: 'settings/clearError' });
+  }, [dispatch]);
+  
+  return {
+    preferences: communicationPreferences || {},
+    loading,
+    error,
+    fetchPreferences,
+    updatePreferences,
+    toggleSetting,
+    toggleMainSetting,
+    clearError,
+    enabled: communicationPreferences?.enabled || false,
+    dispatch,
+  };
+};
+
+// Webhook-specific hooks
+export const useWebhooks = () => {
+  const webhookSettings = useSelector((state) => state.settings.settings?.webhooks);
+  const webhooks = useSelector((state) => state.settings.webhooks);
+  const loading = useSelector((state) => state.settings.categoryLoading);
+  const error = useSelector((state) => state.settings.categoryErrors);
+  const dispatch = useDispatch();
+
+  const fetchWebhookSettingsAction = useCallback(() => {
+    return dispatch(fetchWebhookSettings());
+  }, [dispatch]);
+
+  const updateWebhookSettingsAction = useCallback((settings) => {
+    return dispatch(updateWebhookSettings(settings));
+  }, [dispatch]);
+
+  const createWebhookAction = useCallback((webhookData) => {
+    return dispatch(createWebhook(webhookData));
+  }, [dispatch]);
+
+  const updateWebhookAction = useCallback((webhookId, webhookData) => {
+    return dispatch(updateWebhook({ webhookId, webhookData }));
+  }, [dispatch]);
+
+  const deleteWebhookAction = useCallback((webhookId) => {
+    return dispatch(deleteWebhook(webhookId));
+  }, [dispatch]);
+
+  const toggleWebhookAction = useCallback((webhookId) => {
+    return dispatch(toggleWebhook(webhookId));
+  }, [dispatch]);
+
+  const testWebhookAction = useCallback((webhookId, testData = {}) => {
+    return dispatch(testWebhook({ webhookId, testData }));
+  }, [dispatch]);
+
+  const fetchWebhookLogsAction = useCallback((webhookId, page = 1, limit = 10) => {
+    return dispatch(fetchWebhookLogs({ webhookId, page, limit }));
+  }, [dispatch]);
+
+  const clearError = useCallback(() => {
+    dispatch({ type: 'settings/clearError' });
+  }, [dispatch]);
+
+  return {
+    settings: webhookSettings || {},
+    endpoints: webhooks?.endpoints || [],
+    logs: webhooks?.logs || [],
+    testResults: webhooks?.testResults || {},
+    loading: {
+      fetchSettings: loading?.webhooks || false,
+      updateSettings: loading?.updateWebhookSettings || false,
+      createWebhook: loading?.createWebhook || false,
+      updateWebhook: loading?.updateWebhook || false,
+      deleteWebhook: loading?.deleteWebhook || false,
+      toggleWebhook: loading?.toggleWebhook || false,
+      testWebhook: loading?.testWebhook || false,
+      fetchLogs: loading?.fetchWebhookLogs || false,
+      ...webhooks?.loading
+    },
+    errors: {
+      settings: error?.webhooks,
+      createWebhook: error?.createWebhook,
+      updateWebhook: error?.updateWebhook,
+      deleteWebhook: error?.deleteWebhook,
+      toggleWebhook: error?.toggleWebhook,
+      testWebhook: error?.testWebhook,
+      fetchLogs: error?.fetchWebhookLogs,
+      ...webhooks?.errors
+    },
+    // Actions
+    fetchWebhookSettings: fetchWebhookSettingsAction,
+    updateWebhookSettings: updateWebhookSettingsAction,
+    createWebhook: createWebhookAction,
+    updateWebhook: updateWebhookAction,
+    deleteWebhook: deleteWebhookAction,
+    toggleWebhook: toggleWebhookAction,
+    testWebhook: testWebhookAction,
+    fetchWebhookLogs: fetchWebhookLogsAction,
+    clearError,
+    // Computed values
+    enabled: webhookSettings?.enabled || false,
+    totalEndpoints: webhooks.endpoints?.length || 0,
+    activeEndpoints: webhooks.endpoints?.filter(w => w.active)?.length || 0,
+    dispatch,
+  };
+};
+
+// Shipping management hook
+export const useShipping = () => {
+  const dispatch = useDispatch();
+  
+  // Selectors
+  const charges = useSelector(selectShippingCharges);
+  const generalSettings = useSelector(selectShippingGeneralSettings);
+  const loading = useSelector(selectShippingLoading);
+  const errors = useSelector(selectShippingErrors);
+
+  // Initialize shipping state on first use
+  useEffect(() => {
+    dispatch(initializeShipping());
+  }, [dispatch]);
+
+  // Action creators
+  const fetchChargesAction = useCallback((params) => {
+    return dispatch(fetchShippingCharges(params));
+  }, [dispatch]);
+
+  const createChargeAction = useCallback((chargeData) => {
+    return dispatch(createShippingCharge(chargeData));
+  }, [dispatch]);
+
+  const updateChargeAction = useCallback(({ chargeId, chargeData }) => {
+    return dispatch(updateShippingCharge({ chargeId, chargeData }));
+  }, [dispatch]);
+
+  const deleteChargeAction = useCallback((chargeId) => {
+    return dispatch(deleteShippingCharge(chargeId));
+  }, [dispatch]);
+
+  const updateGeneralSettingsAction = useCallback((settingsData) => {
+    return dispatch(updateShippingSettings(settingsData));
+  }, [dispatch]);
+
+  const getChargeByLocationAction = useCallback((locationData) => {
+    return dispatch(getShippingChargeByLocation(locationData));
+  }, [dispatch]);
+
+  const clearError = useCallback((errorType) => {
+    // You can implement a clear error action if needed
+    console.log('Clear error for:', errorType);
+  }, []);
+
+  return {
+    // Data
+    charges: charges || [],
+    generalSettings: generalSettings || {
+      freeShippingThreshold: 500,
+      expeditedShipping: true,
+      internationalShipping: false,
+      shippingInsurance: false,
+      trackingUpdates: true,
+    },
+    
+    // Loading states
+    loading: {
+      fetchCharges: loading?.fetchCharges || false,
+      createCharge: loading?.createCharge || false,
+      updateCharge: loading?.updateCharge || false,
+      deleteCharge: loading?.deleteCharge || false,
+      updateSettings: loading?.updateSettings || false,
+      fetchByLocation: loading?.fetchByLocation || false,
+    },
+    
+    // Errors
+    errors: {
+      fetchCharges: errors?.fetchCharges,
+      createCharge: errors?.createCharge,
+      updateCharge: errors?.updateCharge,
+      deleteCharge: errors?.deleteCharge,
+      updateSettings: errors?.updateSettings,
+      fetchByLocation: errors?.fetchByLocation,
+    },
+    
+    // Actions
+    fetchCharges: fetchChargesAction,
+    createCharge: createChargeAction,
+    updateCharge: updateChargeAction,
+    deleteCharge: deleteChargeAction,
+    updateGeneralSettings: updateGeneralSettingsAction,
+    getChargeByLocation: getChargeByLocationAction,
+    clearError,
+    
+    // Computed values
+    totalCharges: Array.isArray(charges) ? charges.length : 0,
+    activeCharges: Array.isArray(charges) ? charges.filter(c => c.active !== false).length : 0,
     dispatch,
   };
 };

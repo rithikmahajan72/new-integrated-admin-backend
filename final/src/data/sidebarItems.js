@@ -6,7 +6,6 @@ const sidebarItems = [
   {
     title: "Dashboard Analytics",
     items: [
-      "Dashboard Overview", 
       "Analytics Reports", 
       "Marketplace Sync", 
       "User Management", 

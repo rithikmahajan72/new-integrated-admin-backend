@@ -30,6 +30,8 @@ import cartAbandonmentSlice from './slices/cartAbandonmentSlice';
 import reviewSlice from './slices/reviewSlice';
 import orderManagementSlice from './slices/orderManagementSlice';
 import inboxSlice from './slices/inboxSlice';
+import googleAnalyticsSlice from './slices/googleAnalyticsSlice';
+import settingsSlice from './slices/settingsSlice';
 
 // Persist configuration
 const persistConfig = {
@@ -82,6 +84,8 @@ const rootReducer = combineReducers({
   reviews: reviewSlice,
   orderManagement: orderManagementSlice,
   inbox: inboxSlice,
+  googleAnalytics: googleAnalyticsSlice,
+  settings: settingsSlice,
 });
 
 // Create persisted reducer (temporarily disabled)

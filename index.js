@@ -33,6 +33,10 @@ const cartAbandonmentRoutes = require("./src/routes/cartAbandonmentRoutes"); // 
 const pointsRoutes = require("./src/routes/PointsRoutes"); // Handles points system routes
 const inviteFriendRoutes = require("./src/routes/inviteafriend"); // Handles invite a friend system routes
 const inboxRoutes = require("./src/routes/InboxRoutes"); // Handles inbox/messaging system routes
+const analyticsRoutes = require("./src/routes/AnalyticsRoutes"); // Handles Google Analytics routes
+const settingsRoutes = require("./src/routes/SettingsRoutes"); // Handles settings management routes
+const bannerRoutes = require("./src/routes/BannerRoutes"); // Handles banner management routes
+const joinUsRoutes = require("./src/routes/JoinUsRoutes"); // Handles join us post management routes
 const morgan = require("morgan");
 
 const app = express();
@@ -94,6 +98,10 @@ app.use("/api/points", pointsRoutes); // Mount points system routes
 app.use("/api/invite-friend", inviteFriendRoutes); // Mount invite a friend system routes
 app.use("/api/inbox", inboxRoutes); // Mount inbox/messaging system routes
 app.use("/api/cart-abandonment", cartAbandonmentRoutes); // Mount cart abandonment recovery routes
+app.use("/api/analytics", analyticsRoutes); // Mount Google Analytics routes
+app.use("/api/settings", settingsRoutes); // Mount settings management routes
+app.use("/api/banners", bannerRoutes); // Mount banner management routes
+app.use("/api/joinus", joinUsRoutes); // Mount join us post management routes
 
 
 // Start the server and listen on port 8080

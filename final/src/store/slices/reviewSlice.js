@@ -1,7 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { getApiURL } from '../../config/apiConfig.js';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = getApiURL();
 
 // Async thunks for review management
 

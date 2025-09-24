@@ -1,5 +1,16 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import TwoFactorAuth from '../components/TwoFactorAuth';
+import FirebaseTwoFactorAuth from '../components/FirebaseTwoFactorAuth';
+import {
+  fetchSettingCategory,
+  updateSettingCategory,
+  toggleSetting,
+  selectSettingCategory,
+  selectCategoryLoading,
+  selectCategoryError,
+  clearError
+} from '../store/slices/settingsSlice';
 
 /**
  * Auto Invoice Mailing Component
@@ -45,11 +56,20 @@ const SUCCESS_MODAL_CLASSES = {
 
 const GetAutoInvoiceMailing = () => {
   // ==============================
-  // STATE MANAGEMENT
+  // REDUX STATE MANAGEMENT
   // ==============================
+  const dispatch = useDispatch();
   
-  // Auto invoicing setting
-  const [autoInvoicing, setAutoInvoicing] = useState(true);
+  // Redux selectors
+  const autoInvoiceSettings = useSelector(selectSettingCategory('autoInvoice'));
+  const loading = useSelector(selectCategoryLoading('autoInvoice'));
+  const error = useSelector(selectCategoryError('autoInvoice'));
+  
+  // Local state for UI
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Auto invoicing state derived from Redux
+  const [autoInvoicing, setAutoInvoicing] = useState(false);
 
   // Modal states for auto invoicing
   const [modals, setModals] = useState({
@@ -63,8 +83,30 @@ const GetAutoInvoiceMailing = () => {
     autoInvoicingFinalSuccessOff: false,
   });
 
-  // Authentication state
-  // Note: OTP and password inputs are now handled by TwoFactorAuth component
+  // ==============================
+  // EFFECTS
+  // ==============================
+  
+  // Fetch settings on component mount
+  useEffect(() => {
+    dispatch(fetchSettingCategory('autoInvoice'));
+  }, [dispatch]);
+
+  // Sync Redux state with local state
+  useEffect(() => {
+    if (autoInvoiceSettings?.enabled !== undefined) {
+      setAutoInvoicing(autoInvoiceSettings.enabled);
+    }
+  }, [autoInvoiceSettings]);
+
+  // Clear errors when component unmounts
+  useEffect(() => {
+    return () => {
+      if (error) {
+        dispatch(clearError('autoInvoice'));
+      }
+    };
+  }, [dispatch, error]);
 
   // ==============================
   // UTILITY FUNCTIONS
@@ -286,22 +328,22 @@ const GetAutoInvoiceMailing = () => {
           onCancel={() => handleCancelToggle(settingKey, 'Off')}
         />
 
-        {/* 2FA Modals */}
+        {/* 2FA Modals - Firebase Enabled */}
         {modals.autoInvoicing2FAOn && (
-          <TwoFactorAuth
+          <FirebaseTwoFactorAuth
             onSubmit={(data) => handle2FASubmit(settingKey, 'On', data)}
             onClose={() => handleCancel2FA(settingKey, 'On')}
-            phoneNumber={PHONE_NUMBER}
-            emailAddress={EMAIL_ADDRESS}
+            phoneNumber="7006114695"
+            emailAddress="rithikmahajan27@gmail.com"
           />
         )}
 
         {modals.autoInvoicing2FAOff && (
-          <TwoFactorAuth
+          <FirebaseTwoFactorAuth
             onSubmit={(data) => handle2FASubmit(settingKey, 'Off', data)}
             onClose={() => handleCancel2FA(settingKey, 'Off')}
-            phoneNumber={PHONE_NUMBER}
-            emailAddress={EMAIL_ADDRESS}
+            phoneNumber="7006114695"
+            emailAddress="rithikmahajan27@gmail.com"
           />
         )}
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import CollectCommunicationPreferences from './Collect communication preferences';
+import CollectCommunicationPreferences from '../pages/settingscommunicationpreferences';
 
 /**
  * Communication Preferences Toggle Component

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { getApiURL } from '../config/apiConfig.js';
 
 const APIDebugPage = () => {
   const [categoriesData, setCategoriesData] = useState(null);
@@ -30,7 +31,7 @@ const APIDebugPage = () => {
 
       console.log('Testing categories API...');
       const categoriesResponse = await axios.get(
-        'http://localhost:8080/api/items/bundles/categories',
+        `${getApiURL()}/items/bundles/categories`,
         config
       );
       console.log('Categories response:', categoriesResponse.data);
@@ -38,7 +39,7 @@ const APIDebugPage = () => {
 
       console.log('Testing items API...');
       const itemsResponse = await axios.get(
-        'http://localhost:8080/api/items/bundles/items',
+        `${getApiURL()}/items/bundles/items`,
         config
       );
       console.log('Items response:', itemsResponse.data);
