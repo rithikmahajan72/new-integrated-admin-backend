@@ -2,10 +2,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { itemAPI, productAPI, categoryAPI, subCategoryAPI } from '../../api/endpoints';
 import { apiCall } from '../../api/utils';
-import { getApiURL } from '../../config/apiConfig.js';
 
-// API base URL
-const API_BASE_URL = getApiURL();
+const API_BASE_URL = 'http://localhost:8080/api';
 
 // Async thunks for item/product operations
 export const fetchItems = createAsyncThunk(

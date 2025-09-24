@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { getApiURL, AXIOS_CONFIG } from '../config/apiConfig.js';
 
 console.log('🔧 AXIOS CONFIG FILE LOADING...');
 
@@ -7,15 +6,28 @@ console.log('🔧 AXIOS CONFIG FILE LOADING...');
 console.log('Environment variables:', {
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   NODE_ENV: import.meta.env.NODE_ENV,
+  all: import.meta.env
 });
 
-// Create axios instance with base configuration using centralized config
-const baseURL = getApiURL();
+// Create axios instance with base configuration
+// Ensure we always use the backend URL, not the frontend URL
+let baseURL = import.meta.env.VITE_API_BASE_URL;
+
+// If environment variable is not set or is incorrect, force the correct backend URL
+if (!baseURL || baseURL.includes('3000') || baseURL.includes('3001')) {
+  baseURL = 'http://localhost:8080/api';
+  console.warn('⚠️ VITE_API_BASE_URL not set correctly, using fallback:', baseURL);
+}
+
 console.log('🚀 AXIOS CONFIG: Using baseURL:', baseURL);
+console.log('🔍 Environment check - VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
 
 const API = axios.create({
   baseURL: baseURL,
-  ...AXIOS_CONFIG,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Request interceptor to add auth token to requests

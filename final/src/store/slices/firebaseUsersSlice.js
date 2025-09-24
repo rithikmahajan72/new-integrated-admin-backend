@@ -1,6 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import { getApiURL } from '../../config/apiConfig.js';
 
 // Backend API endpoints
 console.log('🔧 Environment check:', {
@@ -9,8 +8,8 @@ console.log('🔧 Environment check:', {
   NODE_ENV: import.meta.env.NODE_ENV
 });
 
-// Configuration
-const API_BASE_URL = getApiURL();
+// Force correct API URL for now
+const API_BASE_URL = 'http://localhost:8080/api';
 console.log('🔧 Final API_BASE_URL:', API_BASE_URL);
 
 // Get admin token from localStorage or environment

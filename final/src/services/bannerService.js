@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance for banner API
 const bannerApi = axios.create({
-  baseURL: `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/banners`,
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}/banners`,
   headers: {
     'Content-Type': 'application/json',
   },

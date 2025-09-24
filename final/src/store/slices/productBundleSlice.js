@@ -1,10 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { getApiURL } from '../../config/apiConfig.js';
-
-// API base URL - adjust this according to your backend configuration
-
-const API_BASE_URL = getApiURL();
+import API from '../../api/axiosConfig';
 
 // ==============================
 // ASYNC THUNKS (API CALLS)
@@ -15,23 +10,7 @@ export const getAllProductBundles = createAsyncThunk(
   'productBundle/getAllProductBundles',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      Object.keys(params).forEach(key => {
-        if (params[key] !== undefined && params[key] !== '') {
-          queryParams.append(key, params[key]);
-        }
-      });
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/items/bundles?${queryParams}`,
-        config
-      );
+      const response = await API.get('/items/bundles', { params });
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -46,16 +25,7 @@ export const createProductBundle = createAsyncThunk(
   'productBundle/createProductBundle',
   async (bundleData, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      const response = await axios.post(
-        `${API_BASE_URL}/items/bundles`,
-        bundleData,
-        config
-      );
+      const response = await API.post('/items/bundles', bundleData);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -70,15 +40,7 @@ export const getProductBundleById = createAsyncThunk(
   'productBundle/getProductBundleById',
   async (bundleId, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/items/bundles/${bundleId}`,
-        config
-      );
+      const response = await API.get(`/items/bundles/${bundleId}`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -93,16 +55,7 @@ export const updateProductBundle = createAsyncThunk(
   'productBundle/updateProductBundle',
   async ({ bundleId, bundleData }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      const response = await axios.put(
-        `${API_BASE_URL}/items/bundles/${bundleId}`,
-        bundleData,
-        config
-      );
+      const response = await API.put(`/items/bundles/${bundleId}`, bundleData);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -117,15 +70,7 @@ export const deleteProductBundle = createAsyncThunk(
   'productBundle/deleteProductBundle',
   async (bundleId, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      const response = await axios.delete(
-        `${API_BASE_URL}/items/bundles/${bundleId}`,
-        config
-      );
+      const response = await API.delete(`/items/bundles/${bundleId}`);
       return { bundleId, response: response.data };
     } catch (error) {
       return rejectWithValue(
@@ -140,16 +85,7 @@ export const toggleBundleStatus = createAsyncThunk(
   'productBundle/toggleBundleStatus',
   async ({ bundleId, updatedBy }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      const response = await axios.patch(
-        `${API_BASE_URL}/items/bundles/${bundleId}/toggle-status`,
-        { updatedBy },
-        config
-      );
+      const response = await API.patch(`/items/bundles/${bundleId}/toggle-status`, { updatedBy });
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -164,16 +100,7 @@ export const updateBundleItemsOrder = createAsyncThunk(
   'productBundle/updateBundleItemsOrder',
   async ({ bundleId, bundleItems, updatedBy }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      const response = await axios.put(
-        `${API_BASE_URL}/items/bundles/${bundleId}/reorder`,
-        { bundleItems, updatedBy },
-        config
-      );
+      const response = await API.put(`/items/bundles/${bundleId}/reorder`, { bundleItems, updatedBy });
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -188,23 +115,7 @@ export const getItemsForBundling = createAsyncThunk(
   'productBundle/getItemsForBundling',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      Object.keys(params).forEach(key => {
-        if (params[key] !== undefined && params[key] !== '') {
-          queryParams.append(key, params[key]);
-        }
-      });
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/items/bundles/items?${queryParams}`,
-        config
-      );
+      const response = await API.get('/items/bundles/items', { params });
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -219,15 +130,7 @@ export const getCategoriesForBundling = createAsyncThunk(
   'productBundle/getCategoriesForBundling',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/items/bundles/categories`,
-        config
-      );
+      const response = await API.get('/items/bundles/categories');
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -242,7 +145,7 @@ export const getBundlesForProduct = createAsyncThunk(
   'productBundle/getBundlesForProduct',
   async (itemId, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/items/${itemId}/bundles`);
+      const response = await API.get(`/items/${itemId}/bundles`);
       return response.data;
     } catch (error) {
       return rejectWithValue(

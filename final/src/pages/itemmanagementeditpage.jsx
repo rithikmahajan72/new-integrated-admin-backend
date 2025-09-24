@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { X, Plus, Upload, Trash2, Save, ArrowLeft, ChevronDown } from 'lucide-react';
 import { itemAPI, categoryAPI, subCategoryAPI, filterAPI } from '../api/endpoints';
-import { getApiURL } from '../config/apiConfig.js';
 import FilterTest from '../components/FilterTest';
 import { 
   fetchItemById, 
@@ -808,7 +807,7 @@ const ItemManagementEditPage = () => {
         return;
       }
 
-      const response = await fetch(`${getApiURL()}/users/make-admin/${parsed._id}`, {
+      const response = await fetch(`http://localhost:8080/api/users/make-admin/${parsed._id}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,

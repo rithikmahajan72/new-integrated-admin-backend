@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create axios instance with default configuration
 const joinUsAPI = axios.create({
-    baseURL: `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"}/api/joinus`,
+    baseURL: `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api"}/joinus`,
     timeout: 10000,
     headers: {
         "Content-Type": "application/json",

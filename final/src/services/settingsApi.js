@@ -1,10 +1,11 @@
 import axios from 'axios';
-import { API_ENDPOINTS, AXIOS_CONFIG } from '../config/apiConfig.js';
 
 // Create axios instance for settings API
 const settingsApi = axios.create({
-  baseURL: API_ENDPOINTS.settings,
-  ...AXIOS_CONFIG,
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api/settings',
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Add token to all requests

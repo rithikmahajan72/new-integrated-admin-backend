@@ -18,31 +18,31 @@ export const userAPI = {
   getProfile: () => API.get('/user/profile'),
   updateProfile: (userData) => API.put('/user/profile', userData),
   deleteAccount: () => API.delete('/user/profile'),
-  getUserById: (userId) => API.get(`/api/user/${userId}`),
+  getUserById: (userId) => API.get(`/user/${userId}`),
 };
 
 // Firebase Admin API endpoints
 export const firebaseAPI = {
   getAllUsers: () => API.get('/firebase/users'),
-  getUserById: (uid) => API.get(`/api/firebase/users/${uid}`),
-  blockUser: (uid, reason) => API.post(`/api/firebase/users/${uid}/block`, { reason }),
-  unblockUser: (uid) => API.post(`/api/firebase/users/${uid}/unblock`),
-  deleteUser: (uid) => API.delete(`/api/firebase/users/${uid}`),
+  getUserById: (uid) => API.get(`/firebase/users/${uid}`),
+  blockUser: (uid, reason) => API.post(`/firebase/users/${uid}/block`, { reason }),
+  unblockUser: (uid) => API.post(`/firebase/users/${uid}/unblock`),
+  deleteUser: (uid) => API.delete(`/firebase/users/${uid}`),
 };
 
 // Items/Products API endpoints
 export const itemAPI = {
   // Get items
   getAllItems: (params = {}) => API.get('/items', { params }),
-  getItemById: (itemId) => API.get(`/api/items/${itemId}`),
-  getItemsByCategory: (categoryId) => API.get(`/api/items/category/${categoryId}`),
-  getItemsBySubCategory: (subCategoryId) => API.get(`/api/items/subcategory/${subCategoryId}`),
+  getItemById: (itemId) => API.get(`/items/${itemId}`),
+  getItemsByCategory: (categoryId) => API.get(`/items/category/${categoryId}`),
+  getItemsBySubCategory: (subCategoryId) => API.get(`/items/subcategory/${subCategoryId}`),
   getItemStatistics: () => API.get('/items/statistics'),
   
   // NEW SIMPLIFIED FLOW - No authentication required initially
   createItem: (itemData) => API.post('/items/create-draft', itemData), // New simplified endpoint
-  updateItem: (itemId, itemData) => API.put(`/api/items/${itemId}`, itemData),
-  deleteItem: (itemId) => API.delete(`/api/items/${itemId}`),
+  updateItem: (itemId, itemData) => API.put(`/items/${itemId}`, itemData),
+  deleteItem: (itemId) => API.delete(`/items/${itemId}`),
   
   // Media upload endpoints
   uploadImage: (formData) => API.post('/items/upload-image', formData, {
@@ -60,26 +60,26 @@ export const itemAPI = {
   createBasicProduct: (productData) => API.post('/items/basic-product', productData),
   
   // Phase 2: Update product with draft configuration (images, filters, categories)
-  updateDraftConfiguration: (productId, draftData) => API.put(`/api/items/${productId}/draft-configuration`, draftData),
+  updateDraftConfiguration: (productId, draftData) => API.put(`/items/${productId}/draft-configuration`, draftData),
   
   // Phase 3: Add review to product (consumer/admin side)
-  addReview: (productId, reviewData) => API.post(`/api/items/${productId}/reviews`, reviewData),
+  addReview: (productId, reviewData) => API.post(`/items/${productId}/reviews`, reviewData),
   
   // Phase 4: Update also show in options (draft management)
-  updateAlsoShowInOptions: (productId, optionsData) => API.put(`/api/items/${productId}/also-show-options`, optionsData),
+  updateAlsoShowInOptions: (productId, optionsData) => API.put(`/items/${productId}/also-show-options`, optionsData),
   
   // Phase 5: Update product status (draft → schedule → live)
-  updateProductStatus: (productId, statusData) => API.put(`/api/items/${productId}/status`, statusData),
+  updateProductStatus: (productId, statusData) => API.put(`/items/${productId}/status`, statusData),
   
   // Utility endpoints for the new flow
-  getProductById: (productId) => API.get(`/api/items/product/${productId}`), // Supports both ObjectId and productId
-  getProductsByStatus: (status, params = {}) => API.get(`/api/items/status/${status}`, { params }),
-  updateProductSizes: (productId, sizesData) => API.put(`/api/items/${productId}/sizes`, sizesData),
-  updateReviewSettings: (productId, settingsData) => API.put(`/api/items/${productId}/review-settings`, settingsData),
+  getProductById: (productId) => API.get(`/items/product/${productId}`), // Supports both ObjectId and productId
+  getProductsByStatus: (status, params = {}) => API.get(`/items/status/${status}`, { params }),
+  updateProductSizes: (productId, sizesData) => API.put(`/items/${productId}/sizes`, sizesData),
+  updateReviewSettings: (productId, settingsData) => API.put(`/items/${productId}/review-settings`, settingsData),
   
   // Item details
-  getItemDetails: (itemId) => API.get(`/api/item-details/${itemId}`),
-  updateItemDetails: (itemId, detailsData) => API.put(`/api/item-details/${itemId}`, detailsData),
+  getItemDetails: (itemId) => API.get(`/item-details/${itemId}`),
+  updateItemDetails: (itemId, detailsData) => API.put(`/item-details/${itemId}`, detailsData),
   
   // Arrangement control endpoints
   getCategoriesForArrangement: () => API.get('/items/categories-arrangement'),
@@ -92,28 +92,28 @@ export const itemAPI = {
 // Category API endpoints
 export const categoryAPI = {
   getAllCategories: () => API.get('/categories'),
-  getCategoryById: (categoryId) => API.get(`/api/categories/${categoryId}`),
+  getCategoryById: (categoryId) => API.get(`/categories/${categoryId}`),
   createCategory: (categoryData) => API.post('/categories', categoryData),
-  updateCategory: (categoryId, categoryData) => API.put(`/api/categories/${categoryId}`, categoryData),
-  deleteCategory: (categoryId) => API.delete(`/api/categories/${categoryId}`),
+  updateCategory: (categoryId, categoryData) => API.put(`/categories/${categoryId}`, categoryData),
+  deleteCategory: (categoryId) => API.delete(`/categories/${categoryId}`),
 };
 
 // SubCategory API endpoints
 export const subCategoryAPI = {
   getAllSubCategories: () => API.get('/subcategories'),
-  getSubCategoryById: (subCategoryId) => API.get(`/api/subcategories/${subCategoryId}`),
-  getSubCategoriesByCategory: (categoryId) => API.get(`/api/subcategories/category/${categoryId}`),
+  getSubCategoryById: (subCategoryId) => API.get(`/subcategories/${subCategoryId}`),
+  getSubCategoriesByCategory: (categoryId) => API.get(`/subcategories/category/${categoryId}`),
   createSubCategory: (subCategoryData) => API.post('/subcategories', subCategoryData),
-  updateSubCategory: (subCategoryId, subCategoryData) => API.put(`/api/subcategories/${subCategoryId}`, subCategoryData),
-  deleteSubCategory: (subCategoryId) => API.delete(`/api/subcategories/${subCategoryId}`),
+  updateSubCategory: (subCategoryId, subCategoryData) => API.put(`/subcategories/${subCategoryId}`, subCategoryData),
+  deleteSubCategory: (subCategoryId) => API.delete(`/subcategories/${subCategoryId}`),
 };
 
 // Cart API endpoints
 export const cartAPI = {
   getCart: () => API.get('/cart'),
   addToCart: (itemData) => API.post('/cart/add', itemData),
-  updateCartItem: (itemId, quantity) => API.put(`/api/cart/update/${itemId}`, { quantity }),
-  removeFromCart: (itemId) => API.delete(`/api/cart/remove/${itemId}`),
+  updateCartItem: (itemId, quantity) => API.put(`/cart/update/${itemId}`, { quantity }),
+  removeFromCart: (itemId) => API.delete(`/cart/remove/${itemId}`),
   clearCart: () => API.delete('/cart/clear'),
 };
 
@@ -121,7 +121,7 @@ export const cartAPI = {
 export const wishlistAPI = {
   getWishlist: () => API.get('/wishlist'),
   addToWishlist: (itemId) => API.post('/wishlist/add', { itemId }),
-  removeFromWishlist: (itemId) => API.delete(`/api/wishlist/remove/${itemId}`),
+  removeFromWishlist: (itemId) => API.delete(`/wishlist/remove/${itemId}`),
   clearWishlist: () => API.delete('/wishlist/clear'),
 };
 
@@ -142,16 +142,16 @@ export const promoCodeAPI = {
   getAllPromoCodes: (params = {}) => API.get('/promoCode/admin/promo-codes', { params }),
   
   // Get promo code by ID
-  getPromoCodeById: (id) => API.get(`/api/promoCode/admin/promo-codes/${id}`),
+  getPromoCodeById: (id) => API.get(`/promoCode/admin/promo-codes/${id}`),
   
   // Create new promo code
   createPromoCode: (promoCodeData) => API.post('/promoCode/admin/promo-codes', promoCodeData),
   
   // Update promo code
-  updatePromoCode: (id, promoCodeData) => API.put(`/api/promoCode/admin/promo-codes/${id}`, promoCodeData),
+  updatePromoCode: (id, promoCodeData) => API.put(`/promoCode/admin/promo-codes/${id}`, promoCodeData),
   
   // Delete promo code
-  deletePromoCode: (id) => API.delete(`/api/promoCode/admin/promo-codes/${id}`),
+  deletePromoCode: (id) => API.delete(`/promoCode/admin/promo-codes/${id}`),
   
   // Validate promo code (public endpoint)
   validatePromoCode: (data) => API.post('/promoCode/promo-codes/validate', data),
@@ -164,25 +164,25 @@ export const promoCodeAPI = {
   getPromoCodeStats: () => API.get('/promoCode/admin/promo-codes/stats'),
   
   // Search promo codes
-  searchPromoCodes: (query) => API.get(`/api/promoCode/admin/promo-codes/search?q=${encodeURIComponent(query)}`),
+  searchPromoCodes: (query) => API.get(`/promoCode/admin/promo-codes/search?q=${encodeURIComponent(query)}`),
   
   // Get promo codes by status
-  getPromoCodesByStatus: (isActive) => API.get(`/api/promoCode/admin/promo-codes/status/${isActive}`),
+  getPromoCodesByStatus: (isActive) => API.get(`/promoCode/admin/promo-codes/status/${isActive}`),
   
   // Get expired promo codes
   getExpiredPromoCodes: () => API.get('/promoCode/admin/promo-codes/expired'),
   
   // Clone promo code
-  clonePromoCode: (id) => API.post(`/api/promoCode/admin/promo-codes/${id}/clone`),
+  clonePromoCode: (id) => API.post(`/promoCode/admin/promo-codes/${id}/clone`),
 };
 
 // Order API endpoints
 export const orderAPI = {
   getAllOrders: (params = {}) => API.get('/orders', { params }),
-  getOrderById: (orderId) => API.get(`/api/orders/${orderId}`),
+  getOrderById: (orderId) => API.get(`/orders/${orderId}`),
   createOrder: (orderData) => API.post('/orders', orderData),
-  updateOrderStatus: (orderId, status) => API.put(`/api/orders/${orderId}/status`, { status }),
-  cancelOrder: (orderId) => API.put(`/api/orders/${orderId}/cancel`),
+  updateOrderStatus: (orderId, status) => API.put(`/orders/${orderId}/status`, { status }),
+  cancelOrder: (orderId) => API.put(`/orders/${orderId}/cancel`),
   getUserOrders: () => API.get('/orders/user'),
 };
 
@@ -225,11 +225,11 @@ export const adminOrderAPI = {
 // Address API endpoints
 export const addressAPI = {
   getAllAddresses: () => API.get('/addresses'),
-  getAddressById: (addressId) => API.get(`/api/addresses/${addressId}`),
+  getAddressById: (addressId) => API.get(`/addresses/${addressId}`),
   createAddress: (addressData) => API.post('/addresses', addressData),
-  updateAddress: (addressId, addressData) => API.put(`/api/addresses/${addressId}`, addressData),
-  deleteAddress: (addressId) => API.delete(`/api/addresses/${addressId}`),
-  setDefaultAddress: (addressId) => API.put(`/api/addresses/${addressId}/default`),
+  updateAddress: (addressId, addressData) => API.put(`/addresses/${addressId}`, addressData),
+  deleteAddress: (addressId) => API.delete(`/addresses/${addressId}`),
+  setDefaultAddress: (addressId) => API.put(`/addresses/${addressId}/default`),
 };
 
 // Payment API endpoints
@@ -258,10 +258,10 @@ export const reviewAPI = {
   updateReviewSettings: (itemId, settings) => API.put(`/reviews/admin/${itemId}/review-settings`, settings),
   
   // Legacy endpoints (kept for backward compatibility)
-  getItemReviews: (itemId) => API.get(`/api/reviews/item/${itemId}`),
+  getItemReviews: (itemId) => API.get(`/reviews/item/${itemId}`),
   createReviewLegacy: (reviewData) => API.post('/reviews', reviewData),
-  updateReviewLegacy: (reviewId, reviewData) => API.put(`/api/reviews/${reviewId}`, reviewData),
-  deleteReviewLegacy: (reviewId) => API.delete(`/api/reviews/${reviewId}`),
+  updateReviewLegacy: (reviewId, reviewData) => API.put(`/reviews/${reviewId}`, reviewData),
+  deleteReviewLegacy: (reviewId) => API.delete(`/reviews/${reviewId}`),
   getUserReviews: () => API.get('/reviews/user'),
 };
 
@@ -276,14 +276,14 @@ export const legacyPromoAPI = {
 export const filterAPI = {
   // Get all available filters
   getAllFilters: () => API.get('/filters'),
-  getFilterById: (filterId) => API.get(`/api/filters/${filterId}`),
-  getFiltersByKey: (key) => API.get(`/api/filters/key/${key}`),
+  getFilterById: (filterId) => API.get(`/filters/${filterId}`),
+  getFiltersByKey: (key) => API.get(`/filters/key/${key}`),
   
   // Filter CRUD operations (admin)
   createFilter: (filterData) => API.post('/filters', filterData),
-  updateFilter: (filterId, filterData) => API.put(`/api/filters/${filterId}`, filterData),
-  deleteFilter: (filterId) => API.delete(`/api/filters/${filterId}`),
-  updateFilterPriority: (filterId, priority) => API.patch(`/api/filters/${filterId}/priority`, { priority }),
+  updateFilter: (filterId, filterData) => API.put(`/filters/${filterId}`, filterData),
+  deleteFilter: (filterId) => API.delete(`/filters/${filterId}`),
+  updateFilterPriority: (filterId, priority) => API.patch(`/filters/${filterId}/priority`, { priority }),
   
   // Filter application and search
   applyFilters: (filterCriteria) => API.post('/filters/apply', filterCriteria),
@@ -292,18 +292,18 @@ export const filterAPI = {
   // Filter analytics and suggestions
   getFilterAnalytics: () => API.get('/filters/analytics'),
   getPopularFilters: () => API.get('/filters/popular'),
-  getSuggestedFilters: (productId) => API.get(`/api/filters/suggestions/${productId}`),
+  getSuggestedFilters: (productId) => API.get(`/filters/suggestions/${productId}`),
   
   // Filter presets and management
   saveFilterPreset: (presetData) => API.post('/filters/presets', presetData),
   getFilterPresets: () => API.get('/filters/presets'),
-  deleteFilterPreset: (presetId) => API.delete(`/api/filters/presets/${presetId}`),
+  deleteFilterPreset: (presetId) => API.delete(`/filters/presets/${presetId}`),
   
   // Price range and dynamic filters
-  getPriceRange: (categoryId) => API.get(`/api/filters/price-range/${categoryId || 'all'}`),
-  getAvailableSizes: (categoryId) => API.get(`/api/filters/sizes/${categoryId || 'all'}`),
-  getAvailableColors: (categoryId) => API.get(`/api/filters/colors/${categoryId || 'all'}`),
-  getBrands: (categoryId) => API.get(`/api/filters/brands/${categoryId || 'all'}`),
+  getPriceRange: (categoryId) => API.get(`/filters/price-range/${categoryId || 'all'}`),
+  getAvailableSizes: (categoryId) => API.get(`/filters/sizes/${categoryId || 'all'}`),
+  getAvailableColors: (categoryId) => API.get(`/filters/colors/${categoryId || 'all'}`),
+  getBrands: (categoryId) => API.get(`/filters/brands/${categoryId || 'all'}`),
   
   // Filter validation and compatibility
   validateFilters: (filterData) => API.post('/filters/validate', filterData),
@@ -316,9 +316,9 @@ export const filterAPI = {
 // Notification API endpoints
 export const notificationAPI = {
   getAllNotifications: () => API.get('/notifications/notifications'),
-  markAsRead: (notificationId) => API.put(`/api/notifications/${notificationId}/read`),
+  markAsRead: (notificationId) => API.put(`/notifications/${notificationId}/read`),
   markAllAsRead: () => API.put('/notifications/read-all'),
-  deleteNotification: (notificationId) => API.delete(`/api/notifications/${notificationId}`),
+  deleteNotification: (notificationId) => API.delete(`/notifications/${notificationId}`),
 };
 
 // Push Notification API endpoints
@@ -329,7 +329,7 @@ export const pushNotificationAPI = {
   }),
   getNotificationHistory: () => API.get('/notifications/notifications'),
   scheduleNotification: (notificationData) => API.post('/notifications/schedule-notification', notificationData),
-  cancelScheduledNotification: (notificationId) => API.delete(`/api/notifications/schedule/${notificationId}`),
+  cancelScheduledNotification: (notificationId) => API.delete(`/notifications/schedule/${notificationId}`),
 };
 
 // Bulk Upload API endpoints (admin)
@@ -355,21 +355,21 @@ export const imageAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
     ...config
   }),
-  deleteImage: (imageId) => API.delete(`/api/images/${imageId}`),
+  deleteImage: (imageId) => API.delete(`/images/${imageId}`),
   getSignedUrl: (fileName) => API.post('/images/signed-url', { fileName }),
 };
 
 // Product API endpoints (for managing products saved from SingleProductUpload)
 export const productAPI = {
   getAllProducts: (params = {}) => API.get('/items', { params }),
-  getProductById: (productId) => API.get(`/api/items/${productId}`),
+  getProductById: (productId) => API.get(`/items/${productId}`),
   createProduct: (productData) => API.post('/items', productData),
-  updateProduct: (productId, productData) => API.patch(`/api/items/${productId}`, productData),
-  deleteProduct: (productId) => API.delete(`/api/items/${productId}`),
+  updateProduct: (productId, productData) => API.patch(`/items/${productId}`, productData),
+  deleteProduct: (productId) => API.delete(`/items/${productId}`),
   // Additional methods for lifecycle management
-  publishProduct: (productId) => API.patch(`/api/items/publish/${productId}`),
-  scheduleProduct: (productId, scheduleData) => API.patch(`/api/items/schedule/${productId}`, scheduleData),
-  cancelSchedule: (productId) => API.patch(`/api/items/cancel-schedule/${productId}`),
+  publishProduct: (productId) => API.patch(`/items/publish/${productId}`),
+  scheduleProduct: (productId, scheduleData) => API.patch(`/items/schedule/${productId}`, scheduleData),
+  cancelSchedule: (productId) => API.patch(`/items/cancel-schedule/${productId}`),
 };// Privacy Policy API endpoints
 export const privacyAPI = {
   getPrivacyPolicy: () => API.get('/privacy-policy'),
@@ -381,11 +381,11 @@ export const partnerAPI = {
   // Admin endpoints for partner management
   createPartner: (partnerData) => API.post('/partners', partnerData),
   getAllPartners: (params = {}) => API.get('/partners', { params }),
-  getPartnerById: (partnerId) => API.get(`/api/partners/${partnerId}`),
-  updatePartner: (partnerId, updates) => API.put(`/api/partners/${partnerId}`, updates),
-  updatePartnerPassword: (partnerId, passwordData) => API.put(`/api/partners/${partnerId}/password`, passwordData),
-  togglePartnerStatus: (partnerId, statusData) => API.patch(`/api/partners/${partnerId}/toggle-status`, statusData),
-  deletePartner: (partnerId) => API.delete(`/api/partners/${partnerId}`),
+  getPartnerById: (partnerId) => API.get(`/partners/${partnerId}`),
+  updatePartner: (partnerId, updates) => API.put(`/partners/${partnerId}`, updates),
+  updatePartnerPassword: (partnerId, passwordData) => API.put(`/partners/${partnerId}/password`, passwordData),
+  togglePartnerStatus: (partnerId, statusData) => API.patch(`/partners/${partnerId}/toggle-status`, statusData),
+  deletePartner: (partnerId) => API.delete(`/partners/${partnerId}`),
   getPartnerStatistics: () => API.get('/partners/statistics'),
   
   // Partner authentication endpoints
@@ -400,14 +400,14 @@ export const pointsAPI = {
   
   // Users with points
   getAllUsersWithPoints: (params = {}) => API.get('/points/users', { params }),
-  getUserPoints: (userId) => API.get(`/api/points/user/${userId}`),
-  getUserPointsHistory: (userId, params = {}) => API.get(`/api/points/user/${userId}/history`, { params }),
+  getUserPoints: (userId) => API.get(`/points/user/${userId}`),
+  getUserPointsHistory: (userId, params = {}) => API.get(`/points/user/${userId}/history`, { params }),
   
   // Points operations
-  allocatePoints: (userId, pointsData) => API.post(`/api/points/user/${userId}/allocate`, pointsData),
-  redeemPoints: (userId, pointsData) => API.post(`/api/points/user/${userId}/redeem`, pointsData),
-  updateUserPoints: (userId, pointsData) => API.put(`/api/points/user/${userId}`, pointsData),
-  deleteUserPoints: (userId) => API.delete(`/api/points/user/${userId}`),
+  allocatePoints: (userId, pointsData) => API.post(`/points/user/${userId}/allocate`, pointsData),
+  redeemPoints: (userId, pointsData) => API.post(`/points/user/${userId}/redeem`, pointsData),
+  updateUserPoints: (userId, pointsData) => API.put(`/points/user/${userId}`, pointsData),
+  deleteUserPoints: (userId) => API.delete(`/points/user/${userId}`),
   
   // Summary and statistics
   getPointsSummary: () => API.get('/points/summary'),
