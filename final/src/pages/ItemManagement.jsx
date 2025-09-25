@@ -1229,10 +1229,9 @@ const ItemManagement = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="bg-white min-h-screen">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 px-6 pt-8">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Product Management</h1>
@@ -1264,7 +1263,7 @@ const ItemManagement = () => {
           </div>
 
           {/* Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 px-6">
             <div className="bg-white p-4 rounded-lg shadow">
               <div className="flex items-center gap-3">
                 <Package className="w-8 h-8 text-blue-600" />
@@ -1314,7 +1313,7 @@ const ItemManagement = () => {
         </div>
 
         {/* Filters and Controls */}
-        <div className="bg-white rounded-lg shadow mb-6">
+        <div className="bg-white rounded-lg shadow mb-6 mx-6">
           <div className="p-4 border-b border-gray-200">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search */}
@@ -1454,6 +1453,7 @@ const ItemManagement = () => {
         </div>
 
         {/* Content */}
+        <div className="px-6">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
@@ -1600,6 +1600,7 @@ const ItemManagement = () => {
             )}
           </>
         )}
+        </div>
 
         {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal
@@ -1610,7 +1611,6 @@ const ItemManagement = () => {
           message={`Are you sure you want to delete "${itemToDelete?.productName || itemToDelete?.name}"? This action cannot be undone.`}
         />
 
-      </div>
     </div>
   );
 };

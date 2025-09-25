@@ -838,10 +838,10 @@ const ItemManagementEditPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="bg-white min-h-screen">
       {/* Header */}
       <div className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -862,7 +862,7 @@ const ItemManagementEditPage = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="px-6 py-8">
         {/* Error/Success Messages */}
         {(error || localError) && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
@@ -2151,13 +2151,6 @@ const ItemManagementEditPage = () => {
               className="px-8 py-4 border border-gray-300 rounded-full text-black font-medium hover:bg-gray-50 transition-colors"
             >
               Go Back
-            </button>
-            <button
-              onClick={() => navigate('/bulk-upload')}
-              className="px-8 py-4 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Bulk Upload
             </button>
             <button
               onClick={handleSave}

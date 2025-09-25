@@ -8,14 +8,14 @@ export const pointsAPI = {
   
   // Users with points
   getAllUsersWithPoints: (params = {}) => API.get('/points/users', { params }),
-  getUserPoints: (userId) => API.get(`/api/points/user/${userId}`),
-  getUserPointsHistory: (userId, params = {}) => API.get(`/api/points/user/${userId}/history`, { params }),
+  getUserPoints: (userId) => API.get(`/points/user/${userId}`),
+  getUserPointsHistory: (userId, params = {}) => API.get(`/points/user/${userId}/history`, { params }),
   
   // Points operations
-  allocatePoints: (userId, pointsData) => API.post(`/api/points/user/${userId}/allocate`, pointsData),
-  redeemPoints: (userId, pointsData) => API.post(`/api/points/user/${userId}/redeem`, pointsData),
-  updateUserPoints: (userId, pointsData) => API.put(`/api/points/user/${userId}`, pointsData),
-  deleteUserPoints: (userId) => API.delete(`/api/points/user/${userId}`),
+  allocatePoints: (userId, pointsData) => API.post(`/points/user/${userId}/allocate`, pointsData),
+  redeemPoints: (userId, pointsData) => API.post(`/points/user/${userId}/redeem`, pointsData),
+  updateUserPoints: (userId, pointsData) => API.put(`/points/user/${userId}`, pointsData),
+  deleteUserPoints: (userId) => API.delete(`/points/user/${userId}`),
   
   // Summary and statistics
   getPointsSummary: () => API.get('/points/summary'),

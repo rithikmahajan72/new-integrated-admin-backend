@@ -32,7 +32,7 @@ export const fetchItemsForArrangement = createAsyncThunk(
       if (categoryId && categoryId !== 'all') params.append('categoryId', categoryId);
       if (subCategoryId && subCategoryId !== 'all') params.append('subCategoryId', subCategoryId);
       
-      const response = await API.get(`/api/items/items-arrangement?${params.toString()}`);
+      const response = await API.get(`/items/items-arrangement?${params.toString()}`);
       if (response.data?.success) {
         return {
           items: response.data.data,
