@@ -22,10 +22,8 @@ import DashboardMarketplaceSync from "./pages/dashboardmarketplacesync";
 import DashboardUsers from "./pages/dashboardusers";
 import DashboardOrders from "./pages/dashboardorders";
 import DashboardProductData from "./pages/dashboardproductdata";
-import Orders from "./pages/Orders"; // Old Orders component (fallback)
-import OrdersNew from "./pages/OrdersNew"; // New Redux Orders component
-import OrderDetails from "./pages/OrderDetails"; // Old OrderDetails component (fallback)
-import OrderDetailsNew from "./pages/OrderDetailsNew"; // New Redux OrderDetails component
+import Orders from "./pages/Orders"; // Main Orders component with Redux
+import OrderDetails from "./pages/OrderDetails"; // Main OrderDetails component with Redux
 import ReturnOrders from "./pages/ReturnOrders"; // Old ReturnOrders component (fallback)
 import ReturnOrdersNew from "./pages/ReturnOrdersNew"; // New Redux ReturnOrders component
 import ExchangeOrders from "./pages/ExchangeOrders"; // New Exchange Orders component
@@ -169,10 +167,8 @@ const App = () => {
           <Route path="/product-data" element={<DashboardProductData />} />
 
           {/* ===== ORDER MANAGEMENT ===== */}
-          <Route path="/orders" element={<OrdersNew />} />
-          <Route path="/orders-old" element={<Orders />} /> {/* Fallback to old component */}
-          <Route path="/order-details/:orderId" element={<OrderDetailsNew />} />
-          <Route path="/order-details-old/:orderId" element={<OrderDetails />} /> {/* Fallback to old component */}
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/order-details/:orderId" element={<OrderDetails />} />
           <Route path="/return-orders" element={<ReturnOrdersNew />} />
           <Route path="/return-orders-old" element={<ReturnOrders />} /> {/* Fallback to old component */}
           <Route path="/exchange-orders" element={<ExchangeOrders />} /> {/* New Exchange Orders */}

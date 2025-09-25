@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { X, Plus, Upload, Trash2, Save, ArrowLeft, ChevronDown, RefreshCw } from 'lucide-react';
 import { itemAPI, categoryAPI, subCategoryAPI, filterAPI } from '../api/endpoints';
-import FilterTest from '../components/FilterTest';
 import { 
   fetchItemById, 
   selectCurrentItem, 
@@ -98,7 +97,6 @@ const ItemManagementEditPage = () => {
   // Initialize form data when item changes
   useEffect(() => {
     if (item) {
-      console.log('Loading item data:', item);
       setFormData({
         productName: item.productName || '',
         title: item.title || '',
@@ -183,12 +181,10 @@ const ItemManagementEditPage = () => {
   // Fetch item data when component mounts
   useEffect(() => {
     if (id) {
-      console.log('🔍 Fetching item with ID:', id);
-      console.log('🔍 Dispatch function:', dispatch);
       dispatch(fetchItemById(id))
         .unwrap()
         .then((data) => {
-          console.log('✅ Successfully fetched item:', data);
+          // Item fetched successfully
         })
         .catch((error) => {
           console.error('❌ Failed to fetch item:', error);
@@ -200,56 +196,16 @@ const ItemManagementEditPage = () => {
         });
       
       // Fetch filters for the dropdown
-      console.log('🔍 About to fetch filters...');
       dispatch(fetchFilters())
         .unwrap()
         .then((data) => {
-          console.log('✅ Successfully fetched filters:', data);
-          console.log('✅ Filters length:', data?.length);
-          console.log('✅ First filter sample:', data?.[0]);
+          // Filters fetched successfully
         })
         .catch((error) => {
           console.error('❌ Failed to fetch filters:', error);
         });
     }
   }, [id, dispatch]);
-
-  // Debug effect for filters state
-  useEffect(() => {
-    console.log('🔍 Filters state changed:', {
-      filters,
-      filtersLoading,
-      filtersLength: filters?.length,
-      firstFilter: filters?.[0]
-    });
-  }, [filters, filtersLoading]);
-
-  // Debug filter state
-  useEffect(() => {
-    console.log('🔍 Filters state updated:', {
-      filters,
-      filtersLength: filters?.length,
-      filtersLoading,
-      filterState: filters
-    });
-  }, [filters, filtersLoading]);
-
-  // Test direct API call
-  useEffect(() => {
-    const testDirectFetch = async () => {
-      try {
-        console.log('🧪 Testing direct filter API call...');
-        const response = await filterAPI.getAllFilters();
-        console.log('🧪 Direct API response:', response.data);
-      } catch (error) {
-        console.error('🧪 Direct API error:', error);
-      }
-    };
-    
-    if (id) {
-      testDirectFetch();
-    }
-  }, [id]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -278,18 +234,8 @@ const ItemManagementEditPage = () => {
     }
   }, [item]);
 
-  // Debug log when item data changes
-  useEffect(() => {
-    console.log('🎯 Item data updated:', item);
-    console.log('🚨 Current error:', error);
-    console.log('⏳ Loading state:', loading);
-  }, [item, error, loading]);
-
   // Load categories on component mount
   useEffect(() => {
-    console.log('🚀 Component mounted, loading categories...');
-    console.log('🔑 Auth token available:', !!localStorage.getItem('authToken'));
-    console.log('👤 User data available:', !!localStorage.getItem('userData'));
     loadCategories();
   }, []);
 
@@ -307,13 +253,10 @@ const ItemManagementEditPage = () => {
   const loadCategories = async () => {
     try {
       setCategoryLoading(true);
-      console.log('🏷️ Loading categories...');
       const response = await categoryAPI.getAllCategories();
-      console.log('🏷️ Categories response:', response.data);
       
       // Backend response structure: {success: true, data: [...], message: "..."}
       const categoriesData = response.data.data || [];
-      console.log('🏷️ Extracted categories:', categoriesData);
       setCategories(categoriesData);
     } catch (error) {
       console.error('❌ Failed to load categories:', error);
@@ -328,9 +271,7 @@ const ItemManagementEditPage = () => {
   const loadSubCategories = async (categoryId) => {
     try {
       setSubCategoryLoading(true);
-      console.log('🏷️ Loading subcategories for category:', categoryId);
       const response = await subCategoryAPI.getSubCategoriesByCategory(categoryId);
-      console.log('🏷️ Subcategories response:', response.data);
       
       // Handle both response formats: {success: true, data: [...]} or [...] or {data: [...]}
       let subCategoriesData = [];
@@ -342,7 +283,6 @@ const ItemManagementEditPage = () => {
         subCategoriesData = response.data.data;
       }
       
-      console.log('🏷️ Extracted subcategories:', subCategoriesData);
       setSubCategories(subCategoriesData);
     } catch (error) {
       console.error('❌ Failed to load subcategories:', error);
@@ -616,7 +556,6 @@ const ItemManagementEditPage = () => {
 
   const getFilteredFilters = () => {
     if (!filters || filters.length === 0) {
-      console.log('🔍 getFilteredFilters: No filters available', { filters, filtersLength: filters?.length });
       return [];
     }
     
@@ -626,13 +565,6 @@ const ItemManagementEditPage = () => {
         value.name.toLowerCase().includes(filterSearchTerm.toLowerCase())
       )
     );
-    
-    console.log('🔍 getFilteredFilters:', {
-      originalCount: filters.length,
-      filteredCount: filteredResults.length,
-      searchTerm: filterSearchTerm,
-      firstFilter: filteredResults[0]
-    });
     
     return filteredResults;
   };
@@ -774,16 +706,9 @@ const ItemManagementEditPage = () => {
     const token = localStorage.getItem('authToken');
     const userData = localStorage.getItem('userData');
     
-    // Debug: Log what's actually in localStorage
-    console.log('🔍 Auth Debug:');
-    console.log('- Raw token:', token);
-    console.log('- Raw userData:', userData);
-    
     let parsedUserData = null;
     try {
       parsedUserData = userData ? JSON.parse(userData) : null;
-      console.log('- Parsed userData:', parsedUserData);
-      console.log('- User isAdmin:', parsedUserData?.isAdmin);
     } catch (e) {
       console.warn('Failed to parse userData from localStorage:', e);
     }
@@ -809,8 +734,6 @@ const ItemManagementEditPage = () => {
         setLocalError(`Admin access required. Current status: role=${parsedUserData.role}, isAdmin=${parsedUserData.isAdmin}`);
         return;
       }
-      
-      console.log('✅ Admin access confirmed, proceeding with API call...');
 
       // Basic validation
       if (!formData.productName.trim()) {
@@ -828,12 +751,6 @@ const ItemManagementEditPage = () => {
         }
         return;
       }
-
-      console.log('🏷️ Category validation:');
-      console.log('- Selected Category ID:', formData.categoryId);
-      console.log('- Selected Subcategory ID:', formData.subCategoryId);
-      console.log('- Category Object:', selectedCategory);
-      console.log('- Subcategory Object:', selectedSubCategory);
 
       const updateData = {
         ...formData,
@@ -866,25 +783,17 @@ const ItemManagementEditPage = () => {
         })) : []
       };
 
-      console.log('📝 Attempting to update item with data:', updateData);
-      console.log('🔑 Current auth token:', localStorage.getItem('authToken'));
-      console.log('👤 Current user data:', localStorage.getItem('userData'));
-      
       // Validate we have the productId for the draft configuration
       if (!item?.productId) {
         setLocalError('❌ Product ID not found. Please reload the page and try again.');
         return;
       }
-
-      console.log('🆔 Using Product ID for update:', item.productId);
       
       // First try the standard update endpoint with MongoDB _id
       let response;
       try {
         response = await itemAPI.updateItem(id, updateData);
       } catch (updateError) {
-        console.log('🔄 Standard update failed, trying draft-configuration endpoint...');
-        console.log('🆔 Switching to productId for draft-configuration:', item.productId);
         // If standard update fails, try the draft configuration endpoint with productId
         response = await itemAPI.updateDraftConfiguration(item.productId, updateData);
       }
@@ -913,78 +822,10 @@ const ItemManagementEditPage = () => {
         const errorMessage = error.response?.data?.message || error.message || 'Failed to update product';
         setLocalError(`Update failed: ${errorMessage}`);
       }
-      
-      // Add debugging information for troubleshooting
-      console.log('🔍 Debug Info:');
-      console.log('- Item ID:', id);
-      console.log('- Has Auth Token:', !!localStorage.getItem('authToken'));
-      console.log('- User Role:', parsedUserData?.role);
-      console.log('- Error Status:', error.response?.status);
-      console.log('- Error Message:', error.response?.data?.message);
     }
   };
 
-  // Debug function to check auth status
-  const checkAuthStatus = () => {
-    const token = localStorage.getItem('authToken');
-    const userData = localStorage.getItem('userData');
-    
-    console.log('🔍 Authentication Status Check:');
-    console.log('Token exists:', !!token);
-    console.log('Token value:', token);
-    console.log('UserData raw:', userData);
-    
-    try {
-      const parsed = userData ? JSON.parse(userData) : null;
-      console.log('UserData parsed:', parsed);
-      console.log('User role:', parsed?.role);
-      console.log('User isAdmin:', parsed?.isAdmin);
-      console.log('Is admin?', parsed?.role === 'admin' || parsed?.isAdmin === true);
-      
-      alert(`Auth Status:\nToken: ${!!token}\nRole: ${parsed?.role || 'none'}\nIsAdmin: ${parsed?.isAdmin || 'false'}\nHas Admin Access: ${parsed?.role === 'admin' || parsed?.isAdmin === true}`);
-    } catch (e) {
-      console.error('Error parsing userData:', e);
-      alert('Error parsing user data from localStorage');
-    }
-  };
 
-  // Function to promote current user to admin
-  const makeUserAdmin = async () => {
-    try {
-      const userData = localStorage.getItem('userData');
-      const parsed = userData ? JSON.parse(userData) : null;
-      
-      if (!parsed?._id) {
-        alert('User ID not found');
-        return;
-      }
-
-      const response = await fetch(`http://localhost:8080/api/users/make-admin/${parsed._id}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert('Success! User promoted to admin. Please refresh the page.');
-        
-        // Update localStorage with new admin status
-        const updatedUserData = { ...parsed, isAdmin: true };
-        localStorage.setItem('userData', JSON.stringify(updatedUserData));
-        
-        console.log('✅ User promoted to admin:', result);
-      } else {
-        const error = await response.json();
-        alert(`Failed to promote user: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('Error promoting user to admin:', error);
-      alert('Error promoting user to admin');
-    }
-  };
 
   if (loading && !item) {
     return (
@@ -1049,9 +890,6 @@ const ItemManagementEditPage = () => {
             {success}
           </div>
         )}
-
-        {/* Filter Test Component - Temporary for debugging */}
-        <FilterTest />
 
         <div className="space-y-8">
           {/* Images Section */}
@@ -2187,13 +2025,6 @@ const ItemManagementEditPage = () => {
             <h2 className="text-2xl font-semibold text-black">Category & Subcategory Assignment</h2>
             <p className="text-sm text-gray-600">⚠️ Both category and subcategory must be selected before saving the item.</p>
             
-            {/* Debug Info */}
-            <div className="text-xs bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
-              <strong>Debug Info:</strong> Categories loaded: {Array.isArray(categories) ? categories.length : 'not array'} | 
-              Loading: {categoryLoading ? 'yes' : 'no'} | 
-              Auth: {localStorage.getItem('authToken') ? '✅' : '❌'}
-            </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Category Dropdown */}
               <div className="space-y-2">
@@ -2320,18 +2151,6 @@ const ItemManagementEditPage = () => {
               className="px-8 py-4 border border-gray-300 rounded-full text-black font-medium hover:bg-gray-50 transition-colors"
             >
               Go Back
-            </button>
-            <button
-              onClick={checkAuthStatus}
-              className="px-4 py-4 border border-blue-300 rounded-full text-blue-600 font-medium hover:bg-blue-50 transition-colors"
-            >
-              Check Auth
-            </button>
-            <button
-              onClick={makeUserAdmin}
-              className="px-4 py-4 border border-green-300 rounded-full text-green-600 font-medium hover:bg-green-50 transition-colors"
-            >
-              Make Admin
             </button>
             <button
               onClick={() => navigate('/bulk-upload')}
