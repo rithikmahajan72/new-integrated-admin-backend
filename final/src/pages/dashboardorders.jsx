@@ -968,7 +968,15 @@ const DashboardOrders = memo(() => {
         }
         break;
       case "print":
-        window.print();
+        // Add print-specific classes before printing
+        document.body.classList.add('printing');
+        setTimeout(() => {
+          window.print();
+          // Remove print classes after printing
+          setTimeout(() => {
+            document.body.classList.remove('printing');
+          }, 100);
+        }, 100);
         break;
     }
   };
@@ -977,7 +985,7 @@ const DashboardOrders = memo(() => {
     <div className="space-y-6">
       {/* Error Alert */}
       {showErrorAlert && error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg print-hide">
           <div className="flex items-center">
             <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
             <div>
@@ -1030,7 +1038,7 @@ const DashboardOrders = memo(() => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 print-hide">
           <DateRangePicker
             selectedRange={selectedDateRange}
             onRangeChange={handleDateRangeChange}
@@ -1046,7 +1054,7 @@ const DashboardOrders = memo(() => {
             <span>Refresh</span>
           </button>
 
-          <div className="relative" ref={exportDropdownRef}>
+          <div className="relative print-hide" ref={exportDropdownRef}>
             <button
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
               className="flex items-center space-x-2 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -1149,20 +1157,22 @@ const DashboardOrders = memo(() => {
 
       {/* Orders Table */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-12">
+        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-12 print-hide">
           <div className="text-center">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
             <p className="text-gray-500">Loading orders...</p>
           </div>
         </div>
       ) : (
-        <OrderTable
-          orders={filteredOrders}
-          onUpdateStatus={updateOrderStatus}
-          onUpdatePaymentStatus={updatePaymentStatus}
-          onViewOrder={handleViewOrder}
-          onEditOrder={handleEditOrder}
-        />
+        <div className="print-content print-table print-clean">
+          <OrderTable
+            orders={filteredOrders}
+            onUpdateStatus={updateOrderStatus}
+            onUpdatePaymentStatus={updatePaymentStatus}
+            onViewOrder={handleViewOrder}
+            onEditOrder={handleEditOrder}
+          />
+        </div>
       )}
     </div>
   );

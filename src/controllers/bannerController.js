@@ -75,7 +75,7 @@ const createBanner = async (req, res) => {
             priority: priority || await getNextPriority(),
             textPosition: textPosition || { x: 20, y: 20 },
             bannerType: bannerType || 'reward',
-            createdBy: req.user?.id || new mongoose.Types.ObjectId(), // Assuming user is attached to req
+            createdBy: req.user?.id || new mongoose.Types.ObjectId(), // Default ObjectId if no user
             displaySettings,
             rewardDetails,
             seo,

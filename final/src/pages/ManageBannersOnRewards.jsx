@@ -66,15 +66,31 @@ const useImageUpload = () => {
     if (file) {
       try {
         setImageLoading(true);
+        
+        // Check file size
+        const fileSizeInMB = file.size / (1024 * 1024);
+        const maxSizeInMB = 10; // 10MB limit
+        
+        if (fileSizeInMB > maxSizeInMB) {
+          throw new Error(`File size (${fileSizeInMB.toFixed(2)}MB) exceeds the ${maxSizeInMB}MB limit. Please choose a smaller image.`);
+        }
+        
+        // Check file type
+        if (!file.type.startsWith('image/')) {
+          throw new Error('Please select a valid image file.');
+        }
+        
         const imageUrl = await bannerService.uploadBannerImage(file);
         currentImageRef.current = imageUrl;
         setSelectedImage(imageUrl);
       } catch (error) {
         console.error('Error uploading image:', error);
-        // Fallback to createImageUrl for local preview
-        const imageUrl = await createImageUrl(file);
-        currentImageRef.current = imageUrl;
-        setSelectedImage(imageUrl);
+        
+        // Show error to user instead of falling back
+        alert(error.message || 'Failed to upload image. Please try again with a smaller image.');
+        
+        // Reset the file input
+        event.target.value = '';
       } finally {
         setImageLoading(false);
       }
@@ -238,6 +254,9 @@ const ImageUploadSection = memo(
           )}
         </div>
         {uploadLabel}
+        <p className="text-sm text-gray-500 mt-2">
+          Supported formats: JPG, PNG, GIF. Max size: 10MB. Images will be automatically compressed if needed.
+        </p>
       </div>
     );
   }

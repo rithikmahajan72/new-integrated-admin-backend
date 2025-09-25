@@ -618,6 +618,19 @@ const settingsSlice = createSlice({
       state.categoryErrors = {};
     },
     
+    clearShippingErrors: (state) => {
+      if (state.shipping && state.shipping.errors) {
+        state.shipping.errors = {
+          fetchCharges: null,
+          createCharge: null,
+          updateCharge: null,
+          deleteCharge: null,
+          updateSettings: null,
+          fetchByLocation: null,
+        };
+      }
+    },
+    
     setCategoryLoading: (state, action) => {
       const { category, loading } = action.payload;
       state.categoryLoading[category] = loading;
@@ -1097,6 +1110,7 @@ export const {
   initializeShipping,
   clearError,
   clearAllErrors,
+  clearShippingErrors,
   setCategoryLoading,
   clearExportData,
 } = settingsSlice.actions;

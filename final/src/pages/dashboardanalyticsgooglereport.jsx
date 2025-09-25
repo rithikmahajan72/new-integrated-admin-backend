@@ -758,7 +758,15 @@ const DashboardAnalyticsGoogleReport = memo(() => {
         }
         break;
       case "print":
-        window.print();
+        // Add print-specific classes before printing
+        document.body.classList.add('printing');
+        setTimeout(() => {
+          window.print();
+          // Remove print classes after printing
+          setTimeout(() => {
+            document.body.classList.remove('printing');
+          }, 100);
+        }, 100);
         break;
       default:
         break;
@@ -769,7 +777,7 @@ const DashboardAnalyticsGoogleReport = memo(() => {
     <div className="space-y-6">
       {/* Real-time Status Banner */}
       {loading && (
-        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 print-hide">
           <div className="flex items-center space-x-3">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
             <div>
@@ -781,7 +789,7 @@ const DashboardAnalyticsGoogleReport = memo(() => {
       )}
 
       {error && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 print-hide">
           <div className="flex items-center space-x-3">
             <AlertCircle className="h-5 w-5 text-red-600" />
             <div>
@@ -822,7 +830,7 @@ const DashboardAnalyticsGoogleReport = memo(() => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 print-hide">
           {/* Dynamic Date Range Picker */}
           <DateRangePicker
             selectedRange={selectedAnalyticsDateRange}
@@ -840,7 +848,7 @@ const DashboardAnalyticsGoogleReport = memo(() => {
           </button>
 
           {/* Export Dropdown */}
-          <div className="relative" ref={exportDropdownRef}>
+          <div className="relative print-hide" ref={exportDropdownRef}>
             <button
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
               className="flex items-center space-x-2 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -893,7 +901,7 @@ const DashboardAnalyticsGoogleReport = memo(() => {
       </div>
 
       {/* Google Analytics Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 print-content print-clean">
         {/* Active Users */}
         <div className="bg-white p-6 rounded-xl shadow-sm border-2 border-gray-200 relative">
           {loading && <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>}

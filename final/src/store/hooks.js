@@ -21,6 +21,7 @@ import {
   updateShippingSettings,
   getShippingChargeByLocation,
   initializeShipping,
+  clearShippingErrors,
   selectShippingCharges,
   selectShippingGeneralSettings,
   selectShippingLoading,
@@ -673,10 +674,9 @@ export const useShipping = () => {
     return dispatch(getShippingChargeByLocation(locationData));
   }, [dispatch]);
 
-  const clearError = useCallback((errorType) => {
-    // You can implement a clear error action if needed
-    console.log('Clear error for:', errorType);
-  }, []);
+  const clearErrors = useCallback(() => {
+    dispatch(clearShippingErrors());
+  }, [dispatch]);
 
   return {
     // Data
@@ -716,7 +716,7 @@ export const useShipping = () => {
     deleteCharge: deleteChargeAction,
     updateGeneralSettings: updateGeneralSettingsAction,
     getChargeByLocation: getChargeByLocationAction,
-    clearError,
+    clearErrors,
     
     // Computed values
     totalCharges: Array.isArray(charges) ? charges.length : 0,

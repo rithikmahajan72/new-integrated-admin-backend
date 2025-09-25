@@ -721,13 +721,13 @@ const DashboardUsers = memo(() => {
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 65);
 
       const tableData = filteredUsers.map((user) => [
-        user.name,
-        user.email,
-        user.status,
-        user.role,
-        user.totalOrders.toString(),
-        `₹${user.totalSpent.toFixed(2)}`,
-        new Date(user.joinDate).toLocaleDateString(),
+        user.name || "N/A",
+        user.email || "N/A",
+        user.status || "N/A",
+        user.role || "N/A",
+        (user.totalOrders || 0).toString(),
+        `₹${(user.totalSpent || 0).toFixed(2)}`,
+        user.joinDate ? new Date(user.joinDate).toLocaleDateString() : "N/A",
       ]);
 
       doc.autoTable({
@@ -752,16 +752,16 @@ const DashboardUsers = memo(() => {
 
       const usersWS = XLSX.utils.json_to_sheet(
         filteredUsers.map((user) => ({
-          Name: user.name,
-          Email: user.email,
-          Phone: user.phone,
-          Location: user.location,
-          Status: user.status,
-          Role: user.role,
-          "Total Orders": user.totalOrders,
-          "Total Spent": user.totalSpent,
-          "Join Date": user.joinDate,
-          "Last Login": user.lastLogin,
+          Name: user.name || "N/A",
+          Email: user.email || "N/A",
+          Phone: user.phone || "N/A",
+          Location: user.location || "N/A",
+          Status: user.status || "N/A",
+          Role: user.role || "N/A",
+          "Total Orders": user.totalOrders || 0,
+          "Total Spent": user.totalSpent || 0,
+          "Join Date": user.joinDate || "N/A",
+          "Last Login": user.lastLogin || "N/A",
           Verified: user.verified ? "Yes" : "No",
         }))
       );
@@ -798,7 +798,15 @@ const DashboardUsers = memo(() => {
         }
         break;
       case "print":
-        window.print();
+        // Add print-specific classes before printing
+        document.body.classList.add('printing');
+        setTimeout(() => {
+          window.print();
+          // Remove print classes after printing
+          setTimeout(() => {
+            document.body.classList.remove('printing');
+          }, 100);
+        }, 100);
         break;
     }
   };
@@ -806,7 +814,7 @@ const DashboardUsers = memo(() => {
   return (
     <div className="space-y-6">
       {/* Real-time Database Dashboard Status */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border-2 border-blue-200 p-6">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border-2 border-blue-200 p-6 print-clean print-header">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Database className="h-8 w-8 text-blue-600" />
@@ -903,7 +911,7 @@ const DashboardUsers = memo(() => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 print-hide">
           <DateRangePicker
             selectedRange={selectedDateRange}
             onRangeChange={handleDateRangeChange}
@@ -919,7 +927,7 @@ const DashboardUsers = memo(() => {
             <span>Refresh</span>
           </button>
 
-          <div className="relative" ref={exportDropdownRef}>
+          <div className="relative print-hide" ref={exportDropdownRef}>
             <button
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
               className="flex items-center space-x-2 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -1018,20 +1026,22 @@ const DashboardUsers = memo(() => {
 
       {/* Users Table */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-12">
+        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-12 print-hide">
           <div className="text-center">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
             <p className="text-gray-500">Loading users...</p>
           </div>
         </div>
       ) : (
-        <UserTable
-          users={filteredUsers}
-          onUpdateStatus={updateUserStatus}
-          onDeleteUser={deleteUser}
-          onViewUser={handleViewUser}
-          onEditUser={handleEditUser}
-        />
+        <div className="print-content print-table print-clean">
+          <UserTable
+            users={filteredUsers}
+            onUpdateStatus={updateUserStatus}
+            onDeleteUser={deleteUser}
+            onViewUser={handleViewUser}
+            onEditUser={handleEditUser}
+          />
+        </div>
       )}
     </div>
   );

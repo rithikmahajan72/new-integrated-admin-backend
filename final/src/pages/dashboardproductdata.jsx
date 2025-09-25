@@ -933,13 +933,13 @@ const DashboardProductData = memo(() => {
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 65);
 
       const tableData = filteredProducts.map((product) => [
-        product.name,
-        product.sku,
-        product.category,
-        `₹${product.price.toFixed(2)}`,
-        product.stock.toString(),
-        product.status,
-        product.salesCount.toString(),
+        product.name || "",
+        product.sku || "",
+        product.category || "",
+        `₹${(product.price || 0).toFixed(2)}`,
+        (product.stock || 0).toString(),
+        product.status || "",
+        (product.salesCount || 0).toString(),
       ]);
 
       doc.autoTable({
@@ -964,34 +964,34 @@ const DashboardProductData = memo(() => {
 
       const productsWS = XLSX.utils.json_to_sheet(
         filteredProducts.map((product) => ({
-          "Product Name": product.name,
-          "SKU": product.sku,
-          "Barcode": product.barcode,
-          "Category": product.category,
-          "Subcategory": product.subcategory,
-          "Brand": product.brand,
-          "Price": product.price,
-          "Compare At Price": product.compareAtPrice,
-          "Cost Price": product.costPrice,
-          "Stock": product.stock,
-          "Low Stock Threshold": product.lowStockThreshold,
-          "Status": product.status,
-          "Visibility": product.visibility,
-          "Tags": product.tags.join(", "),
-          "Description": product.description,
-          "Weight (g)": product.weight,
-          "Length (cm)": product.dimensions.length,
-          "Width (cm)": product.dimensions.width,
-          "Height (cm)": product.dimensions.height,
-          "Images": product.images.join(", "),
-          "SEO Title": product.seoTitle,
-          "SEO Description": product.seoDescription,
-          "Created At": product.createdAt,
-          "Updated At": product.updatedAt,
-          "Sales Count": product.salesCount,
-          "View Count": product.viewCount,
-          "Rating": product.rating,
-          "Review Count": product.reviewCount,
+          "Product Name": product.name || "",
+          "SKU": product.sku || "",
+          "Barcode": product.barcode || "",
+          "Category": product.category || "",
+          "Subcategory": product.subcategory || "",
+          "Brand": product.brand || "",
+          "Price": product.price || 0,
+          "Compare At Price": product.compareAtPrice || 0,
+          "Cost Price": product.costPrice || 0,
+          "Stock": product.stock || 0,
+          "Low Stock Threshold": product.lowStockThreshold || 0,
+          "Status": product.status || "",
+          "Visibility": product.visibility || "",
+          "Tags": (Array.isArray(product.tags) ? product.tags : []).join(", "),
+          "Description": product.description || "",
+          "Weight (g)": product.weight || 0,
+          "Length (cm)": product.dimensions?.length || 0,
+          "Width (cm)": product.dimensions?.width || 0,
+          "Height (cm)": product.dimensions?.height || 0,
+          "Images": (Array.isArray(product.images) ? product.images : []).join(", "),
+          "SEO Title": product.seoTitle || "",
+          "SEO Description": product.seoDescription || "",
+          "Created At": product.createdAt || "",
+          "Updated At": product.updatedAt || "",
+          "Sales Count": product.salesCount || 0,
+          "View Count": product.viewCount || 0,
+          "Rating": product.rating || 0,
+          "Review Count": product.reviewCount || 0,
         }))
       );
 
@@ -1027,7 +1027,15 @@ const DashboardProductData = memo(() => {
         }
         break;
       case "print":
-        window.print();
+        // Add print-specific classes before printing
+        document.body.classList.add('printing');
+        setTimeout(() => {
+          window.print();
+          // Remove print classes after printing
+          setTimeout(() => {
+            document.body.classList.remove('printing');
+          }, 100);
+        }, 100);
         break;
     }
   };
@@ -1035,7 +1043,7 @@ const DashboardProductData = memo(() => {
   return (
     <div className="space-y-6">
       {/* Real-time Database Dashboard Status */}
-      <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl shadow-sm border-2 border-green-200 p-6">
+      <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl shadow-sm border-2 border-green-200 p-6 print-clean print-header">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Database className="h-8 w-8 text-green-600" />
@@ -1156,7 +1164,7 @@ const DashboardProductData = memo(() => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 print-hide">
           <DateRangePicker
             selectedRange={selectedDateRange}
             onRangeChange={handleDateRangeChange}
@@ -1177,7 +1185,7 @@ const DashboardProductData = memo(() => {
             <span>Add Product</span>
           </button>
 
-          <div className="relative" ref={exportDropdownRef}>
+          <div className="relative print-hide" ref={exportDropdownRef}>
             <button
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
               className="flex items-center space-x-2 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -1290,21 +1298,23 @@ const DashboardProductData = memo(() => {
 
       {/* Products Table */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-12">
+        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-12 print-hide">
           <div className="text-center">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
             <p className="text-gray-500">Loading products...</p>
           </div>
         </div>
       ) : (
-        <ProductTable
-          products={filteredProducts}
-          onUpdateStatus={updateProductStatus}
-          onDeleteProduct={deleteProduct}
-          onViewProduct={handleViewProduct}
-          onEditProduct={handleEditProduct}
-          onUpdateStock={updateProductStock}
-        />
+        <div className="print-content print-table print-clean">
+          <ProductTable
+            products={filteredProducts}
+            onUpdateStatus={updateProductStatus}
+            onDeleteProduct={deleteProduct}
+            onViewProduct={handleViewProduct}
+            onEditProduct={handleEditProduct}
+            onUpdateStock={updateProductStock}
+          />
+        </div>
       )}
     </div>
   );

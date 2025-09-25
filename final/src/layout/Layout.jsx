@@ -16,7 +16,7 @@ const Layout = () => {
   // Map sidebar items to routes
   const getRouteForItem = (item) => {
     const routeMap = {
-      "Dashboard": "/",
+      "Dashboard": "/admin-dashboard",
       "Database Dashboard": "/database",
       "Analytics Reports": "/analytics-reports", 
       "Marketplace Sync": "/marketplace-sync",

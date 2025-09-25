@@ -49,10 +49,17 @@ bannerApi.interceptors.response.use(
       }
     }
     
+    // Handle specific error cases
+    let errorMessage = error.response?.data?.message || error.message || 'An error occurred';
+    
+    if (error.response?.status === 413) {
+      errorMessage = 'Image file is too large. Please use a smaller image or try compressing it.';
+    }
+    
     // Return a structured error response
     const errorResponse = {
       success: false,
-      message: error.response?.data?.message || error.message || 'An error occurred',
+      message: errorMessage,
       status: error.response?.status || 500,
       details: error.response?.data?.details || null
     };
@@ -367,6 +374,53 @@ export const bannerService = {
   // Helper Methods
 
   /**
+   * Compress image to reduce file size
+   * @param {File} imageFile - Original image file
+   * @param {number} maxWidth - Maximum width (default: 1200)
+   * @param {number} maxHeight - Maximum height (default: 800)
+   * @param {number} quality - Image quality (0-1, default: 0.8)
+   * @returns {Promise<string>} Compressed base64 image
+   */
+  compressImage: async (imageFile, maxWidth = 1200, maxHeight = 800, quality = 0.8) => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+        
+        if (width > maxWidth || height > maxHeight) {
+          const aspectRatio = width / height;
+          
+          if (width > height) {
+            width = maxWidth;
+            height = width / aspectRatio;
+          } else {
+            height = maxHeight;
+            width = height * aspectRatio;
+          }
+        }
+
+        // Set canvas dimensions
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress image
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to base64 with compression
+        const compressedDataURL = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataURL);
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image for compression'));
+      img.src = URL.createObjectURL(imageFile);
+    });
+  },
+
+  /**
    * Upload banner image to server
    * @param {File} imageFile - Image file to upload
    * @returns {Promise<string>} Image URL
@@ -377,12 +431,16 @@ export const bannerService = {
         throw new Error('Image file is required');
       }
 
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('image', imageFile);
+      // Check file size and compress if necessary
+      const maxSizeInMB = 2; // 2MB limit
+      const fileSizeInMB = imageFile.size / (1024 * 1024);
+      
+      if (fileSizeInMB > maxSizeInMB) {
+        console.log(`Image size (${fileSizeInMB.toFixed(2)}MB) exceeds limit. Compressing...`);
+        return await bannerService.compressImage(imageFile);
+      }
 
-      // Use a separate endpoint for image upload or convert to base64
-      // For now, we'll convert to base64 for simplicity
+      // For smaller files, convert to base64 directly
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target.result);
@@ -421,6 +479,16 @@ export const bannerService = {
     
     if (!bannerData.image || (!bannerData.image.url && typeof bannerData.image !== 'string')) {
       errors.push('Image is required');
+    }
+    
+    // Check image size if it's a base64 string
+    if (typeof bannerData.image === 'string' && bannerData.image.startsWith('data:')) {
+      const sizeInBytes = Math.round((bannerData.image.length * 3) / 4);
+      const sizeInMB = sizeInBytes / (1024 * 1024);
+      
+      if (sizeInMB > 8) { // 8MB limit for base64 images
+        errors.push(`Image size (${sizeInMB.toFixed(2)}MB) is too large. Please use a smaller image.`);
+      }
     }
     
     if (bannerData.priority && (isNaN(bannerData.priority) || bannerData.priority < 1)) {

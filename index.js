@@ -45,8 +45,8 @@ const app = express();
 // Apply middleware
 app.use(morgan('dev')); // Use Morgan for HTTP request logging
 app.use(cors()); // Enable CORS for all routes to allow cross-origin requests
-app.use(express.json()); // Parse incoming JSON requests
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data with extended option for complex objects
+app.use(express.json({ limit: '10mb' })); // Parse incoming JSON requests with increased size limit
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-encoded data with extended option for complex objects
 
 // Connect to the database (e.g., MongoDB, MySQL) using the connectToDB function
 connectToDB();

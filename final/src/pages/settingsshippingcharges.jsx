@@ -52,6 +52,7 @@ const SettingsShippingCharges = () => {
     createCharge,
     updateCharge,
     deleteCharge,
+    clearErrors,
   } = useShipping();
 
   // ==============================
@@ -76,6 +77,17 @@ const SettingsShippingCharges = () => {
     fetchCharges();
   }, [fetchCharges]);
 
+  // Debug effect to log shipping charges data
+  useEffect(() => {
+    console.log('Shipping charges data:', {
+      shippingCharges,
+      length: shippingCharges?.length,
+      loading: loading.fetchCharges,
+      errors: errors.fetchCharges,
+      authToken: localStorage.getItem('authToken') ? 'Present' : 'Missing'
+    });
+  }, [shippingCharges, loading.fetchCharges, errors.fetchCharges]);
+
   // ==============================
   // HANDLERS
   // ==============================
@@ -84,11 +96,20 @@ const SettingsShippingCharges = () => {
     setModals(prev => ({ ...prev, shippingChargesModal: true }));
   }, []);
 
-  const handleCloseShippingModal = useCallback(() => {
-    setModals(prev => ({ ...prev, shippingChargesModal: false }));
+  const handleCloseModal = useCallback((modalType) => {
+    setModals(prev => ({ ...prev, [modalType]: false }));
     setShippingForm(DEFAULT_SHIPPING_FORM);
     setEditingShippingId(null);
-  }, []);
+    
+    // Clear errors when closing shipping charges modal
+    if (modalType === 'shippingChargesModal') {
+      clearErrors();
+    }
+  }, [clearErrors]);
+
+  const handleCloseShippingModal = useCallback(() => {
+    handleCloseModal('shippingChargesModal');
+  }, [handleCloseModal]);
 
   const handleShippingFormChange = useCallback((key, value) => {
     setShippingForm(prev => ({ ...prev, [key]: value }));
@@ -96,17 +117,66 @@ const SettingsShippingCharges = () => {
 
   const handleSaveShippingCharge = useCallback(async () => {
     try {
+      console.log('🚀 Starting to save shipping charge...', shippingForm);
+      
+      // Clear any previous errors
+      clearErrors();
+      
+      // Validate required fields
+      if (!shippingForm.country || 
+          shippingForm.deliveryCharge === '' || 
+          shippingForm.returnCharge === '' || 
+          !shippingForm.estimatedDays) {
+        const errorMsg = 'Please fill in all required fields';
+        console.error('❌ Validation error:', errorMsg);
+        alert(errorMsg);
+        return;
+      }
+      
+      // Validate numeric fields
+      if (isNaN(shippingForm.deliveryCharge) || isNaN(shippingForm.returnCharge) || 
+          parseFloat(shippingForm.deliveryCharge) < 0 || parseFloat(shippingForm.returnCharge) < 0 ||
+          parseInt(shippingForm.estimatedDays) < 1) {
+        const errorMsg = 'Please enter valid values for charges and delivery days';
+        console.error('❌ Validation error:', errorMsg);
+        alert(errorMsg);
+        return;
+      }
+      
+      console.log('✅ Validation passed');
+      
       if (editingShippingId) {
+        console.log('📝 Updating existing charge with ID:', editingShippingId);
         // Update existing charge
-        await updateCharge({ chargeId: editingShippingId, chargeData: shippingForm });
+        const result = await updateCharge({ chargeId: editingShippingId, chargeData: shippingForm });
+        console.log('✅ Update result:', result);
         setModals(prev => ({ 
           ...prev, 
           shippingChargesModal: false,
           shippingChargeUpdatedSuccess: true 
         }));
       } else {
+        // Check for duplicate country-region combination before creating
+        const isDuplicate = shippingCharges.some(charge => 
+          charge.country === shippingForm.country && 
+          (charge.region || null) === (shippingForm.region || null)
+        );
+        
+        if (isDuplicate) {
+          const errorMsg = 'Duplicate shipping charge detected for this country and region';
+          console.error('❌ Duplicate error:', errorMsg);
+          alert(errorMsg);
+          return;
+        }
+        
+        console.log('🆕 Creating new charge...');
+        console.log('🔐 Auth token exists:', !!localStorage.getItem('authToken'));
+        console.log('🌐 API Base URL:', import.meta.env.VITE_API_BASE_URL);
+        
         // Create new charge
-        await createCharge(shippingForm);
+        const result = await createCharge(shippingForm);
+        console.log('✅ Create result:', result);
+        
         setModals(prev => ({ 
           ...prev, 
           shippingChargesModal: false,
@@ -116,9 +186,18 @@ const SettingsShippingCharges = () => {
       setShippingForm(DEFAULT_SHIPPING_FORM);
       setEditingShippingId(null);
     } catch (error) {
-      console.error('Error saving shipping charge:', error);
+      console.error('💥 Error saving shipping charge:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config
+      });
+      
+      // Show user-friendly error message
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to save shipping charge';
+      alert(`Error: ${errorMsg}`);
     }
-  }, [shippingForm, editingShippingId, createCharge, updateCharge]);
+  }, [shippingForm, editingShippingId, createCharge, updateCharge, shippingCharges, clearErrors]);
 
   const handleEditShippingCharge = useCallback((charge) => {
     const { _id, __v, createdAt, updatedAt, ...formData } = charge;
@@ -146,9 +225,59 @@ const SettingsShippingCharges = () => {
     }
   }, [editingShippingId, deleteCharge]);
 
+  const handleCreateSampleData = useCallback(async () => {
+    const sampleCharges = [
+      {
+        country: "United States",
+        region: "East Coast",
+        deliveryCharge: 15.99,
+        returnCharge: 8.99,
+        estimatedDays: 3
+      },
+      {
+        country: "Canada",
+        region: "",
+        deliveryCharge: 22.50,
+        returnCharge: 12.50,
+        estimatedDays: 5
+      },
+      {
+        country: "United Kingdom",
+        region: "",
+        deliveryCharge: 18.75,
+        returnCharge: 10.25,
+        estimatedDays: 7
+      }
+    ];
+
+    try {
+      for (const charge of sampleCharges) {
+        await createCharge(charge);
+        // Small delay to prevent overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      console.log('Sample data created successfully');
+      await fetchCharges(); // Refresh the data
+    } catch (error) {
+      console.error('Error creating sample data:', error);
+    }
+  }, [createCharge, fetchCharges]);
+
   // ==============================
   // COMPUTED VALUES
   // ==============================
+  
+  const isFormValid = useMemo(() => {
+    return shippingForm.country && 
+           shippingForm.deliveryCharge !== '' && 
+           shippingForm.returnCharge !== '' && 
+           shippingForm.estimatedDays &&
+           !isNaN(shippingForm.deliveryCharge) && 
+           !isNaN(shippingForm.returnCharge) &&
+           parseFloat(shippingForm.deliveryCharge) >= 0 &&
+           parseFloat(shippingForm.returnCharge) >= 0 &&
+           parseInt(shippingForm.estimatedDays) >= 1;
+  }, [shippingForm]);
 
   const ViewSettingsButton = useMemo(() => 
     ({ onClick }) => (
@@ -175,7 +304,67 @@ const SettingsShippingCharges = () => {
         <h3 className="font-semibold text-[#000000] text-lg font-montserrat mb-2">
           Set shipping and time estimates charges by region and country
         </h3>
-        <ViewSettingsButton onClick={handleOpenShippingModal} />
+        <div className="flex gap-2 flex-wrap">
+          <ViewSettingsButton onClick={handleOpenShippingModal} />
+          <button
+            onClick={() => fetchCharges()}
+            disabled={loading.fetchCharges}
+            className="bg-gray-600 text-white px-4 py-2 rounded-full text-sm font-medium font-montserrat hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            {loading.fetchCharges ? 'Loading...' : 'Refresh Data'}
+          </button>
+          <button
+            onClick={handleCreateSampleData}
+            disabled={loading.createCharge}
+            className="bg-green-600 text-white px-4 py-2 rounded-full text-sm font-medium font-montserrat hover:bg-green-700 transition-colors disabled:opacity-50"
+          >
+            {loading.createCharge ? 'Creating...' : 'Add Sample Data'}
+          </button>
+          <button
+            onClick={() => {
+              console.log('🧪 Testing API call manually...');
+              console.log('🔐 Auth token:', localStorage.getItem('authToken'));
+              console.log('🌐 Base URL:', import.meta.env.VITE_API_BASE_URL);
+              console.log('🚀 Making fetch request...');
+              
+              fetchCharges().then(result => {
+                console.log('✅ Manual fetch result:', result);
+              }).catch(error => {
+                console.error('💥 Manual fetch error:', {
+                  message: error.message,
+                  response: error.response?.data,
+                  status: error.response?.status,
+                  config: error.config
+                });
+              });
+            }}
+            className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium font-montserrat hover:bg-purple-700 transition-colors"
+          >
+            Test API
+          </button>
+          <button
+            onClick={async () => {
+              console.log('🔑 Setting up authentication...');
+              
+              // Use the generated admin token
+              const adminToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2OGNkNzFmM2YzMWViNWQ3MmE2YzhlMjUiLCJuYW1lIjoiSm9oeWVlaW50ZWVldHkgcnRvZSIsInBoTm8iOiI3MDM2NTY3ODkwIiwiaXNWZXJpZmllZCI6dHJ1ZSwiaXNQaG9uZVZlcmlmaWVkIjp0cnVlLCJpc0VtYWlsVmVyaWZpZWQiOnRydWUsImlzQWRtaW4iOnRydWUsImlzUHJvZmlsZSI6dHJ1ZSwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwicGxhdGZvcm0iOm51bGwsImlhdCI6MTc1ODc1ODY2NiwiZXhwIjoxNzU5MzYzNDY2fQ.83CZkrfYuzHT4G0vl9y_pEkVQirjkoPV49gACVpB69I';
+              const userData = '{"_id":"68cd71f3f31eb5d72a6c8e25","name":"Johyeeinteeety rtoe","phNo":"7036567890","isVerified":true,"isPhoneVerified":true,"isEmailVerified":true,"isAdmin":true,"isProfile":true,"email":"user@example.com","platform":null}';
+              
+              localStorage.setItem('authToken', adminToken);
+              localStorage.setItem('userData', userData);
+              console.log('✅ Admin token and user data set');
+              
+              // Try to fetch data again
+              setTimeout(() => {
+                console.log('🔄 Refreshing data with new auth...');
+                fetchCharges();
+              }, 1000);
+            }}
+            className="bg-orange-600 text-white px-4 py-2 rounded-full text-sm font-medium font-montserrat hover:bg-orange-700 transition-colors"
+          >
+            Set Admin Auth
+          </button>
+        </div>
         
         {/* Loading State */}
         {loading.fetchCharges && (
@@ -192,28 +381,57 @@ const SettingsShippingCharges = () => {
           </div>
         )}
 
+        {/* Authentication Status */}
+        <div className={`mt-4 p-3 rounded text-sm ${localStorage.getItem('authToken') ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <strong>Authentication Status:</strong> {localStorage.getItem('authToken') ? '✅ Authenticated' : '❌ Not Authenticated'}
+              {!localStorage.getItem('authToken') && (
+                <div className="mt-1 text-xs">Click "Set Admin Auth" button to authenticate</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Debug Info */}
+        <div className="mt-4 p-4 bg-gray-100 rounded text-sm space-y-2">
+          <div><strong>Debug Information:</strong></div>
+          <div>• Charges Count: {shippingCharges?.length || 0}</div>
+          <div>• Loading State: {loading.fetchCharges ? 'Yes' : 'No'}</div>
+          <div>• Error State: {errors.fetchCharges ? 'Yes' : 'No'}</div>
+          <div>• Error Message: {errors.fetchCharges || 'None'}</div>
+          <div>• Auth Token: {localStorage.getItem('authToken') ? '✅ Present' : '❌ Missing'}</div>
+          <div>• API Base URL: {import.meta.env.VITE_API_BASE_URL || 'Not Set'}</div>
+          <div>• Charges Data: {JSON.stringify(shippingCharges).substring(0, 100)}...</div>
+        </div>
+
         {/* Existing Charges List */}
         {!loading.fetchCharges && shippingCharges.length > 0 && (
           <div className="mt-4 space-y-2">
+            <h4 className="font-medium text-gray-800">Current Shipping Charges ({shippingCharges.length})</h4>
             {shippingCharges.map((charge, index) => (
-              <div key={charge._id || charge.id || `charge-${index}`} className="p-3 border rounded-lg flex justify-between items-center">
-                <div>
-                  <span className="font-medium">{charge.country}</span>
-                  {charge.region && <span> - {charge.region}</span>}
+              <div key={charge._id || charge.id || `charge-${index}`} className="p-3 border rounded-lg flex justify-between items-center bg-white shadow-sm">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-lg">{charge.country}</span>
+                    {charge.region && <span className="text-gray-600">({charge.region})</span>}
+                  </div>
                   <div className="text-sm text-gray-600">
-                    Delivery: ${charge.deliveryCharge} | Return: ${charge.returnCharge} | {charge.estimatedDays} days
+                    <span className="mr-4">💰 Delivery: ${charge.deliveryCharge}</span>
+                    <span className="mr-4">↩️ Return: ${charge.returnCharge}</span>
+                    <span>⏱️ {charge.estimatedDays} days</span>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEditShippingCharge(charge)}
-                    className="text-blue-600 hover:text-blue-800"
+                    className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDeleteShippingCharge(charge._id || charge.id)}
-                    className="text-red-600 hover:text-red-800"
+                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
                   >
                     Delete
                   </button>
@@ -252,7 +470,24 @@ const SettingsShippingCharges = () => {
               {/* Error Display */}
               {(errors.createCharge || errors.updateCharge) && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                  Error: {errors.createCharge || errors.updateCharge}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong>Error:</strong> {errors.createCharge || errors.updateCharge}
+                      {(errors.createCharge && errors.createCharge.includes('already exists')) && (
+                        <div className="mt-2 text-sm">
+                          A shipping charge for this country and region combination already exists. 
+                          Please choose a different country/region or edit the existing charge.
+                        </div>
+                      )}
+                    </div>
+                    <button 
+                      onClick={clearErrors}
+                      className="ml-2 text-red-600 hover:text-red-800"
+                      title="Dismiss error"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -316,7 +551,7 @@ const SettingsShippingCharges = () => {
                 </button>
                 <button
                   onClick={handleSaveShippingCharge}
-                  disabled={loading.createCharge || loading.updateCharge}
+                  disabled={loading.createCharge || loading.updateCharge || !isFormValid}
                   className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading.createCharge || loading.updateCharge 

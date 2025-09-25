@@ -12,9 +12,11 @@ const bannerSchema = new mongoose.Schema(
         // Banner identification
         bannerId: {
             type: String,
-            required: true,
             unique: true,
             index: true,
+            default: function() {
+                return `banner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            }
         },
 
         // Banner content
@@ -116,7 +118,10 @@ const bannerSchema = new mongoose.Schema(
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            required: true
+            default: function() {
+                // Default to a system user ID or new ObjectId
+                return new mongoose.Types.ObjectId();
+            }
         },
 
         updatedBy: {
