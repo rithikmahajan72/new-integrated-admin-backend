@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Search,
@@ -301,8 +302,8 @@ const ItemCard = ({
   onKeepCopyAndMove,
   onMoveToEyx
 }) => {
-  const [showActions, setShowActions] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showActionPanel, setShowActionPanel] = useState(false);
   const primaryImage = item.images?.[0]?.url || item.imageUrl || '/placeholder-image.jpg';
 
   const statusOptions = [
@@ -389,151 +390,224 @@ const ItemCard = ({
           {item.categoryId?.name || 'Uncategorized'} → {item.subCategoryId?.name || 'No subcategory'}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-2">
+        {/* Quick Action buttons */}
+        <div className="flex gap-2 mb-3">
           <button
             onClick={() => onEdit(item)}
             className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
             Edit
           </button>
-          <div className="relative flex-1">
-            <button
-              onClick={() => setShowStatusMenu(!showStatusMenu)}
-              className={`w-full px-3 py-1.5 text-sm rounded transition-colors ${
-                getStatusColor(item.status || 'draft')
-              }`}
-            >
-              {item.status === 'published' ? 'Live' : item.status === 'scheduled' ? 'Scheduled' : 'Draft'} ▼
-            </button>
-            
-            {/* Status dropdown menu */}
-            {showStatusMenu && (
-              <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 mt-1">
-                {statusOptions.map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      onStatusChange(item, option.value);
-                      setShowStatusMenu(false);
-                    }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${
-                      (item.status || 'draft') === option.value ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${option.color.split(' ')[0]}`}></span>
-                    {option.label}
-                  </button>
-                ))}
+          <button
+            onClick={() => onView(item)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            title="View Details"
+          >
+            <Eye className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Action Panel Toggle */}
+        <button
+          onClick={() => setShowActionPanel(true)}
+          className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <MoreVertical className="w-4 h-4" />
+          More Actions & Settings
+        </button>
+
+        {/* Full-Screen Action Panel */}
+        {showActionPanel && ReactDOM.createPortal(
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10000 }}>
+            {/* Left Side - Product Info (1/3 width) */}
+            <div className="w-1/3 bg-white p-6 overflow-y-auto border-r border-gray-200">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Product Details</h2>
+                <button
+                  onClick={() => setShowActionPanel(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <XCircle className="w-5 h-5 text-gray-500" />
+                </button>
               </div>
-            )}
-          </div>
-          
-          {/* More Actions Button */}
-          <div className="relative">
-            <button
-              onClick={() => setShowActions(!showActions)}
-              className="p-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              title="More Actions"
-            >
-              <MoreVertical className="w-4 h-4 text-gray-500" />
-            </button>
-            
-            {/* More Actions Dropdown */}
-            {showActions && (
-              <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-md shadow-lg z-20 border">
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      onView(item);
-                      setShowActions(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View Details
-                  </button>
-                  
-                  <hr className="my-1" />
-                  
-                  {/* Recommendation Options */}
-                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Recommendations
+              
+              {/* Product Image */}
+              <div className="mb-6">
+                <img 
+                  src={primaryImage} 
+                  alt={item.productName || item.name}
+                  className="w-full h-64 object-cover rounded-lg bg-gray-100"
+                  onError={(e) => {
+                    e.target.src = '/placeholder-image.jpg';
+                  }}
+                />
+              </div>
+
+              {/* Product Info */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-lg text-gray-900 mb-2">
+                    {item.productName || item.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-2">
+                    SKU: {item.productId}
+                  </p>
+                  {item.brand && (
+                    <p className="text-sm text-gray-600">
+                      Brand: {item.brand}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Category</h4>
+                  <p className="text-sm text-gray-600">
+                    {item.categoryId?.name || 'Uncategorized'} → {item.subCategoryId?.name || 'No subcategory'}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Price</h4>
+                  <PriceDisplay 
+                    sizes={item.sizes}
+                    platformPricing={item.platformPricing}
+                    price={item.price}
+                    salePrice={item.salePrice}
+                    discountPrice={item.discountPrice}
+                  />
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Stock Status</h4>
+                  <StockStatus 
+                    sizes={item.sizes}
+                    variants={item.variants}
+                    stockSizeOption={item.stockSizeOption}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side - Actions (2/3 width) */}
+            <div className="flex-1 bg-white p-6 overflow-y-auto">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Product Actions & Settings</h2>
+              
+              <div className="space-y-8">
+                {/* Status Management */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Status Management
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    {statusOptions.map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          onStatusChange(item, option.value);
+                        }}
+                        className={`p-4 rounded-lg border-2 transition-all text-center ${
+                          (item.status || 'draft') === option.value 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className={`inline-block w-3 h-3 rounded-full mb-2 ${option.color.split(' ')[0]}`}></div>
+                        <div className="font-medium">{option.label}</div>
+                      </button>
+                    ))}
                   </div>
-                  <button
-                    onClick={() => {
-                      onAddToRecommendations(item, 'youMayAlsoLike');
-                      setShowActions(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <Heart className="w-4 h-4" />
-                    You may also like
-                  </button>
-                  <button
-                    onClick={() => {
-                      onAddToRecommendations(item, 'othersAlsoBought');
-                      setShowActions(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <Users className="w-4 h-4" />
-                    Others also bought
-                  </button>
-                  
-                  <hr className="my-1" />
-                  
-                  {/* Product Management Options */}
-                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Product Actions
+                </div>
+
+                {/* Recommendations Management */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Heart className="w-5 h-5" />
+                    Recommendation Settings
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => onAddToRecommendations(item, 'youMayAlsoLike')}
+                      className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                    >
+                      <Heart className="w-6 h-6 mx-auto mb-2 text-red-500" />
+                      <div className="font-medium">You May Also Like</div>
+                      <div className="text-sm text-gray-600 mt-1">Add to recommendation list</div>
+                    </button>
+                    <button
+                      onClick={() => onAddToRecommendations(item, 'othersAlsoBought')}
+                      className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                    >
+                      <Users className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                      <div className="font-medium">Others Also Bought</div>
+                      <div className="text-sm text-gray-600 mt-1">Add to cross-sell list</div>
+                    </button>
                   </div>
+                </div>
+
+                {/* Product Actions */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Product Management
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <button
+                      onClick={() => onMoveToSale(item)}
+                      className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-left flex items-center gap-3"
+                    >
+                      <Tag className="w-6 h-6 text-green-500" />
+                      <div>
+                        <div className="font-medium">Move to Sale</div>
+                        <div className="text-sm text-gray-600">Apply discount and move to sale section</div>
+                      </div>
+                    </button>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        onClick={() => onKeepCopyAndMove(item)}
+                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                      >
+                        <Copy className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                        <div className="font-medium">Keep Copy & Move</div>
+                        <div className="text-sm text-gray-600 mt-1">Duplicate before moving</div>
+                      </button>
+                      <button
+                        onClick={() => onMoveToEyx(item)}
+                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                      >
+                        <ExternalLink className="w-6 h-6 mx-auto mb-2 text-purple-500" />
+                        <div className="font-medium">Move to EYX</div>
+                        <div className="text-sm text-gray-600 mt-1">Transfer to EYX platform</div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="bg-red-50 rounded-lg p-6 border border-red-200">
+                  <h3 className="text-lg font-semibold text-red-900 mb-4 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    Danger Zone
+                  </h3>
                   <button
                     onClick={() => {
-                      onMoveToSale(item);
-                      setShowActions(false);
+                      if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+                        onDelete(item);
+                        setShowActionPanel(false);
+                      }
                     }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="w-full p-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
                   >
-                    <Tag className="w-4 h-4" />
-                    Move to sale
-                  </button>
-                  <button
-                    onClick={() => {
-                      onKeepCopyAndMove(item);
-                      setShowActions(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Keep a copy and move
-                  </button>
-                  <button
-                    onClick={() => {
-                      onMoveToEyx(item);
-                      setShowActions(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Move to EYX
-                  </button>
-                  
-                  <hr className="my-1" />
-                  <button
-                    onClick={() => {
-                      onDelete(item);
-                      setShowActions(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
+                    <Trash2 className="w-5 h-5" />
+                    Delete Product Permanently
                   </button>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </div>, 
+          document.body
+        )}
       </div>
     </div>
   );
@@ -552,7 +626,7 @@ const ItemRow = ({
   onKeepCopyAndMove,
   onMoveToEyx
 }) => {
-  const [showActions, setShowActions] = useState(false);
+  const [showActionPanel, setShowActionPanel] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const primaryImage = item.images?.[0]?.url || item.imageUrl || '/placeholder-image.jpg';
 
@@ -654,132 +728,217 @@ const ItemRow = ({
       <td className="px-6 py-4 text-right">
         <div className="relative">
           <button
-            onClick={() => setShowActions(!showActions)}
-            className="p-1 hover:bg-gray-100 rounded"
+            onClick={() => onView(item)}
+            className="p-1 hover:bg-gray-100 rounded transition-colors mr-1"
+            title="View Details"
           >
-            <MoreVertical className="w-4 h-4 text-gray-500" />
+            <Eye className="w-4 h-4 text-gray-500" />
+          </button>
+          <button
+            onClick={() => onEdit(item)}
+            className="p-1 hover:bg-gray-100 rounded transition-colors mr-1"
+            title="Edit"
+          >
+            <Edit className="w-4 h-4 text-gray-500" />
+          </button>
+          <button
+            onClick={() => setShowActionPanel(true)}
+            className="p-1 hover:bg-blue-100 rounded transition-colors"
+            title="More Actions"
+          >
+            <MoreVertical className="w-4 h-4 text-blue-600" />
           </button>
           
-          {showActions && (
-            <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg z-10 border">
-              <div className="py-1">
-                <button
-                  onClick={() => {
-                    onView(item);
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Eye className="w-4 h-4" />
-                  View Details
-                </button>
-                <button
-                  onClick={() => {
-                    onEdit(item);
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => {
-                    onToggleStatus(item);
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  {item.status === 'published' || item.status === 'active' ? (
-                    <>
-                      <XCircle className="w-4 h-4" />
-                      Unpublish
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      Publish
-                    </>
-                  )}
-                </button>
-                
-                <hr className="my-1" />
-                
-                {/* Recommendation Options */}
-                <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Recommendations
+          {showActionPanel && ReactDOM.createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10000 }}>
+              {/* Left Side - Product Info (1/3 width) */}
+              <div className="w-1/3 bg-white p-6 overflow-y-auto border-r border-gray-200">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900">Product Details</h2>
+                  <button
+                    onClick={() => setShowActionPanel(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <XCircle className="w-5 h-5 text-gray-500" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    onAddToRecommendations(item, 'youMayAlsoLike');
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Heart className="w-4 h-4" />
-                  You may also like
-                </button>
-                <button
-                  onClick={() => {
-                    onAddToRecommendations(item, 'othersAlsoBought');
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Users className="w-4 h-4" />
-                  Others also bought
-                </button>
                 
-                <hr className="my-1" />
-                
-                {/* Product Management Options */}
-                <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Product Actions
+                {/* Product Image */}
+                <div className="mb-6">
+                  <img 
+                    src={primaryImage} 
+                    alt={item.productName || item.name}
+                    className="w-full h-64 object-cover rounded-lg bg-gray-100"
+                    onError={(e) => {
+                      e.target.src = '/placeholder-image.jpg';
+                    }}
+                  />
                 </div>
-                <button
-                  onClick={() => {
-                    onMoveToSale(item);
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Tag className="w-4 h-4" />
-                  Move to sale
-                </button>
-                <button
-                  onClick={() => {
-                    onKeepCopyAndMove(item);
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Copy className="w-4 h-4" />
-                  Keep a copy and move
-                </button>
-                <button
-                  onClick={() => {
-                    onMoveToEyx(item);
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Move to EYX
-                </button>
-                
-                <hr className="my-1" />
-                <button
-                  onClick={() => {
-                    onDelete(item);
-                    setShowActions(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
+
+                {/* Product Info */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-lg text-gray-900 mb-2">
+                      {item.productName || item.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      SKU: {item.productId}
+                    </p>
+                    {item.brand && (
+                      <p className="text-sm text-gray-600">
+                        Brand: {item.brand}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Category</h4>
+                    <p className="text-sm text-gray-600">
+                      {item.categoryId?.name || 'Uncategorized'} → {item.subCategoryId?.name || 'No subcategory'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Price</h4>
+                    <PriceDisplay 
+                      sizes={item.sizes}
+                      platformPricing={item.platformPricing}
+                      price={item.price}
+                      salePrice={item.salePrice}
+                      discountPrice={item.discountPrice}
+                    />
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Stock Status</h4>
+                    <DetailedStockDisplay 
+                      sizes={item.sizes}
+                      variants={item.variants}
+                      stockSizeOption={item.stockSizeOption}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+
+              {/* Right Side - Actions (2/3 width) */}
+              <div className="flex-1 bg-white p-6 overflow-y-auto">
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">Product Actions & Settings</h2>
+                
+                <div className="space-y-8">
+                  {/* Status Management */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Status Management
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      {statusOptions.map(option => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            onStatusChange(item, option.value);
+                          }}
+                          className={`p-4 rounded-lg border-2 transition-all text-center ${
+                            (item.status || 'draft') === option.value 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className={`inline-block w-3 h-3 rounded-full mb-2 ${option.color.split(' ')[0]}`}></div>
+                          <div className="font-medium">{option.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Recommendations Management */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Heart className="w-5 h-5" />
+                      Recommendation Settings
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        onClick={() => onAddToRecommendations(item, 'youMayAlsoLike')}
+                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                      >
+                        <Heart className="w-6 h-6 mx-auto mb-2 text-red-500" />
+                        <div className="font-medium">You May Also Like</div>
+                        <div className="text-sm text-gray-600 mt-1">Add to recommendation list</div>
+                      </button>
+                      <button
+                        onClick={() => onAddToRecommendations(item, 'othersAlsoBought')}
+                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                      >
+                        <Users className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                        <div className="font-medium">Others Also Bought</div>
+                        <div className="text-sm text-gray-600 mt-1">Add to cross-sell list</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Product Actions */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Package className="w-5 h-5" />
+                      Product Management
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      <button
+                        onClick={() => onMoveToSale(item)}
+                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-left flex items-center gap-3"
+                      >
+                        <Tag className="w-6 h-6 text-green-500" />
+                        <div>
+                          <div className="font-medium">Move to Sale</div>
+                          <div className="text-sm text-gray-600">Apply discount and move to sale section</div>
+                        </div>
+                      </button>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          onClick={() => onKeepCopyAndMove(item)}
+                          className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                        >
+                          <Copy className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                          <div className="font-medium">Keep Copy & Move</div>
+                          <div className="text-sm text-gray-600 mt-1">Duplicate before moving</div>
+                        </button>
+                        <button
+                          onClick={() => onMoveToEyx(item)}
+                          className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
+                        >
+                          <ExternalLink className="w-6 h-6 mx-auto mb-2 text-purple-500" />
+                          <div className="font-medium">Move to EYX</div>
+                          <div className="text-sm text-gray-600 mt-1">Transfer to EYX platform</div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Danger Zone */}
+                  <div className="bg-red-50 rounded-lg p-6 border border-red-200">
+                    <h3 className="text-lg font-semibold text-red-900 mb-4 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5" />
+                      Danger Zone
+                    </h3>
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+                          onDelete(item);
+                          setShowActionPanel(false);
+                        }
+                      }}
+                      className="w-full p-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      Delete Product Permanently
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>, 
+            document.body
           )}
         </div>
       </td>
@@ -797,17 +956,6 @@ const ItemManagement = () => {
   const error = useSelector(selectProductsError);
   const categories = useSelector(selectCategories);
   const subCategories = useSelector(selectSubCategories);
-
-  // DEBUG: Add console logs to see what's happening
-  console.log('🎯 ItemManagement Component Debug:', {
-    products: products,
-    productsLength: products?.length || 0,
-    productsType: typeof products,
-    loading: loading,
-    error: error,
-    selectedStatus: null, // Will be defined below
-    searchTerm: null, // Will be defined below
-  });
 
   // Local state
   const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list' - Default to table view
@@ -892,32 +1040,12 @@ const ItemManagement = () => {
     return filtered;
   }, [products, searchTerm, selectedCategory, selectedSubCategory, selectedStatus, sortBy, sortOrder]);
 
-  // DEBUG: Check what happened during filtering
-  console.log('🔍 Filtering Debug:', {
-    originalProductsCount: products?.length || 0,
-    filteredProductsCount: filteredProducts?.length || 0,
-    searchTerm,
-    selectedCategory,
-    selectedSubCategory, 
-    selectedStatus,
-    filteredProducts: filteredProducts
-  });
-
   // Pagination
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  // DEBUG: Check pagination
-  console.log('📄 Pagination Debug:', {
-    totalPages,
-    currentPage,
-    itemsPerPage,
-    paginatedProductsCount: paginatedProducts?.length || 0,
-    paginatedProducts: paginatedProducts
-  });
 
   // Handlers
   const handleRefresh = useCallback(() => {
@@ -1334,26 +1462,6 @@ const ItemManagement = () => {
             </div>
           </div>
         )}
-
-        {/* DEBUG INFO */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="font-medium text-blue-900 mb-2">Debug Information:</h3>
-          <div className="text-sm text-blue-800 space-y-1">
-            <p>Products in Redux: {products?.length || 0}</p>
-            <p>Filtered Products: {filteredProducts?.length || 0}</p>
-            <p>Loading: {loading ? 'Yes' : 'No'}</p>
-            <p>Error: {error || 'None'}</p>
-            <p>View Mode: {viewMode}</p>
-            {products && products.length > 0 && (
-              <div className="mt-2">
-                <p className="font-medium">Sample Product:</p>
-                <pre className="text-xs bg-white p-2 rounded border">
-                  {JSON.stringify(products[0], null, 2).substring(0, 300)}...
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
 
         {filteredProducts.length === 0 && !loading ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">

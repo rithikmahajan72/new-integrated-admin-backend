@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { X, Plus, Upload, Trash2, Save, ArrowLeft, ChevronDown } from 'lucide-react';
+import { X, Plus, Upload, Trash2, Save, ArrowLeft, ChevronDown, RefreshCw } from 'lucide-react';
 import { itemAPI, categoryAPI, subCategoryAPI, filterAPI } from '../api/endpoints';
 import FilterTest from '../components/FilterTest';
 import { 
@@ -61,6 +61,8 @@ const ItemManagementEditPage = () => {
   
   // Filter management state
   const [sizeFilterDropdowns, setSizeFilterDropdowns] = useState({}); // Track which dropdown is open for each size
+  const [selectedFilterValues, setSelectedFilterValues] = useState({}); // Track selected filter values for each size {sizeId: [valueId1, valueId2, ...]}
+  const [filterSearchTerm, setFilterSearchTerm] = useState(''); // Search term for filters
   
   // Category and subcategory states
   const [categories, setCategories] = useState([]);
@@ -261,6 +263,21 @@ const ItemManagementEditPage = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Initialize selected filter values when item loads
+  useEffect(() => {
+    if (item && item.sizes) {
+      const initialSelectedFilterValues = {};
+      item.sizes.forEach(size => {
+        if (size.assignedFilters && size.assignedFilters.length > 0) {
+          initialSelectedFilterValues[size.id] = size.assignedFilters.map(f => f.valueId).filter(Boolean);
+        } else {
+          initialSelectedFilterValues[size.id] = [];
+        }
+      });
+      setSelectedFilterValues(initialSelectedFilterValues);
+    }
+  }, [item]);
+
   // Debug log when item data changes
   useEffect(() => {
     console.log('🎯 Item data updated:', item);
@@ -359,18 +376,52 @@ const ItemManagementEditPage = () => {
       return;
     }
 
+    const newSizeId = Date.now().toString();
+    const selectedValuesForNewSize = selectedFilterValues['new'] || [];
+    
+    // Group values by filter and create assigned filters
+    const assignedFilters = [];
+    const valuesByFilter = {};
+    
+    selectedValuesForNewSize.forEach(valueId => {
+      // Find which filter this value belongs to
+      const parentFilter = filters?.find(filter => 
+        filter.values?.some(value => value._id === valueId)
+      );
+      if (parentFilter) {
+        if (!valuesByFilter[parentFilter._id]) {
+          valuesByFilter[parentFilter._id] = [];
+        }
+        valuesByFilter[parentFilter._id].push(valueId);
+      }
+    });
+    
+    // Create assigned filters array
+    Object.entries(valuesByFilter).forEach(([filterId, valueIds]) => {
+      valueIds.forEach(valueId => {
+        assignedFilters.push({ filterId, valueId });
+      });
+    });
+
     const newSize = {
-      id: Date.now(),
+      id: newSizeId,
       ...currentSize,
       quantity: parseInt(currentSize.quantity) || 0,
       regularPrice: parseFloat(currentSize.regularPrice) || 0,
       salePrice: parseFloat(currentSize.salePrice) || 0,
-      assignedFilters: [],
+      assignedFilters,
     };
 
     setFormData(prev => ({
       ...prev,
       sizes: [...prev.sizes, newSize]
+    }));
+
+    // Update selected filter values state to include the new size
+    setSelectedFilterValues(prev => ({
+      ...prev,
+      [newSizeId]: selectedValuesForNewSize,
+      'new': [] // Clear the 'new' filters for next size
     }));
 
     // Reset current size form
@@ -483,6 +534,107 @@ const ItemManagementEditPage = () => {
         return size;
       })
     }));
+  };
+
+  // New filter management functions for real-time functionality
+  const toggleFilterValueForSize = (sizeId, filterId, valueId) => {
+    setSelectedFilterValues(prev => {
+      const currentValues = prev[sizeId] || [];
+      const newValues = currentValues.includes(valueId)
+        ? currentValues.filter(id => id !== valueId)
+        : [...currentValues, valueId];
+      
+      // Update form data as well for consistency (skip for 'new' size as it's not in formData yet)
+      if (sizeId !== 'new') {
+        setFormData(prevForm => ({
+          ...prevForm,
+          sizes: prevForm.sizes.map(size => {
+            if (size.id === sizeId || size.id === parseInt(sizeId)) {
+              // Group values by filter and create assigned filters
+              const assignedFilters = [];
+              const valuesByFilter = {};
+              
+              newValues.forEach(vId => {
+                // Find which filter this value belongs to
+                const parentFilter = filters?.find(filter => 
+                  filter.values?.some(value => value._id === vId)
+                );
+                if (parentFilter) {
+                  if (!valuesByFilter[parentFilter._id]) {
+                    valuesByFilter[parentFilter._id] = [];
+                  }
+                  valuesByFilter[parentFilter._id].push(vId);
+                }
+              });
+              
+              // Create assigned filters array
+              Object.entries(valuesByFilter).forEach(([fId, vIds]) => {
+                vIds.forEach(vId => {
+                  assignedFilters.push({ filterId: fId, valueId: vId });
+                });
+              });
+              
+              return {
+                ...size,
+                assignedFilters
+              };
+            }
+            return size;
+          })
+        }));
+      }
+      
+      return {
+        ...prev,
+        [sizeId]: newValues
+      };
+    });
+  };
+
+  const clearAllFiltersForSize = (sizeId) => {
+    setSelectedFilterValues(prev => ({
+      ...prev,
+      [sizeId]: []
+    }));
+    
+    // Update form data as well for consistency (skip for 'new' size as it's not in formData yet)
+    if (sizeId !== 'new') {
+      setFormData(prev => ({
+        ...prev,
+        sizes: prev.sizes.map(size => {
+          if (size.id === sizeId || size.id === parseInt(sizeId)) {
+            return {
+              ...size,
+              assignedFilters: []
+            };
+          }
+          return size;
+        })
+      }));
+    }
+  };
+
+  const getFilteredFilters = () => {
+    if (!filters || filters.length === 0) {
+      console.log('🔍 getFilteredFilters: No filters available', { filters, filtersLength: filters?.length });
+      return [];
+    }
+    
+    const filteredResults = filters.filter(filter => 
+      filter.key.toLowerCase().includes(filterSearchTerm.toLowerCase()) ||
+      filter.values.some(value => 
+        value.name.toLowerCase().includes(filterSearchTerm.toLowerCase())
+      )
+    );
+    
+    console.log('🔍 getFilteredFilters:', {
+      originalCount: filters.length,
+      filteredCount: filteredResults.length,
+      searchTerm: filterSearchTerm,
+      firstFilter: filteredResults[0]
+    });
+    
+    return filteredResults;
   };
 
   // Image upload handlers
@@ -1131,19 +1283,48 @@ const ItemManagementEditPage = () => {
 
           {/* Stock Size Section */}
           <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <label className="text-xl font-medium text-black">Stock Size</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStockSizeOption('addSize')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    stockSizeOption === 'addSize'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white text-black border border-gray-300'
-                  }`}
-                >
-                  Add Size
-                </button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <label className="text-xl font-medium text-black">Stock Size</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setStockSizeOption('addSize')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      stockSizeOption === 'addSize'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-black border border-gray-300'
+                    }`}
+                  >
+                    Add Size
+                  </button>
+                </div>
+              </div>
+              
+              {/* Filter Summary */}
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">
+                    {Object.values(selectedFilterValues).reduce((total, values) => total + (values || []).length, 0)}
+                  </span>
+                  <span> filter values assigned across </span>
+                  <span className="font-medium">{formData.sizes.length}</span>
+                  <span> sizes</span>
+                </div>
+                {Object.values(selectedFilterValues).some(values => values && values.length > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFilterValues({});
+                      setFormData(prev => ({
+                        ...prev,
+                        sizes: prev.sizes.map(size => ({ ...size, assignedFilters: [] }))
+                      }));
+                    }}
+                    className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors"
+                  >
+                    Clear All Filters
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1154,7 +1335,40 @@ const ItemManagementEditPage = () => {
                 {formData.sizes.map((size, index) => (
                   <div key={size.id} className="border border-gray-300 rounded-lg p-4">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-medium">Size {index + 1}</h3>
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-medium">Size {index + 1}</h3>
+                        {selectedFilterValues[size.id] && selectedFilterValues[size.id].length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                              {selectedFilterValues[size.id].length} value{selectedFilterValues[size.id].length !== 1 ? 's' : ''}
+                            </span>
+                            <div className="flex gap-1">
+                              {selectedFilterValues[size.id].slice(0, 3).map(valueId => {
+                                // Find the value and its parent filter
+                                let valueName = '';
+                                let filterKey = '';
+                                filters?.forEach(filter => {
+                                  const value = filter.values?.find(v => v._id === valueId);
+                                  if (value) {
+                                    valueName = value.name;
+                                    filterKey = filter.key;
+                                  }
+                                });
+                                return valueName ? (
+                                  <span key={valueId} className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                                    {filterKey}: {valueName}
+                                  </span>
+                                ) : null;
+                              })}
+                              {selectedFilterValues[size.id].length > 3 && (
+                                <span className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                                  +{selectedFilterValues[size.id].length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={() => removeSize(size.id)}
                         className="text-red-600 hover:text-red-800"
@@ -1383,10 +1597,179 @@ const ItemManagementEditPage = () => {
                       </div>
                     </div>
 
-                    {/* Filter Assignment - Temporarily Simplified */}
+                    {/* Filter Assignment */}
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="text-sm font-medium text-gray-900">Filter Assignment Coming Soon</h4>
-                      <p className="text-xs text-gray-500">Size: {size.size}</p>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-900">Filter Assignment</h4>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">
+                            {selectedFilterValues[size.id]?.length || 0} filter values selected
+                          </span>
+                          {selectedFilterValues[size.id]?.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => clearAllFiltersForSize(size.id)}
+                              className="text-xs text-red-600 hover:text-red-700 bg-red-50 px-2 py-1 rounded"
+                            >
+                              Clear All
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Filter Search */}
+                      <div className="mb-3 flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Search filters..."
+                          value={filterSearchTerm}
+                          onChange={(e) => setFilterSearchTerm(e.target.value)}
+                          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => dispatch(fetchFilters())}
+                          className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors flex items-center gap-1"
+                          title="Refresh filters"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Filters Loading State */}
+                      {filtersLoading && (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                          <span className="ml-2 text-sm text-gray-600">Loading filters...</span>
+                        </div>
+                      )}
+
+                      {/* Filters Display */}
+                      {!filtersLoading && filters && filters.length > 0 && (
+                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                          {getFilteredFilters().map((filter) => (
+                            <div key={filter._id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                              <div className="flex items-center justify-between mb-2">
+                                <h5 className="text-sm font-medium text-gray-800 capitalize">
+                                  {filter.key}
+                                </h5>
+                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                  {filter.values?.length || 0} values
+                                </span>
+                              </div>
+                              
+                              {/* Filter Values */}
+                              {filter.values && filter.values.length > 0 && (
+                                <div className="grid grid-cols-2 gap-2">
+                                  {filter.values.map((value) => {
+                                    const isSelected = selectedFilterValues[size.id]?.includes(value._id);
+                                    return (
+                                      <button
+                                        key={value._id}
+                                        type="button"
+                                        onClick={() => toggleFilterValueForSize(size.id, filter._id, value._id)}
+                                        className={`flex items-center justify-between p-2 text-xs rounded-lg transition-all ${
+                                          isSelected
+                                            ? 'bg-blue-100 border-2 border-blue-300 text-blue-800'
+                                            : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          {/* Color preview for color filters */}
+                                          {filter.key === 'color' && value.code && (
+                                            <div
+                                              className="w-3 h-3 rounded-full border border-gray-300"
+                                              style={{ backgroundColor: value.code }}
+                                            ></div>
+                                          )}
+                                          <span className="font-medium">{value.name}</span>
+                                        </div>
+                                        {isSelected && (
+                                          <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                                            <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                          </div>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* No Filters Available */}
+                      {!filtersLoading && (!filters || filters.length === 0) && (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-gray-500">No filters available</p>
+                          <p className="text-xs text-gray-400">Create filters in the Filters management section</p>
+                        </div>
+                      )}
+
+                      {/* Filtered Results Empty */}
+                      {!filtersLoading && filters && filters.length > 0 && getFilteredFilters().length === 0 && (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-gray-500">No filters match your search</p>
+                          <button
+                            type="button"
+                            onClick={() => setFilterSearchTerm('')}
+                            className="text-xs text-blue-600 hover:text-blue-700 mt-1"
+                          >
+                            Clear search
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Applied Filters Summary */}
+                      {selectedFilterValues[size.id] && selectedFilterValues[size.id].length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-gray-200">
+                          <h6 className="text-xs font-medium text-gray-600 mb-2">Applied Filter Values:</h6>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedFilterValues[size.id].map(valueId => {
+                              // Find the value and its parent filter
+                              let valueName = '';
+                              let filterKey = '';
+                              let filterId = '';
+                              let valueCode = '';
+                              
+                              filters?.forEach(filter => {
+                                const value = filter.values?.find(v => v._id === valueId);
+                                if (value) {
+                                  valueName = value.name;
+                                  filterKey = filter.key;
+                                  filterId = filter._id;
+                                  valueCode = value.code;
+                                }
+                              });
+                              
+                              return valueName ? (
+                                <span
+                                  key={valueId}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full"
+                                >
+                                  {filterKey === 'color' && valueCode && (
+                                    <div
+                                      className="w-2 h-2 rounded-full border border-gray-300 mr-1"
+                                      style={{ backgroundColor: valueCode }}
+                                    ></div>
+                                  )}
+                                  {filterKey}: {valueName}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleFilterValueForSize(size.id, filterId, valueId)}
+                                    className="ml-1 text-blue-500 hover:text-blue-700"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1615,7 +1998,180 @@ const ItemManagementEditPage = () => {
                     </div>
                   </div>
 
-                  <button
+                  {/* Filter Assignment for New Size */}
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-900">Filter Assignment (New Size)</h4>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">
+                          {selectedFilterValues['new']?.length || 0} filter values selected
+                        </span>
+                        {selectedFilterValues['new']?.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => clearAllFiltersForSize('new')}
+                            className="text-xs text-red-600 hover:text-red-700 bg-red-50 px-2 py-1 rounded"
+                          >
+                            Clear All
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Filter Search */}
+                    <div className="mb-3 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Search filters..."
+                        value={filterSearchTerm}
+                        onChange={(e) => setFilterSearchTerm(e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => dispatch(fetchFilters())}
+                        className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors flex items-center gap-1"
+                        title="Refresh filters"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Filters Loading State */}
+                    {filtersLoading && (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                        <span className="ml-2 text-sm text-gray-600">Loading filters...</span>
+                      </div>
+                    )}
+
+                    {/* Filters Display */}
+                    {!filtersLoading && filters && filters.length > 0 && (
+                      <div className="space-y-3 max-h-48 overflow-y-auto">
+                        {getFilteredFilters().map((filter) => (
+                          <div key={filter._id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="text-sm font-medium text-gray-800 capitalize">
+                                {filter.key}
+                              </h5>
+                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                {filter.values?.length || 0} values
+                              </span>
+                            </div>
+                            
+                            {/* Filter Values */}
+                            {filter.values && filter.values.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2">
+                                {filter.values.map((value) => {
+                                  const isSelected = selectedFilterValues['new']?.includes(value._id);
+                                  return (
+                                    <button
+                                      key={value._id}
+                                      type="button"
+                                      onClick={() => toggleFilterValueForSize('new', filter._id, value._id)}
+                                      className={`flex items-center justify-between p-2 text-xs rounded-lg transition-all ${
+                                        isSelected
+                                          ? 'bg-green-100 border-2 border-green-300 text-green-800'
+                                          : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {/* Color preview for color filters */}
+                                        {filter.key === 'color' && value.code && (
+                                          <div
+                                            className="w-3 h-3 rounded-full border border-gray-300"
+                                            style={{ backgroundColor: value.code }}
+                                          ></div>
+                                        )}
+                                        <span className="font-medium">{value.name}</span>
+                                      </div>
+                                      {isSelected && (
+                                        <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                          <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No Filters Available */}
+                    {!filtersLoading && (!filters || filters.length === 0) && (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-gray-500">No filters available</p>
+                        <p className="text-xs text-gray-400">Create filters in the Filters management section</p>
+                      </div>
+                    )}
+
+                      {/* Filtered Results Empty */}
+                      {!filtersLoading && filters && filters.length > 0 && getFilteredFilters().length === 0 && (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-gray-500">No filters match your search</p>
+                          <button
+                            type="button"
+                            onClick={() => setFilterSearchTerm('')}
+                            className="text-xs text-blue-600 hover:text-blue-700 mt-1"
+                          >
+                            Clear search
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Applied Filters Summary for New Size */}
+                      {selectedFilterValues['new'] && selectedFilterValues['new'].length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-gray-200">
+                          <h6 className="text-xs font-medium text-gray-600 mb-2">Applied Filter Values (New Size):</h6>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedFilterValues['new'].map(valueId => {
+                              // Find the value and its parent filter
+                              let valueName = '';
+                              let filterKey = '';
+                              let filterId = '';
+                              let valueCode = '';
+                              
+                              filters?.forEach(filter => {
+                                const value = filter.values?.find(v => v._id === valueId);
+                                if (value) {
+                                  valueName = value.name;
+                                  filterKey = filter.key;
+                                  filterId = filter._id;
+                                  valueCode = value.code;
+                                }
+                              });
+                              
+                              return valueName ? (
+                                <span
+                                  key={valueId}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full"
+                                >
+                                  {filterKey === 'color' && valueCode && (
+                                    <div
+                                      className="w-2 h-2 rounded-full border border-gray-300 mr-1"
+                                      style={{ backgroundColor: valueCode }}
+                                    ></div>
+                                  )}
+                                  {filterKey}: {valueName}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleFilterValueForSize('new', filterId, valueId)}
+                                    className="ml-1 text-green-500 hover:text-green-700"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      )}
+                  </div>                  <button
                     onClick={addSize}
                     className="bg-white text-black border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
                   >

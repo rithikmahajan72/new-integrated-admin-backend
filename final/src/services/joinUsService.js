@@ -47,7 +47,13 @@ class JoinUsService {
      */
     static async createPost(postData) {
         try {
-            const response = await joinUsAPI.post("/", postData);
+            console.log('Raw post data received:', postData);
+            
+            // Validate data before sending
+            const formattedData = this.formatPostData(postData);
+            console.log('Formatted data to send:', formattedData);
+            
+            const response = await joinUsAPI.post("/", formattedData);
             return {
                 success: true,
                 data: response.data,
@@ -55,9 +61,27 @@ class JoinUsService {
             };
         } catch (error) {
             console.error("Create post error:", error);
+            console.error("Error response:", error.response);
+            console.error("Error response data:", error.response?.data);
+            
+            // Handle validation errors specifically
+            if (error.response?.status === 400) {
+                const validationErrors = error.response?.data?.errors || [];
+                const errorMessages = validationErrors.map(err => err.msg || err.message).join(', ');
+                
+                console.error("Validation errors:", validationErrors);
+                console.error("Error messages:", errorMessages);
+                
+                return {
+                    success: false,
+                    message: errorMessages || error.response?.data?.message || "Validation failed",
+                    errors: validationErrors
+                };
+            }
+            
             return {
                 success: false,
-                message: error.response?.data?.message || "Failed to create post",
+                message: error.message || error.response?.data?.message || "Failed to create post",
                 errors: error.response?.data?.details || []
             };
         }
@@ -469,9 +493,22 @@ class JoinUsService {
         formatted.isActive = formatted.isActive !== undefined ? formatted.isActive : true;
         formatted.isPublished = formatted.isPublished !== undefined ? formatted.isPublished : false;
 
-        // Clean up empty values
+        // Ensure required fields are not empty or null
+        if (!formatted.title || formatted.title.trim() === '') {
+            throw new Error('Title is required');
+        }
+        
+        if (!formatted.detail || formatted.detail.trim() === '') {
+            throw new Error('Detail is required');
+        }
+
+        // Trim and validate string fields
+        formatted.title = formatted.title.trim();
+        formatted.detail = formatted.detail.trim();
+
+        // Clean up empty values (but preserve required fields)
         Object.keys(formatted).forEach(key => {
-            if (formatted[key] === "" || formatted[key] === null) {
+            if (key !== 'title' && key !== 'detail' && (formatted[key] === "" || formatted[key] === null)) {
                 delete formatted[key];
             }
         });

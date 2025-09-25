@@ -3,6 +3,7 @@ const express = require("express");
 const {
   // Admin Order Management
   adminGetAllOrders,
+  adminGetOrderById,
   adminUpdateOrderStatus,
   adminAcceptOrder,
   adminRejectOrder,
@@ -47,6 +48,9 @@ router.get("/orders", verifyToken, adminGetAllOrders);
 
 // GET /api/admin/orders/statistics - Get order statistics
 router.get("/orders/statistics", verifyToken, adminGetOrderStatistics);
+
+// GET /api/admin/orders/:orderId - Get single order by ID
+router.get("/orders/:orderId", verifyToken, adminGetOrderById);
 
 // PUT /api/admin/orders/:orderId/status - Update order status
 router.put("/orders/:orderId/status", verifyToken, adminUpdateOrderStatus);

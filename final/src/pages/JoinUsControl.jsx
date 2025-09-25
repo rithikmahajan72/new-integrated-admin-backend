@@ -9,7 +9,7 @@ const SECTIONS = Object.freeze({
   BOTTOM: 'bottom'
 });
 
-const DEFAULT_TEXT_POSITION = Object.freeze({ x: 20, y: 20 });
+const DEFAULT_TEXT_POSITION = Object.freeze({ x: 20, y: 80 }); // Position text towards bottom like in Figma design
 const PREVIEW_IMAGE_URL = "https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80";
 
 const DEFAULT_POST_CONTENT = Object.freeze([
@@ -228,17 +228,17 @@ const ImageUploadSection = memo(({
   uploadId,
   ariaLabel 
 }) => (
-  <div className="space-y-4">
+  <div className="space-y-3">
     <div className="text-center">
-      <h3 className="text-sm font-bold text-black mb-4">{title}</h3>
+      <h3 className="text-sm font-bold text-black mb-3">{title}</h3>
       
-      <div className="border-2 border-dashed border-gray-400 rounded-lg p-8 text-center h-48 flex flex-col items-center justify-center">
+      <div className="border-2 border-dashed border-gray-400 rounded-lg p-4 text-center h-32 lg:h-48 flex flex-col items-center justify-center">
         {selectedImage ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <img 
               src={selectedImage} 
               alt={`${title} preview`}
-              className="max-w-full max-h-32 object-contain mx-auto rounded-lg"
+              className="max-w-full max-h-20 lg:max-h-32 object-contain mx-auto rounded-lg"
               loading="lazy"
             />
             <button
@@ -250,9 +250,9 @@ const ImageUploadSection = memo(({
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="w-16 h-16 mx-auto border-2 border-gray-400 rounded-lg flex items-center justify-center">
-              <ImageIcon className="w-8 h-8 text-gray-400" />
+          <div className="space-y-2 lg:space-y-4">
+            <div className="w-10 h-10 lg:w-16 lg:h-16 mx-auto border-2 border-gray-400 rounded-lg flex items-center justify-center">
+              <ImageIcon className="w-5 h-5 lg:w-8 lg:h-8 text-gray-400" />
             </div>
             <input
               type="file"
@@ -264,10 +264,10 @@ const ImageUploadSection = memo(({
             />
             <label
               htmlFor={uploadId}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md cursor-pointer hover:bg-blue-700 inline-flex items-center gap-2 transition-colors text-sm font-medium"
+              className="bg-black text-white px-4 py-2 lg:px-6 lg:py-2 rounded-full cursor-pointer hover:bg-gray-800 inline-flex items-center gap-2 transition-colors text-xs lg:text-sm font-medium"
             >
-              <Plus className="w-4 h-4" />
-              upload image
+              <Plus className="w-3 h-3 lg:w-4 lg:h-4" />
+              Upload
             </label>
           </div>
         )}
@@ -369,29 +369,48 @@ const FormSection = memo(({
     <div className="mb-16">
       <h2 className="text-lg font-bold text-black mb-8 text-center">{title}</h2>
       
+      {/* Mobile-friendly layout with image upload positioned at bottom-right */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <ImageUploadSection
-          title="Add image"
-          selectedImage={formState.selectedImage}
-          onImageUpload={onImageUpload}
-          onImageRemove={onImageRemove}
-          uploadId={uploadId}
-          ariaLabel={`Upload ${title.toLowerCase()} image file`}
-        />
-
-        {/* Create Detail Section */}
-        <div className="space-y-4">
+        
+        {/* Create Detail Section - Full width on mobile */}
+        <div className="space-y-4 lg:col-span-2 order-1 lg:order-none">
           <div>
             <h3 className="text-sm font-bold text-black mb-4">Create detail</h3>
             <textarea
               value={formState.detail}
               onChange={onDetailChange}
-              rows={10}
+              rows={8}
               className="w-full px-4 py-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none transition-colors text-sm"
-              placeholder=""
+              placeholder="Enter your Join Us content details here..."
               aria-label={`${title} post details`}
             />
           </div>
+          
+          {/* Mobile: Show image upload at bottom-right of detail section */}
+          <div className="lg:hidden flex justify-end">
+            <div className="w-48">
+              <ImageUploadSection
+                title="Add image"
+                selectedImage={formState.selectedImage}
+                onImageUpload={onImageUpload}
+                onImageRemove={onImageRemove}
+                uploadId={uploadId}
+                ariaLabel={`Upload ${title.toLowerCase()} image file`}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop: Show image upload in separate column */}
+        <div className="hidden lg:block order-2 lg:order-none">
+          <ImageUploadSection
+            title="Add image"
+            selectedImage={formState.selectedImage}
+            onImageUpload={onImageUpload}
+            onImageRemove={onImageRemove}
+            uploadId={uploadId}
+            ariaLabel={`Upload ${title.toLowerCase()} image file`}
+          />
         </div>
 
         <PreviewSection
@@ -403,11 +422,11 @@ const FormSection = memo(({
         />
       </div>
 
-      {/* Action Buttons */}
-      <div className="mt-8 flex justify-center gap-4">
+      {/* Action Buttons - Mobile optimized */}
+      <div className="mt-6 lg:mt-8 flex flex-col lg:flex-row justify-center gap-3 lg:gap-4">
         <button
           onClick={onCreatePost}
-          className="bg-black text-white px-12 py-3 rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="bg-black text-white px-8 lg:px-12 py-3 rounded-full hover:bg-gray-800 transition-colors text-sm lg:text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 w-full lg:w-auto"
           disabled={isButtonDisabled}
           type="button"
         >
@@ -416,10 +435,10 @@ const FormSection = memo(({
         </button>
         <button 
           onClick={onScreenViewOpen}
-          className="bg-red-500 text-white px-8 py-3 rounded-full hover:bg-red-600 transition-colors text-sm font-medium"
+          className="bg-gray-600 text-white px-6 lg:px-8 py-3 rounded-full hover:bg-gray-700 transition-colors text-sm lg:text-base font-medium w-full lg:w-auto"
           type="button"
         >
-          screen view
+          Screen View
         </button>
       </div>
     </div>
@@ -691,21 +710,36 @@ const JoinUsControl = memo(() => {
    * API-integrated Post creation handlers with stable references
    */
   const createPost = useCallback(async (formState, section, textPosition, resetForm, resetPosition) => {
-    if (!formState.detail) return;
+    // Validate required fields before sending
+    if (!formState.detail || !formState.detail.trim()) {
+      showError('Detail is required');
+      return;
+    }
 
     const actionId = `create-${section}`;
     setActionLoadingState(actionId, true);
 
     try {
+      // Ensure title is not empty and meets validation requirements
+      const title = `${section.charAt(0).toUpperCase() + section.slice(1)} Post`;
+      
       const postData = JoinUsService.formatPostData({
-        title: `${section.charAt(0).toUpperCase() + section.slice(1)} Post`,
-        detail: formState.detail,
+        title: title.trim(),
+        detail: formState.detail.trim(),
         section,
         textPosition: { ...textPosition },
-        image: formState.selectedImage ? { url: formState.selectedImage } : undefined,
+        image: formState.selectedImage ? { 
+          url: formState.selectedImage,
+          alt: `${title.trim()} image` 
+        } : undefined,
         isActive: true,
         isPublished: false
       });
+
+      // Log the data being sent for debugging
+      console.log('Creating post with data:', postData);
+      console.log('FormState detail:', formState.detail);
+      console.log('Selected image:', formState.selectedImage);
 
       const response = await JoinUsService.createPost(postData);
 

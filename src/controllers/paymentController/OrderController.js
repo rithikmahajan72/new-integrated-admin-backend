@@ -1566,6 +1566,41 @@ exports.adminGetOrderStatistics = async (req, res) => {
   }
 };
 
+// Get order by ID for admin
+exports.adminGetOrderById = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    console.log('🔍 adminGetOrderById called for orderId:', orderId);
+
+    const order = await Order.findById(orderId)
+      .populate('user', 'displayName email phoneNumber firstName lastName')
+      .populate('cart.itemId', 'productName image price salePrice')
+      .lean();
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    console.log('✅ adminGetOrderById success for orderId:', orderId);
+
+    res.status(200).json({
+      success: true,
+      order
+    });
+  } catch (error) {
+    console.error("❌ Error fetching admin order by ID:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch order details",
+      error: error.message
+    });
+  }
+};
+
 // Update order status
 exports.adminUpdateOrderStatus = async (req, res) => {
   try {

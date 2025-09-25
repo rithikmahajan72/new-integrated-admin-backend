@@ -54,8 +54,15 @@ const sectionValidation = () => [
 const imageValidation = () => [
     body("image.url")
         .optional()
-        .isURL()
-        .withMessage("Image URL must be a valid URL"),
+        .custom((value) => {
+            // Allow blob URLs for development and regular URLs for production
+            if (!value) return true;
+            const isValidUrl = /^https?:\/\//.test(value) || /^blob:/.test(value) || /^data:/.test(value);
+            if (!isValidUrl) {
+                throw new Error('Image URL must be a valid URL, blob URL, or data URL');
+            }
+            return true;
+        }),
     body("image.publicId")
         .optional()
         .isString()
