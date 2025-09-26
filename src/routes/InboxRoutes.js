@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const inboxController = require('../controllers/inboxController');
+const inboxController = require('../controllers/inboxController/inboxController');
 const { isAuthenticated, isAdmin } = require('../middleware/authMiddleware');
 
 // ---------- USER ROUTES ----------

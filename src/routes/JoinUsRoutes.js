@@ -16,7 +16,7 @@ const {
     trackJoinUsPostClick,
     trackJoinUsPostConversion,
     bulkUpdateJoinUsPosts
-} = require("../controllers/joinUsController");
+} = require("../controllers/joinUsController/joinUsController");
 
 const router = express.Router();
 

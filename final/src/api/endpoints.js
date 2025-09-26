@@ -100,8 +100,12 @@ export const itemAPI = {
 export const categoryAPI = {
   getAllCategories: () => API.get('/categories'),
   getCategoryById: (categoryId) => API.get(`/categories/${categoryId}`),
-  createCategory: (categoryData) => API.post('/categories', categoryData),
-  updateCategory: (categoryId, categoryData) => API.put(`/categories/${categoryId}`, categoryData),
+  createCategory: (categoryData) => API.post('/categories', categoryData, {
+    timeout: 30000, // 30 second timeout for uploads
+  }),
+  updateCategory: (categoryId, categoryData) => API.put(`/categories/${categoryId}`, categoryData, {
+    timeout: 30000, // 30 second timeout for uploads
+  }),
   deleteCategory: (categoryId) => API.delete(`/categories/${categoryId}`),
 };
 

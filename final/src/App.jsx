@@ -3,8 +3,6 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { restoreAuthFromStorage } from "./store/slices/authSlice";
 import Layout from "./layout/Layout";
-import MobileFiltersApp from "./pages/MobileFiltersApp";
-import AdvancedMobileFiltersApp from "./pages/AdvancedMobileFiltersApp";
 
 // Import AuthFlow component and ProtectedRoute
 import AuthFlow from "./screens/AuthFlow";
@@ -28,19 +26,22 @@ import ReturnOrders from "./pages/ReturnOrders"; // Old ReturnOrders component (
 import ReturnOrdersNew from "./pages/ReturnOrdersNew"; // New Redux ReturnOrders component
 import ExchangeOrders from "./pages/ExchangeOrders"; // New Exchange Orders component
 import Inbox from "./pages/Inbox";
-import Users from "./pages/Users";
 import BlockUser from "./pages/BlockUser";
-import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Products from "./pages/Products";
 import UploadCategory from "./pages/UploadCategory";
-import UploadCategorySimple from "./pages/UploadCategorySimple";
 import SubCategory from "./pages/SubCategory";
 import SingleProductUpload from "./components/SingleProductUpload";
 import ItemManagementSingleProductUpload from "./pages/itemmanagementsingleproductupload";
 import ItemManagementEditPage from "./pages/itemmanagementeditpage";
 import ItemManagementBulkUpload from "./pages/itemmanagementbulkupload";
 import ItemManagement from "./pages/ItemManagement";
+
+// NEW CLEAN COMPONENTS - Fixed infinite loop issues
+import ItemManagementNew from "./pages/ItemManagement_New";
+import SingleProductUploadNew from "./pages/SingleProductUpload_New";
+import BulkUploadNew from "./pages/BulkUpload_New";
+import EditPageNew from "./pages/EditPage_New";
 import ManageReviews from "./pages/ManageReviews";
 import ReviewDetails from "./pages/ReviewDetails";
 import PushNotification from "./pages/pushNotification";
@@ -55,8 +56,6 @@ import Filters from "./pages/Filters";
 import JoinUsControl from "./pages/JoinUsControl";
 import ManageBannersOnRewards from "./pages/ManageBannersOnRewards";
 import ProductBundling from "./pages/itembundling";
-import APIDebugPage from "./pages/APIDebugPage";
-import APIDebugTest from "./pages/APIDebugTest";
 import ArrangementControl from "./pages/itemarrangementcontrol";
 import NewPartner from "./pages/NewPartner";
 
@@ -130,15 +129,6 @@ const App = () => {
         <Route path="/profile-modal-demo" element={<ProfileModalDemo />} />
         <Route path="/simple-modal-test" element={<SimpleModalTest />} />
 
-        {/* Mobile Filters App - standalone route without Layout */}
-        <Route path="/mobile-filters-app" element={<MobileFiltersApp />} />
-
-        {/* Advanced Mobile Filters App - enhanced desktop management interface */}
-        <Route
-          path="/advanced-mobile-filters"
-          element={<AdvancedMobileFiltersApp />}
-        />
-
         {/* Dashboard route without layout for now */}
         <Route path="/dashboard" element={
           <div style={{ padding: '20px' }}>
@@ -180,6 +170,14 @@ const App = () => {
           <Route path="/item-management" element={<ItemManagement />} />
           <Route path="/item-management/edit/:id" element={<ItemManagementEditPage />} />
           <Route path="/item-management-bulk-upload" element={<ItemManagementBulkUpload />} />
+          
+          {/* NEW CLEAN COMPONENTS - Testing Routes */}
+          <Route path="/item-management-new" element={<ItemManagementNew />} />
+          <Route path="/item-management-new/edit/:id" element={<EditPageNew />} />
+          <Route path="/item-management-new/bulk-upload" element={<BulkUploadNew />} />
+          <Route path="/single-product-upload-new" element={<SingleProductUploadNew />} />
+          <Route path="/single-product-upload-new/:id" element={<SingleProductUploadNew />} />
+          
           <Route path="/admin/products" element={<ItemManagement />} />
           <Route path="/admin/products/new" element={<ItemManagement />} />
           <Route path="/admin/products/edit/:id" element={<ItemManagementEditPage />} />
@@ -191,7 +189,6 @@ const App = () => {
           <Route path="/save-for-later" element={<SaveForLaterPage />} />
           <Route path="/save-for-later-examples" element={<SaveForLaterExamples />} />
           <Route path="/upload-category" element={<UploadCategory />} />
-          <Route path="/upload-category-simple" element={<UploadCategorySimple />} />
           <Route path="/subcategory" element={<SubCategory />} />
           <Route
             path="/single-product-upload"
@@ -213,9 +210,8 @@ const App = () => {
 
           {/* ===== REVIEWS & RATINGS ===== */}
           <Route path="/manage-reviews" element={<ManageReviews />} />
-          <Route path="/api-debug-test" element={<APIDebugTest />} />
           <Route path="/review-details" element={<ReviewDetails />} />          {/* ===== USER MANAGEMENT ===== */}
-          <Route path="/users" element={<Users />} />
+          <Route path="/users" element={<DashboardUsers />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/block-user" element={<BlockUser />} />
 
@@ -248,7 +244,6 @@ const App = () => {
             element={<ManageBannersOnRewards />}
           />
           <Route path="/bundling" element={<ProductBundling />} />
-          <Route path="/api-debug" element={<APIDebugPage />} />
           <Route path="/arrangement" element={<ArrangementControl />} />
           <Route path="/new-partner" element={<NewPartner />} />
 
@@ -276,7 +271,7 @@ const App = () => {
           />
 
           {/* ===== ANALYTICS & REPORTS ===== */}
-          <Route path="/analytics" element={<Analytics />} />
+          {/* Analytics route removed - use /analytics-reports instead */}
 
           {/* ===== SETTINGS & CONFIGURATION ===== */}
           {/* Main Settings Dashboard */}

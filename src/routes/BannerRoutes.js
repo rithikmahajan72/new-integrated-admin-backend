@@ -15,7 +15,7 @@ const {
     trackBannerClick,
     trackBannerConversion,
     bulkUpdateBanners
-} = require("../controllers/bannerController");
+} = require("../controllers/bannerController/bannerController");
 
 const router = express.Router();
 

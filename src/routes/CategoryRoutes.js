@@ -54,17 +54,9 @@ CategoryRouter.post(
       req.body.imageUrl = fileUrl;
 
       // Call the controller to create the category
-      const category = await categoryController.createCategory(req, res, newCategoryId);
-
-      // Prevent further execution if the controller already sent a response
-      if (!category) {
-        return; // Early return if category creation fails or response was sent
-      }
-
-      // Send success response with the created category
-      res
-        .status(201)
-        .json(ApiResponse(category, "Category created successfully", true, 201));
+      await categoryController.createCategory(req, res, newCategoryId);
+      
+      // The controller already sends the response, so no need to send another one
     } catch (error) {
       console.error(error); // Log error for debugging
       // Ensure no response is sent if headers were already sent

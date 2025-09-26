@@ -23,7 +23,7 @@ const sidebarItems = [
   },
   {
     title: "App uploading area",
-    items: ["Category", "Subcategory", "Items"],
+    items: ["Category", "Subcategory", "Items", "Items (NEW - Fixed)", "Single Upload (NEW)", "Bulk Upload (NEW)"],
   },
   {
     title: "App functional area",

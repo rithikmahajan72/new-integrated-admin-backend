@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const CartAbandonmentController = require('../controllers/cartAbandonmentController');
+const CartAbandonmentController = require('../controllers/cartAbandonmentController/cartAbandonmentController');
 
 // Get all abandoned carts with filters
 router.get('/abandoned-carts', CartAbandonmentController.getAbandonedCarts);

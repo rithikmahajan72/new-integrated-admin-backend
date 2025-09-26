@@ -16,7 +16,7 @@ const {
   getConversionAnalytics,
   getDemographicsAnalytics,
   getTechnologyAnalytics
-} = require('../controllers/AnalyticsController');
+} = require('../controllers/analyticsController/AnalyticsController');
 
 // Authentication middleware
 const { isAuthenticated } = require('../middleware/authMiddleware');

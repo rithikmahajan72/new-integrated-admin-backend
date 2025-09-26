@@ -6,7 +6,9 @@ import {
   fetchCategories, 
   createCategory, 
   updateCategory, 
-  deleteCategory 
+  deleteCategory,
+  clearErrors,
+  clearMessages 
 } from '../store/slices/categoriesSlice';
 
 const UploadCategory = () => {
@@ -67,16 +69,20 @@ const UploadCategory = () => {
     if (successMessage) {
       setModals(prev => ({ ...prev, success: true }));
       setTimeout(() => {
+        dispatch(clearMessages());
         setModals(prev => ({ ...prev, success: false }));
       }, 2000);
     }
-  }, [successMessage]);
+  }, [successMessage, dispatch]);
 
   useEffect(() => {
     if (error) {
       console.error('Category operation error:', error);
+      setTimeout(() => {
+        dispatch(clearErrors());
+      }, 3000);
     }
-  }, [error]);
+  }, [error, dispatch]);
 
   // Utility functions
   const openModal = (modalName) => {
@@ -110,7 +116,12 @@ const UploadCategory = () => {
   };
 
   const updateFormData = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    console.log(`updateFormData: ${key} = `, value);
+    setFormData(prev => {
+      const updated = { ...prev, [key]: value };
+      console.log('updateFormData: Updated formData:', updated);
+      return updated;
+    });
   };
 
   // Event handlers
@@ -140,6 +151,15 @@ const UploadCategory = () => {
   };
 
   const handleSaveNewCategory = async () => {
+    console.log('handleSaveNewCategory: Starting with formData:', formData);
+    
+    // Debug authentication
+    const token = localStorage.getItem('authToken');
+    console.log('handleSaveNewCategory: Auth token:', token);
+    console.log('handleSaveNewCategory: User:', user);
+    console.log('handleSaveNewCategory: isAdmin:', isAdmin);
+    console.log('handleSaveNewCategory: isAuthenticated:', isAuthenticated);
+    
     if (!formData.newCategoryName.trim()) {
       alert('Please enter a category name');
       return;
@@ -155,13 +175,21 @@ const UploadCategory = () => {
     categoryData.append('description', formData.newCategoryDescription.trim() || '');
     categoryData.append('image', formData.imageFile);
 
+    // Debug: Log FormData contents
+    console.log('handleSaveNewCategory: FormData contents:');
+    for (let pair of categoryData.entries()) {
+      console.log(pair[0] + ': ', pair[1]);
+    }
+
     try {
+      console.log('handleSaveNewCategory: Dispatching createCategory with:', categoryData);
       await dispatch(createCategory(categoryData)).unwrap();
       closeModal('add');
       resetFormData();
       dispatch(fetchCategories()); // Refresh categories list
     } catch (error) {
       console.error('Failed to create category:', error);
+      alert('Failed to create category: ' + (error.message || error));
     }
   };
 

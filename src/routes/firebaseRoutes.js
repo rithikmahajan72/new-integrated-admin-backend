@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const firebaseController = require("../controllers/firebaseController");
+const firebaseController = require("../controllers/firebaseController/firebaseController");
 const { isAuthenticated } = require("../middleware/authMiddleware");
 
 /**

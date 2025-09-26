@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const SettingsController = require("../controllers/SettingsController");
+const SettingsController = require("../controllers/settingsController/SettingsController");
 const { isAuthenticated } = require("../middleware/authMiddleware");
 
 // Safe validation middleware - only use if express-validator is available

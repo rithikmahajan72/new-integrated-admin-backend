@@ -8,13 +8,13 @@ const categorySchema = new mongoose.Schema(
   {
     // Unique name for the category
     name: { type: String, required: true, unique: true },
-
+    
     // Optional description of the category
     description: { type: String },
-
+    
     // Image URL stored in S3 for category display
     imageUrl: { type: String },
-    
+        
     // Display order for arrangement control
     displayOrder: { type: Number, default: 0, index: true },
   },

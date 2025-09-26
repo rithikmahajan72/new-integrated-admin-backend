@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const reviewController = require('../controllers/ReviewController');
+const reviewController = require('../controllers/reviewController/ReviewController');
 const { isAuthenticated, isAdmin } = require('../middleware/authMiddleware');
 
 // ---------- USER ROUTES (Item ID) ----------

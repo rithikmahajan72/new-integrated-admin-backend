@@ -5,7 +5,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import the controller containing logic for handling Privacy Policy data
-const privacyPolicyController = require('../controllers/PrivacyPolicyController');
+const privacyPolicyController = require('../controllers/privacyPolicyController/PrivacyPolicyController');
 
 // Import middleware for verifying JWT token (for protected routes)
 const { verifyToken } = require('../middleware/VerifyToken');

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const inviteFriendController = require('../controllers/inviteafriend');
+const inviteFriendController = require('../controllers/inviteController/inviteafriend');
 const { verifyToken } = require('../middleware/VerifyToken');
 const checkAdminRole = require('../middleware/CheckAdminRole');
 
