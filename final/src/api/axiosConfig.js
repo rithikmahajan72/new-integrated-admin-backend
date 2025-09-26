@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { errorMonitor } from '../utils/errorMonitor.js';
 
 console.log('🔧 AXIOS CONFIG FILE LOADING...');
 
@@ -24,16 +25,26 @@ console.log('🔍 Environment check - VITE_API_BASE_URL:', import.meta.env.VITE_
 
 const API = axios.create({
   baseURL: baseURL,
-  timeout: 10000,
+  timeout: 60000, // Increased to 60 seconds for large file uploads
   headers: {
     'Content-Type': 'application/json',
   },
+  maxContentLength: 50 * 1024 * 1024, // 50MB max content length
+  maxBodyLength: 50 * 1024 * 1024, // 50MB max body length
 });
 
 // Request interceptor to add auth token to requests
 API.interceptors.request.use(
   (config) => {
-    console.log('📡 Making API request:', config.method?.toUpperCase(), config.url, 'baseURL:', config.baseURL, 'Full URL:', config.baseURL + config.url, config.params);
+    const fullUrl = config.baseURL + config.url;
+    console.log('📡 Making API request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullUrl: fullUrl,
+      params: config.params,
+      data: config.data
+    });
     
     const token = localStorage.getItem('authToken');
     if (token && token !== 'null' && token !== 'undefined') {
@@ -56,37 +67,48 @@ API.interceptors.request.use(
 // Response interceptor to handle common response scenarios
 API.interceptors.response.use(
   (response) => {
-    console.log('API Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data
-    });
+    // Only log successful responses that aren't cached (304)
+    if (response.status !== 304) {
+      console.log('✅ API Response SUCCESS:', {
+        url: response.config.url,
+        status: response.status,
+        method: response.config.method?.toUpperCase(),
+        dataSize: response.data ? JSON.stringify(response.data).length : 0
+      });
+    }
     return response;
   },
   (error) => {
-    console.error('API Error:', {
+    const errorContext = {
       url: error.config?.url,
+      method: error.config?.method?.toUpperCase(),
       status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
+      baseURL: error.config?.baseURL,
+      data: error.response?.data
+    };
+
+    // Use enhanced error monitoring
+    errorMonitor.logError(error, errorContext);
     
-    // Handle common error scenarios
-    if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
+    // Handle common error scenarios with better user messages
+    if (error.code === 'ECONNABORTED') {
+      error.userMessage = 'Request timed out. Please try again.';
+    } else if (error.code === 'ERR_CANCELED') {
+      error.userMessage = 'Request was cancelled.';
+    } else if (!error.response) {
+      error.userMessage = 'Network error. Please check your connection.';
+    } else if (error.response.status === 401) {
+      error.userMessage = 'Authentication failed. Please login again.';
       localStorage.removeItem('authToken');
-      window.location.href = '/login';
-    }
-    
-    if (error.response?.status === 403) {
-      // Forbidden
-      console.error('Access forbidden');
-    }
-    
-    if (error.response?.status >= 500) {
-      // Server error
-      console.error('Server error occurred');
+      // Don't redirect automatically, let components handle it
+    } else if (error.response.status === 403) {
+      error.userMessage = 'Permission denied. You do not have access to this resource.';
+    } else if (error.response.status === 404) {
+      error.userMessage = 'Resource not found.';
+    } else if (error.response.status >= 500) {
+      error.userMessage = 'Server error. Please try again later.';
+    } else if (error.response.status >= 400) {
+      error.userMessage = error.response.data?.message || 'Request failed.';
     }
     
     return Promise.reject(error);

@@ -38,10 +38,19 @@ const sizeSchema = new mongoose.Schema({
 // ==============================
 const itemSchema = new mongoose.Schema(
   {
-    productId: {
+    itemId: {
       type: String,
       required: true,
       unique: true,
+      index: true,
+    },
+    
+    // productId for backward compatibility with existing unique indexes
+    productId: {
+      type: String,
+      required: false, // Make it optional to avoid breaking existing records
+      unique: true,
+      sparse: true, // Only enforce unique constraint on non-null values
       index: true,
     },
     
@@ -192,7 +201,6 @@ const itemSchema = new mongoose.Schema(
 // ==============================
 // Indexes for better performance
 // ==============================
-itemSchema.index({ productId: 1 });
 itemSchema.index({ isActive: 1, isDeleted: 1 });
 itemSchema.index({ categoryId: 1 });
 itemSchema.index({ subCategoryId: 1 });

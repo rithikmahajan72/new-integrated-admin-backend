@@ -1,38 +1,48 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { categoryAPI, subCategoryAPI } from '../../api/endpoints';
 import { apiCall } from '../../api/utils';
+import { monitoredRequest } from '../../utils/errorMonitor.js';
 
 // Async thunks for category operations
 export const fetchCategories = createAsyncThunk(
   'categories/fetchCategories',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      console.log('fetchCategories: Starting API call...');
+      const requestKey = 'fetchCategories';
       
-      // Direct API call for better debugging
-      const response = await categoryAPI.getAllCategories();
-      console.log('fetchCategories response:', response);
-      
-      const result = response.data;
-      console.log('fetchCategories result:', result);
-      
-      if (result.success || response.status === 200) {
-        console.log('fetchCategories: Success, returning data:', result.data || result || []);
-        return result.data || result || [];
-      } else {
-        console.log('fetchCategories: API returned error:', result.message);
-        return rejectWithValue(result.message || 'Failed to fetch categories');
-      }
+      return await monitoredRequest(requestKey, async () => {
+        console.log('fetchCategories: Starting API call...');
+        
+        // Check if we already have categories in state
+        const currentState = getState();
+        if (currentState.categories?.items?.length > 0) {
+          console.log('🔄 Using cached categories data');
+          return currentState.categories.items;
+        }
+        
+        console.log('🔍 Making fresh API call for categories');
+        const response = await categoryAPI.getAllCategories();
+        console.log('fetchCategories response:', response);
+        
+        const result = response.data;
+        console.log('fetchCategories result:', result);
+        
+        if (result.success || response.status === 200) {
+          console.log('fetchCategories: Success, returning data:', result.data || result || []);
+          return result.data || result || [];
+        } else {
+          console.log('fetchCategories: API returned error:', result.message);
+          throw new Error(result.message || 'Failed to fetch categories');
+        }
+      }, {
+        method: 'GET',
+        url: '/categories'
+      });
     } catch (error) {
       console.error('fetchCategories error:', error);
-      console.error('fetchCategories error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config?.url
-      });
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch categories';
-      return rejectWithValue(errorMessage);
+      return rejectWithValue(
+        error.userMessage || error.response?.data?.message || error.message || 'Failed to fetch categories'
+      );
     }
   }
 );

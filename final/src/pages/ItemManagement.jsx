@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import ReactDOM from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import ErrorMonitorWidget from '../components/ErrorMonitorWidget';
 import {
   Search,
   Filter,
   Plus,
   Edit,
   Trash2,
-  Eye,
-  MoreVertical,
-  Grid,
   List,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   RefreshCw,
   Download,
   Upload,
@@ -105,32 +104,92 @@ const StockStatus = ({ sizes, variants, stockSizeOption }) => {
   );
 };
 
-// Detailed stock display component for list view
+// Product status component
+const ProductStatus = ({ status }) => {
+  const getStatusDisplay = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'published':
+      case 'active':
+        return {
+          label: 'Published',
+          icon: CheckCircle,
+          color: 'text-green-700',
+          bg: 'bg-green-100',
+          border: 'border-green-300'
+        };
+      case 'draft':
+        return {
+          label: 'Draft',
+          icon: Clock,
+          color: 'text-yellow-700',
+          bg: 'bg-yellow-100',
+          border: 'border-yellow-300'
+        };
+      case 'inactive':
+      case 'disabled':
+        return {
+          label: 'Inactive',
+          icon: XCircle,
+          color: 'text-red-700',
+          bg: 'bg-red-100',
+          border: 'border-red-300'
+        };
+      case 'scheduled':
+        return {
+          label: 'Scheduled',
+          icon: Calendar,
+          color: 'text-blue-700',
+          bg: 'bg-blue-100',
+          border: 'border-blue-300'
+        };
+      default:
+        return {
+          label: 'Draft',
+          icon: Clock,
+          color: 'text-gray-700',
+          bg: 'bg-gray-100',
+          border: 'border-gray-300'
+        };
+    }
+  };
+
+  const statusDisplay = getStatusDisplay(status);
+  const StatusIcon = statusDisplay.icon;
+
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${statusDisplay.bg} ${statusDisplay.color} ${statusDisplay.border}`}>
+      <StatusIcon className="w-3 h-3" />
+      {statusDisplay.label}
+    </div>
+  );
+};
+
+// Enhanced detailed stock display component for list view
 const DetailedStockDisplay = ({ sizes, variants, stockSizeOption }) => {
+  const [showStockDetails, setShowStockDetails] = useState(false);
+  
   const stockItems = useMemo(() => {
     const items = [];
     
     if (stockSizeOption === 'sizes' && sizes?.length) {
       sizes.forEach(size => {
         const quantity = size.quantity || size.stock || 0;
-        if (quantity > 0) {
-          items.push({
-            name: size.size || size.name,
-            quantity: quantity
-          });
-        }
+        items.push({
+          name: size.size || size.name,
+          quantity: quantity,
+          hasStock: quantity > 0
+        });
       });
     } else if (stockSizeOption === 'variants' && variants?.length) {
       variants.forEach(variant => {
         if (variant.sizes?.length) {
           variant.sizes.forEach(size => {
             const quantity = size.quantity || size.stock || 0;
-            if (quantity > 0) {
-              items.push({
-                name: `${variant.color} - ${size.size}`,
-                quantity: quantity
-              });
-            }
+            items.push({
+              name: `${variant.color} - ${size.size}`,
+              quantity: quantity,
+              hasStock: quantity > 0
+            });
           });
         }
       });
@@ -140,40 +199,117 @@ const DetailedStockDisplay = ({ sizes, variants, stockSizeOption }) => {
   }, [sizes, variants, stockSizeOption]);
 
   const totalStock = stockItems.reduce((total, item) => total + item.quantity, 0);
+  const inStockItems = stockItems.filter(item => item.hasStock);
+  const outOfStockItems = stockItems.filter(item => !item.hasStock);
 
   if (stockItems.length === 0) {
     return (
       <div className="text-xs text-red-600 font-medium">
-        Out of Stock
+        No sizes configured
       </div>
     );
   }
 
   return (
-    <div className="text-xs">
-      <div className={`font-medium mb-1 ${
-        totalStock <= 5 ? 'text-yellow-600' : 'text-green-600'
-      }`}>
-        Total: {totalStock} units
-      </div>
+    <div className="relative">
       <div className="space-y-1">
-        {stockItems.slice(0, 3).map((item, index) => (
-          <div key={index} className="flex justify-between text-gray-600">
-            <span className="truncate mr-2">{item.name}:</span>
-            <span className="font-medium">{item.quantity}</span>
+        {/* Stock Summary */}
+        <div 
+          className={`font-medium text-xs cursor-pointer flex items-center gap-1 group ${
+            totalStock <= 5 ? 'text-yellow-600' : totalStock === 0 ? 'text-red-600' : 'text-green-600'
+          }`}
+          onClick={() => setShowStockDetails(!showStockDetails)}
+        >
+          <span>Total: {totalStock} units</span>
+          <ChevronDown className="w-3 h-3 group-hover:text-blue-500" />
+        </div>
+        
+        {/* Size count and status */}
+        <div className="text-xs space-y-0.5">
+          <div className="text-green-600">
+            ✓ {inStockItems.length} sizes in stock
           </div>
-        ))}
-        {stockItems.length > 3 && (
-          <div className="text-gray-500 italic">
-            +{stockItems.length - 3} more sizes
-          </div>
-        )}
+          {outOfStockItems.length > 0 && (
+            <div className="text-red-500">
+              ✗ {outOfStockItems.length} sizes out of stock
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Detailed Stock Breakdown */}
+      {showStockDetails && (
+        <div className="absolute top-8 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-64">
+          <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+            <span>Size-wise Stock:</span>
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              {stockItems.length} sizes
+            </span>
+          </div>
+          
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {/* In Stock Items */}
+            {inStockItems.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-green-700 mb-1">In Stock:</div>
+                {inStockItems.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm p-2 bg-green-50 rounded">
+                    <span className="text-gray-700 uppercase font-medium bg-white px-2 py-1 rounded text-xs">
+                      {item.name}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-700 font-medium">{item.quantity} units</span>
+                      {item.quantity <= 5 && (
+                        <span className="text-xs bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded">
+                          Low
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Out of Stock Items */}
+            {outOfStockItems.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-red-700 mb-1">Out of Stock:</div>
+                {outOfStockItems.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm p-2 bg-red-50 rounded">
+                    <span className="text-gray-700 uppercase font-medium bg-white px-2 py-1 rounded text-xs">
+                      {item.name}
+                    </span>
+                    <span className="text-red-700 font-medium text-xs">0 units</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowStockDetails(false);
+            }}
+            className="mt-3 w-full text-xs text-blue-600 hover:text-blue-800 border-t border-gray-200 pt-2"
+          >
+            Close Details
+          </button>
+        </div>
+      )}
+      
+      {/* Click outside to close */}
+      {showStockDetails && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setShowStockDetails(false)}
+        />
+      )}
     </div>
   );
 };
 
-// Price display component with detailed size-wise breakdown
+// Enhanced Price display component with better size-wise visibility
 const PriceDisplay = ({ sizes, platformPricing, price, salePrice, discountPrice }) => {
   const [showDetails, setShowDetails] = useState(false);
   
@@ -229,39 +365,62 @@ const PriceDisplay = ({ sizes, platformPricing, price, salePrice, discountPrice 
 
   return (
     <div className="relative">
-      {/* Summary View */}
-      <div 
-        className="flex items-center gap-2 cursor-pointer group"
-        onClick={() => priceInfo.details && setShowDetails(!showDetails)}
-      >
-        {priceInfo.summary.sale && (
-          <span className="text-green-600 font-medium">{priceInfo.summary.sale}</span>
-        )}
-        <span className={`${priceInfo.summary.sale ? 'line-through text-gray-500' : 'text-gray-900 font-medium'}`}>
-          {priceInfo.summary.regular}
-        </span>
-        {priceInfo.details && (
-          <span className="text-blue-500 text-xs group-hover:text-blue-700">
-            ({priceInfo.details.length} sizes)
+      {/* Enhanced Summary View with better size indication */}
+      <div className="space-y-1">
+        <div 
+          className="flex items-center gap-2 cursor-pointer group"
+          onClick={() => priceInfo.details && setShowDetails(!showDetails)}
+        >
+          {priceInfo.summary.sale && (
+            <span className="text-green-600 font-medium">{priceInfo.summary.sale}</span>
+          )}
+          <span className={`${priceInfo.summary.sale ? 'line-through text-gray-500' : 'text-gray-900 font-medium'}`}>
+            {priceInfo.summary.regular}
           </span>
+          {priceInfo.details && (
+            <ChevronDown className="w-3 h-3 text-blue-500 group-hover:text-blue-700" />
+          )}
+        </div>
+        
+        {/* Show size count and preview for size-based pricing */}
+        {priceInfo.details && (
+          <div className="text-xs text-blue-600 space-y-0.5">
+            <div className="font-medium">{priceInfo.details.length} sizes available</div>
+            <div className="text-gray-500">
+              {priceInfo.details.slice(0, 3).map(p => p.size).join(', ')}
+              {priceInfo.details.length > 3 && ` +${priceInfo.details.length - 3} more`}
+            </div>
+          </div>
         )}
       </div>
 
       {/* Detailed Size-wise Breakdown */}
       {showDetails && priceInfo.details && (
         <div className="absolute top-8 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-64">
-          <div className="text-sm font-medium text-gray-700 mb-2">Size-wise Pricing:</div>
-          <div className="space-y-1">
+          <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+            <span>Size-wise Pricing:</span>
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              {priceInfo.details.length} sizes
+            </span>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
             {priceInfo.details.map((sizePrice, index) => (
-              <div key={index} className="flex justify-between items-center text-sm">
-                <span className="text-gray-600 uppercase font-medium">{sizePrice.size}</span>
+              <div key={index} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
+                <span className="text-gray-700 uppercase font-medium bg-white px-2 py-1 rounded text-xs">
+                  {sizePrice.size}
+                </span>
                 <div className="flex items-center gap-2">
                   {sizePrice.sale > 0 && (
                     <span className="text-green-600 font-medium">₹{sizePrice.sale}</span>
                   )}
-                  <span className={`${sizePrice.sale > 0 ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                  <span className={`${sizePrice.sale > 0 ? 'line-through text-gray-400' : 'text-gray-900 font-medium'}`}>
                     ₹{sizePrice.regular}
                   </span>
+                  {sizePrice.sale > 0 && (
+                    <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">
+                      {Math.round(((sizePrice.regular - sizePrice.sale) / sizePrice.regular) * 100)}% off
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -271,9 +430,9 @@ const PriceDisplay = ({ sizes, platformPricing, price, salePrice, discountPrice 
               e.stopPropagation();
               setShowDetails(false);
             }}
-            className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800"
+            className="mt-3 w-full text-xs text-blue-600 hover:text-blue-800 border-t border-gray-200 pt-2"
           >
-            Close
+            Close Details
           </button>
         </div>
       )}
@@ -289,345 +448,21 @@ const PriceDisplay = ({ sizes, platformPricing, price, salePrice, discountPrice 
   );
 };
 
-// Item card component for grid view
-const ItemCard = ({ 
-  item, 
-  onEdit, 
-  onDelete, 
-  onView, 
-  onToggleStatus, 
-  onStatusChange,
-  onAddToRecommendations,
-  onMoveToSale,
-  onKeepCopyAndMove,
-  onMoveToEyx
-}) => {
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
-  const [showActionPanel, setShowActionPanel] = useState(false);
-  const primaryImage = item.images?.[0]?.url || item.imageUrl || '/placeholder-image.jpg';
-
-  const statusOptions = [
-    { value: 'draft', label: 'Draft', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'scheduled', label: 'Scheduled', color: 'bg-blue-100 text-blue-800' },
-    { value: 'published', label: 'Live/Published', color: 'bg-green-100 text-green-800' }
-  ];
-
-  return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden group">
-      {/* Image */}
-      <div className="relative aspect-square overflow-hidden bg-gray-100">
-        <img 
-          src={primaryImage} 
-          alt={item.productName || item.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-          onError={(e) => {
-            e.target.src = '/placeholder-image.jpg';
-          }}
-        />
-        
-        {/* Status badge */}
-        <div className="absolute top-2 left-2">
-          <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(item.status)}`}>
-            {item.status || 'draft'}
-          </span>
-        </div>
-        
-        {/* Quick actions on hover */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="flex gap-1">
-            <button
-              onClick={() => onView(item)}
-              className="p-1.5 bg-white rounded-full shadow hover:bg-gray-50"
-              title="View Details"
-            >
-              <Eye className="w-4 h-4 text-gray-600" />
-            </button>
-            <button
-              onClick={() => onDelete(item)}
-              className="p-1.5 bg-white rounded-full shadow hover:bg-gray-50"
-              title="Delete"
-            >
-              <Trash2 className="w-4 h-4 text-red-600" />
-            </button>
-          </div>
-        </div>
-
-        {/* Stock status overlay */}
-        <div className="absolute bottom-2 left-2">
-          <StockStatus 
-            sizes={item.sizes}
-            variants={item.variants}
-            stockSizeOption={item.stockSizeOption}
-          />
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-4">
-        <div className="mb-2">
-          <h3 className="font-medium text-gray-900 line-clamp-2 mb-1">
-            {item.productName || item.name}
-          </h3>
-          <p className="text-sm text-gray-500 line-clamp-1">
-            {item.brand && `${item.brand} • `}
-            SKU: {item.productId}
-          </p>
-        </div>
-
-        {/* Price */}
-        <div className="mb-3">
-          <PriceDisplay 
-            sizes={item.sizes}
-            platformPricing={item.platformPricing}
-            price={item.price}
-            salePrice={item.salePrice}
-            discountPrice={item.discountPrice}
-          />
-        </div>
-
-        {/* Category info */}
-        <div className="text-xs text-gray-500 mb-3">
-          {item.categoryId?.name || 'Uncategorized'} → {item.subCategoryId?.name || 'No subcategory'}
-        </div>
-
-        {/* Quick Action buttons */}
-        <div className="flex gap-2 mb-3">
-          <button
-            onClick={() => onEdit(item)}
-            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => onView(item)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-            title="View Details"
-          >
-            <Eye className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-
-        {/* Action Panel Toggle */}
-        <button
-          onClick={() => setShowActionPanel(true)}
-          className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-        >
-          <MoreVertical className="w-4 h-4" />
-          More Actions & Settings
-        </button>
-
-        {/* Full-Screen Action Panel */}
-        {showActionPanel && ReactDOM.createPortal(
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10000 }}>
-            {/* Left Side - Product Info (1/3 width) */}
-            <div className="w-1/3 bg-white p-6 overflow-y-auto border-r border-gray-200">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Product Details</h2>
-                <button
-                  onClick={() => setShowActionPanel(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <XCircle className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-              
-              {/* Product Image */}
-              <div className="mb-6">
-                <img 
-                  src={primaryImage} 
-                  alt={item.productName || item.name}
-                  className="w-full h-64 object-cover rounded-lg bg-gray-100"
-                  onError={(e) => {
-                    e.target.src = '/placeholder-image.jpg';
-                  }}
-                />
-              </div>
-
-              {/* Product Info */}
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-900 mb-2">
-                    {item.productName || item.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-2">
-                    SKU: {item.productId}
-                  </p>
-                  {item.brand && (
-                    <p className="text-sm text-gray-600">
-                      Brand: {item.brand}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Category</h4>
-                  <p className="text-sm text-gray-600">
-                    {item.categoryId?.name || 'Uncategorized'} → {item.subCategoryId?.name || 'No subcategory'}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Price</h4>
-                  <PriceDisplay 
-                    sizes={item.sizes}
-                    platformPricing={item.platformPricing}
-                    price={item.price}
-                    salePrice={item.salePrice}
-                    discountPrice={item.discountPrice}
-                  />
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Stock Status</h4>
-                  <StockStatus 
-                    sizes={item.sizes}
-                    variants={item.variants}
-                    stockSizeOption={item.stockSizeOption}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Side - Actions (2/3 width) */}
-            <div className="flex-1 bg-white p-6 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Product Actions & Settings</h2>
-              
-              <div className="space-y-8">
-                {/* Status Management */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Status Management
-                  </h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    {statusOptions.map(option => (
-                      <button
-                        key={option.value}
-                        onClick={() => {
-                          onStatusChange(item, option.value);
-                        }}
-                        className={`p-4 rounded-lg border-2 transition-all text-center ${
-                          (item.status || 'draft') === option.value 
-                            ? 'border-blue-500 bg-blue-50' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className={`inline-block w-3 h-3 rounded-full mb-2 ${option.color.split(' ')[0]}`}></div>
-                        <div className="font-medium">{option.label}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Recommendations Management */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Heart className="w-5 h-5" />
-                    Recommendation Settings
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => onAddToRecommendations(item, 'youMayAlsoLike')}
-                      className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                    >
-                      <Heart className="w-6 h-6 mx-auto mb-2 text-red-500" />
-                      <div className="font-medium">You May Also Like</div>
-                      <div className="text-sm text-gray-600 mt-1">Add to recommendation list</div>
-                    </button>
-                    <button
-                      onClick={() => onAddToRecommendations(item, 'othersAlsoBought')}
-                      className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                    >
-                      <Users className="w-6 h-6 mx-auto mb-2 text-blue-500" />
-                      <div className="font-medium">Others Also Bought</div>
-                      <div className="text-sm text-gray-600 mt-1">Add to cross-sell list</div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Product Actions */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Package className="w-5 h-5" />
-                    Product Management
-                  </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    <button
-                      onClick={() => onMoveToSale(item)}
-                      className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-left flex items-center gap-3"
-                    >
-                      <Tag className="w-6 h-6 text-green-500" />
-                      <div>
-                        <div className="font-medium">Move to Sale</div>
-                        <div className="text-sm text-gray-600">Apply discount and move to sale section</div>
-                      </div>
-                    </button>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        onClick={() => onKeepCopyAndMove(item)}
-                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                      >
-                        <Copy className="w-6 h-6 mx-auto mb-2 text-blue-500" />
-                        <div className="font-medium">Keep Copy & Move</div>
-                        <div className="text-sm text-gray-600 mt-1">Duplicate before moving</div>
-                      </button>
-                      <button
-                        onClick={() => onMoveToEyx(item)}
-                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                      >
-                        <ExternalLink className="w-6 h-6 mx-auto mb-2 text-purple-500" />
-                        <div className="font-medium">Move to EYX</div>
-                        <div className="text-sm text-gray-600 mt-1">Transfer to EYX platform</div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Danger Zone */}
-                <div className="bg-red-50 rounded-lg p-6 border border-red-200">
-                  <h3 className="text-lg font-semibold text-red-900 mb-4 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    Danger Zone
-                  </h3>
-                  <button
-                    onClick={() => {
-                      if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
-                        onDelete(item);
-                        setShowActionPanel(false);
-                      }
-                    }}
-                    className="w-full p-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                    Delete Product Permanently
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>, 
-          document.body
-        )}
-      </div>
-    </div>
-  );
-};
 
 // Table row component for list view
 const ItemRow = ({ 
   item, 
   onEdit, 
   onDelete, 
-  onView, 
   onToggleStatus, 
   onStatusChange,
   onAddToRecommendations,
   onMoveToSale,
   onKeepCopyAndMove,
-  onMoveToEyx
+  onMoveToEyx,
+  statusLoading
 }) => {
-  const [showActionPanel, setShowActionPanel] = useState(false);
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [expandedRow, setExpandedRow] = useState(false);
   const primaryImage = item.images?.[0]?.url || item.imageUrl || '/placeholder-image.jpg';
 
   const statusOptions = [
@@ -637,7 +472,8 @@ const ItemRow = ({
   ];
 
   return (
-    <tr className="hover:bg-gray-50 transition-colors">
+    <>
+      <tr className="hover:bg-gray-50 transition-colors">
       {/* Image & Basic Info */}
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
@@ -653,7 +489,7 @@ const ItemRow = ({
             <p className="font-medium text-gray-900 line-clamp-1">
               {item.productName || item.name}
             </p>
-            <p className="text-sm text-gray-500">SKU: {item.productId}</p>
+            <p className="text-sm text-gray-500">SKU: {item.itemId}</p>
           </div>
         </div>
       </td>
@@ -688,35 +524,7 @@ const ItemRow = ({
 
       {/* Status */}
       <td className="px-6 py-4">
-        <div className="relative">
-          <button
-            onClick={() => setShowStatusMenu(!showStatusMenu)}
-            className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(item.status)} hover:shadow-md transition-shadow`}
-          >
-            {item.status || 'draft'} ▼
-          </button>
-          
-          {/* Status dropdown */}
-          {showStatusMenu && (
-            <div className="absolute top-full left-0 bg-white border border-gray-200 rounded-md shadow-lg z-20 mt-1 min-w-32">
-              {statusOptions.map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => {
-                    onStatusChange(item, option.value);
-                    setShowStatusMenu(false);
-                  }}
-                  className={`w-full px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${
-                    (item.status || 'draft') === option.value ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${option.color.split(' ')[0]}`}></span>
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductStatus status={item.status} />
       </td>
 
       {/* Created Date */}
@@ -728,11 +536,15 @@ const ItemRow = ({
       <td className="px-6 py-4 text-right">
         <div className="relative">
           <button
-            onClick={() => onView(item)}
-            className="p-1 hover:bg-gray-100 rounded transition-colors mr-1"
-            title="View Details"
+            onClick={() => setExpandedRow(!expandedRow)}
+            className="p-1 hover:bg-blue-100 rounded transition-colors mr-1"
+            title="Toggle Actions Panel"
           >
-            <Eye className="w-4 h-4 text-gray-500" />
+            {expandedRow ? (
+              <ChevronUp className="w-4 h-4 text-blue-600" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-blue-600" />
+            )}
           </button>
           <button
             onClick={() => onEdit(item)}
@@ -741,208 +553,157 @@ const ItemRow = ({
           >
             <Edit className="w-4 h-4 text-gray-500" />
           </button>
-          <button
-            onClick={() => setShowActionPanel(true)}
-            className="p-1 hover:bg-blue-100 rounded transition-colors"
-            title="More Actions"
-          >
-            <MoreVertical className="w-4 h-4 text-blue-600" />
-          </button>
-          
-          {showActionPanel && ReactDOM.createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10000 }}>
-              {/* Left Side - Product Info (1/3 width) */}
-              <div className="w-1/3 bg-white p-6 overflow-y-auto border-r border-gray-200">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold text-gray-900">Product Details</h2>
-                  <button
-                    onClick={() => setShowActionPanel(false)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <XCircle className="w-5 h-5 text-gray-500" />
-                  </button>
-                </div>
-                
-                {/* Product Image */}
-                <div className="mb-6">
-                  <img 
-                    src={primaryImage} 
-                    alt={item.productName || item.name}
-                    className="w-full h-64 object-cover rounded-lg bg-gray-100"
-                    onError={(e) => {
-                      e.target.src = '/placeholder-image.jpg';
-                    }}
-                  />
-                </div>
-
-                {/* Product Info */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-lg text-gray-900 mb-2">
-                      {item.productName || item.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-2">
-                      SKU: {item.productId}
-                    </p>
-                    {item.brand && (
-                      <p className="text-sm text-gray-600">
-                        Brand: {item.brand}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Category</h4>
-                    <p className="text-sm text-gray-600">
-                      {item.categoryId?.name || 'Uncategorized'} → {item.subCategoryId?.name || 'No subcategory'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Price</h4>
-                    <PriceDisplay 
-                      sizes={item.sizes}
-                      platformPricing={item.platformPricing}
-                      price={item.price}
-                      salePrice={item.salePrice}
-                      discountPrice={item.discountPrice}
-                    />
-                  </div>
-
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Stock Status</h4>
-                    <DetailedStockDisplay 
-                      sizes={item.sizes}
-                      variants={item.variants}
-                      stockSizeOption={item.stockSizeOption}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Side - Actions (2/3 width) */}
-              <div className="flex-1 bg-white p-6 overflow-y-auto">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Product Actions & Settings</h2>
-                
-                <div className="space-y-8">
-                  {/* Status Management */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <Clock className="w-5 h-5" />
-                      Status Management
-                    </h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      {statusOptions.map(option => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            onStatusChange(item, option.value);
-                          }}
-                          className={`p-4 rounded-lg border-2 transition-all text-center ${
-                            (item.status || 'draft') === option.value 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div className={`inline-block w-3 h-3 rounded-full mb-2 ${option.color.split(' ')[0]}`}></div>
-                          <div className="font-medium">{option.label}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Recommendations Management */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <Heart className="w-5 h-5" />
-                      Recommendation Settings
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        onClick={() => onAddToRecommendations(item, 'youMayAlsoLike')}
-                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                      >
-                        <Heart className="w-6 h-6 mx-auto mb-2 text-red-500" />
-                        <div className="font-medium">You May Also Like</div>
-                        <div className="text-sm text-gray-600 mt-1">Add to recommendation list</div>
-                      </button>
-                      <button
-                        onClick={() => onAddToRecommendations(item, 'othersAlsoBought')}
-                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                      >
-                        <Users className="w-6 h-6 mx-auto mb-2 text-blue-500" />
-                        <div className="font-medium">Others Also Bought</div>
-                        <div className="text-sm text-gray-600 mt-1">Add to cross-sell list</div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Product Actions */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <Package className="w-5 h-5" />
-                      Product Management
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4">
-                      <button
-                        onClick={() => onMoveToSale(item)}
-                        className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-left flex items-center gap-3"
-                      >
-                        <Tag className="w-6 h-6 text-green-500" />
-                        <div>
-                          <div className="font-medium">Move to Sale</div>
-                          <div className="text-sm text-gray-600">Apply discount and move to sale section</div>
-                        </div>
-                      </button>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          onClick={() => onKeepCopyAndMove(item)}
-                          className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                        >
-                          <Copy className="w-6 h-6 mx-auto mb-2 text-blue-500" />
-                          <div className="font-medium">Keep Copy & Move</div>
-                          <div className="text-sm text-gray-600 mt-1">Duplicate before moving</div>
-                        </button>
-                        <button
-                          onClick={() => onMoveToEyx(item)}
-                          className="p-4 border border-gray-300 rounded-lg hover:bg-white transition-colors text-center"
-                        >
-                          <ExternalLink className="w-6 h-6 mx-auto mb-2 text-purple-500" />
-                          <div className="font-medium">Move to EYX</div>
-                          <div className="text-sm text-gray-600 mt-1">Transfer to EYX platform</div>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Danger Zone */}
-                  <div className="bg-red-50 rounded-lg p-6 border border-red-200">
-                    <h3 className="text-lg font-semibold text-red-900 mb-4 flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5" />
-                      Danger Zone
-                    </h3>
-                    <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
-                          onDelete(item);
-                          setShowActionPanel(false);
-                        }
-                      }}
-                      className="w-full p-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                      Delete Product Permanently
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>, 
-            document.body
-          )}
         </div>
       </td>
     </tr>
+
+    {/* Expanded Row */}
+    {expandedRow && (
+      <tr>
+        <td colSpan="7" className="px-0 py-0">
+          <div className="bg-gray-50 border-t border-gray-200">
+            <div className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Status Management */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Status Management
+                  </h3>
+                  <div className="space-y-2">
+                    {statusOptions.map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          onStatusChange(item, option.value);
+                        }}
+                        disabled={statusLoading[item.itemId || item._id]}
+                        className={`w-full p-2 rounded border text-sm transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed ${
+                          (item.status || 'draft') === option.value 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${option.color.split(' ')[0]}`}></div>
+                          <span className="font-medium">{option.label}</span>
+                          {statusLoading[item.itemId || item._id] && option.value !== (item.status || 'draft') && (
+                            <div className="ml-auto">
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recommendation Settings */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Heart className="w-4 h-4" />
+                    Recommendation Settings
+                  </h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => onAddToRecommendations(item, 'youMayAlsoLike')}
+                      className="w-full p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Heart className="w-4 h-4 text-red-500" />
+                        <div>
+                          <div className="text-sm font-medium">You May Also Like</div>
+                          <div className="text-xs text-gray-500">Add to recommendation</div>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => onAddToRecommendations(item, 'othersAlsoBought')}
+                      className="w-full p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-blue-500" />
+                        <div>
+                          <div className="text-sm font-medium">Others Also Bought</div>
+                          <div className="text-xs text-gray-500">Add to cross-sell</div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Product Management */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Product Management
+                  </h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => onMoveToSale(item)}
+                      className="w-full p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Tag className="w-4 h-4 text-green-500" />
+                        <div>
+                          <div className="text-sm font-medium">Move to Sale</div>
+                          <div className="text-xs text-gray-500">Apply discount</div>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => onKeepCopyAndMove(item)}
+                      className="w-full p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Copy className="w-4 h-4 text-blue-500" />
+                        <div>
+                          <div className="text-sm font-medium">Keep Copy & Move</div>
+                          <div className="text-xs text-gray-500">Duplicate first</div>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => onMoveToEyx(item)}
+                      className="w-full p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ExternalLink className="w-4 h-4 text-purple-500" />
+                        <div>
+                          <div className="text-sm font-medium">Move to EYX</div>
+                          <div className="text-xs text-gray-500">Transfer platform</div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                  <h3 className="text-sm font-semibold text-red-900 mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Danger Zone
+                  </h3>
+                  <button
+                    onClick={() => {
+                      if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+                        onDelete(item);
+                        setExpandedRow(false);
+                      }
+                    }}
+                    className="w-full p-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="text-sm font-medium">Delete Product</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    )}
+  </>
   );
 };
 
@@ -958,7 +719,6 @@ const ItemManagement = () => {
   const subCategories = useSelector(selectSubCategories);
 
   // Local state
-  const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list' - Default to table view
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
@@ -971,6 +731,7 @@ const ItemManagement = () => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [statusLoading, setStatusLoading] = useState({}); // Track loading state for each item's status
 
   // Load initial data
   useEffect(() => {
@@ -994,7 +755,7 @@ const ItemManagement = () => {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(item =>
         (item.productName || item.name || '').toLowerCase().includes(search) ||
-        (item.productId || '').toLowerCase().includes(search) ||
+        (item.itemId || '').toLowerCase().includes(search) ||
         (item.brand || '').toLowerCase().includes(search) ||
         (item.description || '').toLowerCase().includes(search)
       );
@@ -1058,10 +819,6 @@ const ItemManagement = () => {
 
   const handleEdit = useCallback((item) => {
     navigate(`/item-management/edit/${item._id}`);
-  }, [navigate]);
-
-  const handleView = useCallback((item) => {
-    navigate(`/admin/products/view/${item._id}`);
   }, [navigate]);
 
   const handleDelete = useCallback((item) => {
@@ -1140,34 +897,123 @@ const ItemManagement = () => {
 
   // New function for direct status change using flow-based API
   const handleStatusChange = useCallback(async (item, newStatus) => {
+    let statusData = { status: newStatus };
+    
     try {
-      const statusData = { status: newStatus };
+      // Debug: Log the item to see its structure
+      console.log('🔍 Item structure:', item);
+      console.log('🔍 Item _id:', item._id);
+      console.log('🔍 Item itemId:', item.itemId);
       
       if (newStatus === 'scheduled') {
-        const scheduledDate = prompt('Enter scheduled date (YYYY-MM-DD):');
-        const scheduledTime = prompt('Enter scheduled time (HH:MM):');
+        // Improved date/time input with validation
+        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const currentTime = now.toTimeString().slice(0, 5);
         
-        if (!scheduledDate || !scheduledTime) {
-          alert('Scheduled date and time are required');
+        const scheduledDate = prompt(`Enter scheduled date (YYYY-MM-DD).\nMinimum date: ${today}`, today);
+        if (!scheduledDate) {
+          return; // User cancelled
+        }
+        
+        // Validate date format and ensure it's not in the past
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(scheduledDate)) {
+          alert('Invalid date format. Please use YYYY-MM-DD format.');
           return;
+        }
+        
+        const selectedDate = new Date(scheduledDate);
+        const todayDate = new Date(today);
+        
+        if (selectedDate < todayDate) {
+          alert('Scheduled date cannot be in the past.');
+          return;
+        }
+        
+        let defaultTime = currentTime;
+        // If scheduling for today, suggest a time at least 5 minutes from now
+        if (scheduledDate === today) {
+          const futureTime = new Date(now.getTime() + 5 * 60 * 1000);
+          defaultTime = futureTime.toTimeString().slice(0, 5);
+        }
+        
+        const scheduledTime = prompt(`Enter scheduled time (HH:MM).\n${scheduledDate === today ? `Minimum time: ${defaultTime}` : 'Format: 24-hour format (e.g., 14:30)'}`, defaultTime);
+        if (!scheduledTime) {
+          return; // User cancelled
+        }
+        
+        // Validate time format
+        const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+        if (!timeRegex.test(scheduledTime)) {
+          alert('Invalid time format. Please use HH:MM format (24-hour).');
+          return;
+        }
+        
+        // Validate that scheduled time is in the future if scheduling for today
+        if (scheduledDate === today) {
+          const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}:00`);
+          if (scheduledDateTime <= now) {
+            alert('Scheduled time must be at least 5 minutes in the future.');
+            return;
+          }
         }
         
         statusData.scheduledDate = scheduledDate;
         statusData.scheduledTime = scheduledTime;
-        statusData.publishAt = new Date(`${scheduledDate}T${scheduledTime}:00.000Z`);
+        statusData.publishAt = new Date(`${scheduledDate}T${scheduledTime}:00.000Z`).toISOString();
       } else if (newStatus === 'published') {
-        statusData.publishedAt = new Date();
+        statusData.publishedAt = new Date().toISOString();
       }
 
-      await dispatch(updateProductStatus({ 
-        productId: item._id, 
+      // Use itemId as the primary identifier
+      const itemId = item.itemId || item._id;
+      if (!itemId) {
+        throw new Error('Item ID not found');
+      }
+
+      console.log('🔍 About to dispatch updateItemStatus with:', {
+        itemId,
+        statusData,
+        itemIdType: typeof itemId,
+        statusDataType: typeof statusData
+      });
+
+      // Show loading state
+      setStatusLoading(prev => ({ ...prev, [itemId]: true }));
+
+      const result = await dispatch(updateProductStatus({ 
+        itemId: itemId, 
         statusData 
       })).unwrap();
       
+      // Success feedback
+      const statusMessages = {
+        draft: 'Product moved to draft successfully!',
+        scheduled: `Product scheduled for ${statusData.scheduledDate} at ${statusData.scheduledTime} successfully!`,
+        published: 'Product published successfully!'
+      };
+      
+      // You could use a toast notification here instead of alert
+      console.log('✅ Status update successful:', statusMessages[newStatus]);
+      
+      // Refresh the items list
       handleRefresh();
+      
     } catch (error) {
       console.error('Failed to update status:', error);
-      alert('Failed to update product status. Please try again.');
+      console.error('Error details:', {
+        itemId: item.itemId || item._id,
+        item: item,
+        statusData: statusData
+      });
+      
+      const errorMessage = error.message || 'Failed to update product status. Please try again.';
+      alert(`Failed to update status: ${errorMessage}`);
+    } finally {
+      // Clear loading state
+      const itemId = item.itemId || item._id;
+      setStatusLoading(prev => ({ ...prev, [itemId]: false }));
     }
   }, [dispatch, handleRefresh]);
 
@@ -1330,22 +1176,6 @@ const ItemManagement = () => {
                 </div>
               </div>
 
-              {/* View Mode Toggle */}
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <Grid className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <List className="w-5 h-5" />
-                </button>
-              </div>
-
               {/* Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -1483,30 +1313,8 @@ const ItemManagement = () => {
           </div>
         ) : (
           <>
-            {/* Grid View */}
-            {viewMode === 'grid' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-                {paginatedProducts.map((item) => (
-                  <ItemCard
-                    key={item._id}
-                    item={item}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onView={handleView}
-                    onToggleStatus={handleToggleStatus}
-                    onStatusChange={handleStatusChange}
-                    onAddToRecommendations={handleAddToRecommendations}
-                    onMoveToSale={handleMoveToSale}
-                    onKeepCopyAndMove={handleKeepCopyAndMove}
-                    onMoveToEyx={handleMoveToEyx}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* List View */}
-            {viewMode === 'list' && (
-              <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
+            {/* List View - Always show table view */}
+            <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -1518,10 +1326,10 @@ const ItemManagement = () => {
                           Category
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Price
+                          Price (Size-wise)
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Stock
+                          Stock (Size-wise)
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
@@ -1541,20 +1349,19 @@ const ItemManagement = () => {
                           item={item}
                           onEdit={handleEdit}
                           onDelete={handleDelete}
-                          onView={handleView}
                           onToggleStatus={handleToggleStatus}
                           onStatusChange={handleStatusChange}
                           onAddToRecommendations={handleAddToRecommendations}
                           onMoveToSale={handleMoveToSale}
                           onKeepCopyAndMove={handleKeepCopyAndMove}
                           onMoveToEyx={handleMoveToEyx}
+                          statusLoading={statusLoading}
                         />
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -1610,6 +1417,9 @@ const ItemManagement = () => {
           title="Delete Product"
           message={`Are you sure you want to delete "${itemToDelete?.productName || itemToDelete?.name}"? This action cannot be undone.`}
         />
+
+        {/* Error Monitor Widget for debugging */}
+        <ErrorMonitorWidget />
 
     </div>
   );

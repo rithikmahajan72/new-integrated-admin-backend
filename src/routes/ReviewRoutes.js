@@ -3,7 +3,7 @@ const router = express.Router();
 const reviewController = require('../controllers/ReviewController');
 const { isAuthenticated, isAdmin } = require('../middleware/authMiddleware');
 
-// ---------- USER ROUTES (Item._id) ----------
+// ---------- USER ROUTES (Item ID) ----------
 
 // Create a review (user)
 router.post('/user/:itemId/reviews', isAuthenticated, reviewController.createReview);
@@ -20,7 +20,7 @@ router.delete('/user/:itemId/reviews/:reviewId', isAuthenticated, reviewControll
 // Get average rating for Item (user)
 router.get('/user/:itemId/average-rating', reviewController.getAverageRating);
 
-// ---------- PUBLIC ROUTES (Item._id) ----------
+// ---------- PUBLIC ROUTES (Item ID) ----------
 
 // Get reviews by Item ID (public)
 router.get('/public/:itemId/reviews', reviewController.getReviews);
@@ -28,7 +28,7 @@ router.get('/public/:itemId/reviews', reviewController.getReviews);
 // Get average rating by Item ID (public)
 router.get('/public/:itemId/average-rating', reviewController.getAverageRating);
 
-// ---------- ADMIN ROUTES (Item._id) ----------
+// ---------- ADMIN ROUTES (Item ID) ----------
 
 // Get reviews by Item ID (admin)
 router.get('/admin/:itemId/reviews', isAuthenticated, isAdmin, reviewController.getReviews);

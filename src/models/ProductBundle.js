@@ -7,7 +7,7 @@ const bundleItemSchema = new mongoose.Schema({
         ref: 'Item',
         required: true
     },
-    productId: { type: String, required: true }, // For easier lookup
+    itemId: { type: String, required: true }, // For easier lookup
     productName: { type: String, required: true },
     categoryId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -57,7 +57,7 @@ const productBundleSchema = new mongoose.Schema({
             ref: 'Item',
             required: true
         },
-        productId: { type: String, required: true },
+        itemId: { type: String, required: true },
         productName: { type: String, required: true },
         categoryId: {
             type: mongoose.Schema.Types.ObjectId,

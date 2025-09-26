@@ -39,6 +39,9 @@ const bannerRoutes = require("./src/routes/BannerRoutes"); // Handles banner man
 const joinUsRoutes = require("./src/routes/JoinUsRoutes"); // Handles join us post management routes
 const morgan = require("morgan");
 
+// Import scheduler for auto-publishing scheduled items
+const itemScheduler = require("./src/services/itemScheduler");
+
 const app = express();
 // Initialize the Express application
 
@@ -110,4 +113,7 @@ const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
 
 app.listen(PORT, HOST, () => {
     console.log(`Server is running on http://${HOST}:${PORT}`);
+    
+    // Start the item scheduler for auto-publishing scheduled items
+    itemScheduler.start();
 });

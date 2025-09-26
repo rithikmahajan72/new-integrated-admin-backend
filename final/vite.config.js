@@ -6,7 +6,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    open: true
+    open: true,
+    hmr: {
+      overlay: false // Disable HMR overlay that can cause loops
+    },
+    watch: {
+      ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**'] // Ignore unnecessary files
+    }
   },
   build: {
     outDir: 'dist',
@@ -16,5 +22,8 @@ export default defineConfig({
     alias: {
       '@': '/src'
     }
+  },
+  optimizeDeps: {
+    exclude: [] // Add any problematic dependencies here if needed
   }
 });

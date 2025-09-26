@@ -115,9 +115,12 @@ export const getItemsForBundling = createAsyncThunk(
   'productBundle/getItemsForBundling',
   async (params = {}, { rejectWithValue }) => {
     try {
+      console.log('🔍 getItemsForBundling called with params:', params);
       const response = await API.get('/items/bundles/items', { params });
+      console.log('🔍 getItemsForBundling response:', response.data);
       return response.data;
     } catch (error) {
+      console.error('❌ getItemsForBundling error:', error);
       return rejectWithValue(
         error.response?.data?.message || 'Failed to fetch items for bundling'
       );

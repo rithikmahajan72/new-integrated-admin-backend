@@ -45,11 +45,15 @@ export const itemAPI = {
   deleteItem: (itemId) => API.delete(`/items/${itemId}`),
   
   // Media upload endpoints
-  uploadImage: (formData) => API.post('/items/upload-image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  uploadImage: (formData, config = {}) => API.post('/items/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000, // 30 second timeout for uploads
+    ...config
   }),
-  uploadVideo: (formData) => API.post('/items/upload-video', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  uploadVideo: (formData, config = {}) => API.post('/items/upload-video', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000, // 60 second timeout for video uploads (larger files)
+    ...config
   }),
   
   // Legacy endpoints (kept for compatibility)
@@ -60,22 +64,25 @@ export const itemAPI = {
   createBasicProduct: (productData) => API.post('/items/basic-product', productData),
   
   // Phase 2: Update product with draft configuration (images, filters, categories)
-  updateDraftConfiguration: (productId, draftData) => API.put(`/items/${productId}/draft-configuration`, draftData),
+  updateDraftConfiguration: (itemId, draftData) => API.put(`/items/${itemId}/draft-configuration`, draftData),
   
   // Phase 3: Add review to product (consumer/admin side)
-  addReview: (productId, reviewData) => API.post(`/items/${productId}/reviews`, reviewData),
+  addReview: (itemId, reviewData) => API.post(`/items/${itemId}/reviews`, reviewData),
   
   // Phase 4: Update also show in options (draft management)
-  updateAlsoShowInOptions: (productId, optionsData) => API.put(`/items/${productId}/also-show-options`, optionsData),
+  updateAlsoShowInOptions: (itemId, optionsData) => API.put(`/items/${itemId}/also-show-options`, optionsData),
   
   // Phase 5: Update product status (draft → schedule → live)
-  updateProductStatus: (productId, statusData) => API.put(`/items/${productId}/status`, statusData),
+  updateProductStatus: (itemId, statusData) => API.put(`/items/${itemId}/status`, statusData),
+  
+  // Get scheduled items summary
+  getScheduledItemsSummary: () => API.get('/items/scheduled-summary'),
   
   // Utility endpoints for the new flow
-  getProductById: (productId) => API.get(`/items/product/${productId}`), // Supports both ObjectId and productId
+  getProductById: (itemId) => API.get(`/items/product/${itemId}`), // Supports both ObjectId and itemId
   getProductsByStatus: (status, params = {}) => API.get(`/items/status/${status}`, { params }),
-  updateProductSizes: (productId, sizesData) => API.put(`/items/${productId}/sizes`, sizesData),
-  updateReviewSettings: (productId, settingsData) => API.put(`/items/${productId}/review-settings`, settingsData),
+  updateProductSizes: (itemId, sizesData) => API.put(`/items/${itemId}/sizes`, sizesData),
+  updateReviewSettings: (itemId, settingsData) => API.put(`/items/${itemId}/review-settings`, settingsData),
   
   // Item details
   getItemDetails: (itemId) => API.get(`/item-details/${itemId}`),

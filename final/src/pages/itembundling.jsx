@@ -153,6 +153,29 @@ const ProductBundling = () => {
     };
   }, [dispatch]);
 
+  // Auto-refresh items when needed for item selector
+  useEffect(() => {
+    if (showItemSelector && currentSelectingFor) {
+      // Get the current product being edited
+      let currentProduct = null;
+      if (currentSelectingFor === "main") {
+        currentProduct = mainProduct;
+      } else {
+        currentProduct = bundleItems.find(item => item.id === currentSelectingFor);
+      }
+
+      // If we have category and subcategory, fetch items for that combination
+      if (currentProduct && currentProduct.category && currentProduct.subcategory) {
+        dispatch(getItemsForBundling({ 
+          categoryId: currentProduct.category, 
+          subCategoryId: currentProduct.subcategory, 
+          page: 1, 
+          limit: 100 
+        }));
+      }
+    }
+  }, [showItemSelector, currentSelectingFor, mainProduct, bundleItems, dispatch]);
+
   // Memoized utility functions
   const getCategoryOptions = useMemo(() => {
     return categories.map(cat => ({
@@ -172,7 +195,9 @@ const ProductBundling = () => {
   }, [subcategories]);
 
   const getAvailableItemsForSelection = useCallback((categoryId, subCategoryId) => {
-    return availableItems
+    console.log('🔍 getAvailableItemsForSelection called with:', { categoryId, subCategoryId, availableItemsCount: availableItems.length });
+    
+    const filtered = availableItems
       .filter(item => {
         const matchesCategory = !categoryId || item.categoryId === categoryId;
         const matchesSubCategory = !subCategoryId || item.subCategoryId === subCategoryId;
@@ -183,10 +208,13 @@ const ProductBundling = () => {
         return matchesCategory && matchesSubCategory && matchesSearch;
       })
       .map(item => ({
-        ...item,
         value: item._id,
-        label: item.productName,
+        label: `${item.productName} - ₹${item.currentPrice || item.regularPrice || 0}`,
+        ...item
       }));
+    
+    console.log('🔍 Filtered items result:', filtered);
+    return filtered;
   }, [availableItems, searchTerm]);
 
   const findItemById = useCallback((itemId) => {
@@ -211,6 +239,67 @@ const ProductBundling = () => {
       page: 1 
     }));
   }, [dispatch, itemFilters]);
+
+  // Auto-fetch items when category or subcategory changes for product selection
+  const handleCategorySelectionForProduct = useCallback((productId, categoryId) => {
+    // Update the product state
+    if (productId === "main") {
+      setMainProduct(prev => ({ 
+        ...prev, 
+        category: categoryId, 
+        subcategory: "", 
+        item: "", 
+        productData: null 
+      }));
+    } else {
+      setBundleItems(prev => 
+        prev.map(item => 
+          item.id === productId 
+            ? { ...item, category: categoryId, subcategory: "", item: "", productData: null }
+            : item
+        )
+      );
+    }
+
+    // Fetch items for this category
+    if (categoryId) {
+      dispatch(getItemsForBundling({ 
+        categoryId, 
+        page: 1, 
+        limit: 100 
+      }));
+    }
+  }, [dispatch]);
+
+  const handleSubcategorySelectionForProduct = useCallback((productId, categoryId, subcategoryId) => {
+    // Update the product state
+    if (productId === "main") {
+      setMainProduct(prev => ({ 
+        ...prev, 
+        subcategory: subcategoryId, 
+        item: "", 
+        productData: null 
+      }));
+    } else {
+      setBundleItems(prev => 
+        prev.map(item => 
+          item.id === productId 
+            ? { ...item, subcategory: subcategoryId, item: "", productData: null }
+            : item
+        )
+      );
+    }
+
+    // Fetch items for this category and subcategory combination
+    if (categoryId && subcategoryId) {
+      dispatch(getItemsForBundling({ 
+        categoryId, 
+        subCategoryId: subcategoryId, 
+        page: 1, 
+        limit: 100 
+      }));
+    }
+  }, [dispatch]);
 
   // Bundle creation and management handlers
   const handleCreateBundle = useCallback(async () => {
@@ -400,6 +489,32 @@ const ProductBundling = () => {
     setCurrentSelectingFor(null);
   }, [currentSelectingFor]);
 
+  // Product-specific item selection handlers
+  const handleProductItemSelect = useCallback((productId, itemId) => {
+    const selectedItem = findItemById(itemId);
+    if (!selectedItem) return;
+
+    if (productId === "main") {
+      setMainProduct(prev => ({
+        ...prev,
+        item: itemId,
+        productData: selectedItem
+      }));
+    } else {
+      setBundleItems(prev => 
+        prev.map(item => 
+          item.id === productId
+            ? {
+                ...item,
+                item: itemId,
+                productData: selectedItem
+              }
+            : item
+        )
+      );
+    }
+  }, [findItemById]);
+
   const handleDragEnd = useCallback((event) => {
     const { active, over } = event;
 
@@ -457,7 +572,7 @@ const ProductBundling = () => {
             {renderDropdown(
               categoryOptions,
               product.category,
-              onCategoryChange,
+              (categoryId) => handleCategorySelectionForProduct(product.id, categoryId),
               "Select Category",
               categoriesLoading
             )}
@@ -471,32 +586,30 @@ const ProductBundling = () => {
             {renderDropdown(
               subcategoryOptions,
               product.subcategory,
-              onSubcategoryChange,
+              (subcategoryId) => handleSubcategorySelectionForProduct(product.id, product.category, subcategoryId),
               "Select Subcategory",
               !product.category || categoriesLoading
             )}
           </div>
 
-          {/* Item Selection Button */}
+          {/* Item Dropdown - Changed from button to dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">
               Product
             </label>
-            <button
-              onClick={() => {
-                setCurrentSelectingFor(product.id);
-                setShowItemSelector(true);
-              }}
-              disabled={!product.category || !product.subcategory || itemsLoading}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-left"
-            >
-              {product.productData 
-                ? product.productData.productName 
-                : itemsLoading 
-                ? "Loading..." 
-                : "Select Product"
-              }
-            </button>
+            {product.category && product.subcategory ? (
+              renderDropdown(
+                itemOptions,
+                product.item,
+                (itemId) => handleProductItemSelect(product.id, itemId),
+                itemOptions.length > 0 ? "Select Product" : "No products available",
+                itemsLoading
+              )
+            ) : (
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500">
+                {!product.category ? "Select Category First" : "Select Subcategory First"}
+              </div>
+            )}
           </div>
         </div>
 
@@ -620,19 +733,8 @@ const ProductBundling = () => {
           {/* Main Product Selection */}
           {renderProductSelector(
             mainProduct,
-            (value) => setMainProduct(prev => ({ 
-              ...prev, 
-              category: value, 
-              subcategory: "", 
-              item: "", 
-              productData: null 
-            })),
-            (value) => setMainProduct(prev => ({ 
-              ...prev, 
-              subcategory: value, 
-              item: "", 
-              productData: null 
-            })),
+            null, // Category change handled by renderProductSelector
+            null, // Subcategory change handled by renderProductSelector
             () => {},
             "Main Product *"
           )}
@@ -657,20 +759,8 @@ const ProductBundling = () => {
                         <div className="flex-1">
                           {renderProductSelector(
                             item,
-                            (value) => setBundleItems(prev => 
-                              prev.map(bundleItem => 
-                                bundleItem.id === item.id 
-                                  ? { ...bundleItem, category: value, subcategory: "", item: "", productData: null }
-                                  : bundleItem
-                              )
-                            ),
-                            (value) => setBundleItems(prev => 
-                              prev.map(bundleItem => 
-                                bundleItem.id === item.id 
-                                  ? { ...bundleItem, subcategory: value, item: "", productData: null }
-                                  : bundleItem
-                              )
-                            ),
+                            null, // Category change handled by renderProductSelector
+                            null, // Subcategory change handled by renderProductSelector
                             () => {},
                             `Bundle Item ${index + 1}`
                           )}

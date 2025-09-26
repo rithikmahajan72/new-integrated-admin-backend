@@ -27,7 +27,7 @@ cartRoutes
   .delete("/user/delete", verifyToken, cartController.deleteByUserId)
 
   // DELETE /api/cart/item/:itemId
-  // Deletes a cart item by the associated item ID (e.g., product ID) for the authenticated user
+  // Deletes a cart item by the associated item ID for the authenticated user
   .delete("/item/:itemId", verifyToken, cartController.deleteByItemId);
 
 // Export the router for use in the main Express app

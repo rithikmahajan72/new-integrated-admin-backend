@@ -680,6 +680,10 @@ class SettingsController {
         data: {
           charges: userSettings.shipping_settings.charges || [],
           settings: userSettings.shipping_settings.general_settings || {}
+        },
+        debug: {
+          chargesCount: userSettings.shipping_settings.charges?.length || 0,
+          firstChargeId: userSettings.shipping_settings.charges?.[0]?._id || null
         }
       });
     } catch (error) {
@@ -775,11 +779,14 @@ class SettingsController {
       userSettings.updatedBy = req.user.email || "user";
       await userSettings.save();
 
+      // Get the saved charge with its _id
+      const savedCharge = userSettings.shipping_settings.charges[userSettings.shipping_settings.charges.length - 1];
+
       return res.status(201).json({
         success: true,
         message: 'Shipping charge created successfully',
         data: {
-          charge: newCharge,
+          charge: savedCharge,
           totalCharges: userSettings.shipping_settings.charges.length
         }
       });
@@ -860,16 +867,14 @@ class SettingsController {
         });
       }
 
-      // Update the charge
-      userSettings.shipping_settings.charges[chargeIndex] = {
-        ...userSettings.shipping_settings.charges[chargeIndex],
-        country,
-        region,
-        deliveryCharge: parseFloat(deliveryCharge),
-        returnCharge: parseFloat(returnCharge),
-        estimatedDays: parseInt(estimatedDays),
-        updatedAt: new Date(),
-      };
+      // Update the charge - preserve the _id
+      const existingCharge = userSettings.shipping_settings.charges[chargeIndex];
+      existingCharge.country = country;
+      existingCharge.region = region;
+      existingCharge.deliveryCharge = parseFloat(deliveryCharge);
+      existingCharge.returnCharge = parseFloat(returnCharge);
+      existingCharge.estimatedDays = parseInt(estimatedDays);
+      existingCharge.updatedAt = new Date();
 
       userSettings.lastUpdated = new Date();
       userSettings.updatedBy = req.user.email || "user";
@@ -908,6 +913,14 @@ class SettingsController {
         });
       }
 
+      // Validate chargeId parameter
+      if (!chargeId || chargeId === 'undefined' || chargeId === 'null') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or missing shipping charge ID'
+        });
+      }
+
       const userSettings = await Settings.findOne({ userId });
       
       if (!userSettings || !userSettings.shipping_settings?.charges) {
@@ -917,8 +930,17 @@ class SettingsController {
         });
       }
 
+      // Additional validation to ensure charges array exists and is not empty
+      if (!Array.isArray(userSettings.shipping_settings.charges) || 
+          userSettings.shipping_settings.charges.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No shipping charges found'
+        });
+      }
+
       const chargeIndex = userSettings.shipping_settings.charges.findIndex(
-        charge => charge._id.toString() === chargeId
+        charge => charge._id && charge._id.toString() === chargeId
       );
 
       if (chargeIndex === -1) {

@@ -4,7 +4,7 @@ const multer = require("multer"); // Middleware for handling file uploads
 const itemController = require("../controllers/itemController/ItemController"); // Controller for item-related logic
 const { uploadMultipart, deleteFileFromS3 } = require("../utils/S3"); // S3 utilities for file upload and deletion
 const mongoose = require("mongoose"); // Mongoose for MongoDB operations
-const { ApiResponse } = require("../utils/ApiResponse"); // Utility to standardize API responses
+const { ApiResponse } = require("../utils/ApiResponse"); // API response utility
 const { verifyToken } = require("../middleware/VerifyToken"); // Middleware to verify JWT tokens
 const Item = require("../models/Item"); // Mongoose model for Item collection
 const SubCategory = require("../models/SubCategory"); // Mongoose model for SubCategory collection
@@ -16,6 +16,24 @@ const itemRouter = express.Router();
 // Configure multer for in-memory storage (files are stored in memory, not on disk)
 const storage = multer.memoryStorage();
 const upload = multer({ storage }); // Multer instance for handling single file uploads
+
+// PHASE 5: Update product status (draft → schedule → live)
+// PUT /api/items/:itemId/status
+itemRouter.put(
+  "/:itemId/status",
+  verifyToken,
+  checkAdminRole,
+  itemController.updateProductStatus
+);
+
+// Get scheduled items summary
+// GET /api/items/scheduled-summary
+itemRouter.get(
+  "/scheduled-summary",
+  verifyToken,
+  checkAdminRole,
+  itemController.getScheduledItemsSummary
+);
 
 // POST /api/items/
 // Creates a new item with an image upload (admin-only)
@@ -194,7 +212,7 @@ itemRouter.post(
   checkAdminRole, // Ensure user has admin role
   upload.single("image"), // Handle single file upload (field name: "image")
   async (req, res) => {
-    console.log("qqqqqqqqqqqqqq"); // Debug log
+    // Debug log removed
     try {
       // Check if an image file was uploaded
       if (!req.file) {
@@ -203,7 +221,7 @@ itemRouter.post(
           .json(ApiResponse(null, "No file uploaded", false, 400));
       }
 
-      console.log("qqqqqqqqqqqqqq11111111111", req.body); // Log request body for debugging
+      // Debug log removed
 
       // Verify the provided subCategoryId exists
       const existingSubCategory = await SubCategory.findOne({
@@ -372,9 +390,9 @@ itemRouter.put(
   itemController.updateSubCategoriesDisplayOrder
 );
 
-// GET /api/items/:id
-// Retrieves a single item by its ID (public access)
-itemRouter.get("/:id", itemController.getItemById);
+// GET /api/items/:itemId
+// Retrieves a single item by its itemId (public access)
+itemRouter.get("/:itemId", itemController.getItemById);
 
 // GET /api/items/latest-items/:subCategoryId
 // Retrieves the latest items for a specific subcategory (public access)
@@ -393,22 +411,42 @@ itemRouter.get(
 // GET /api/items/:itemId/bundles - Get bundles for a specific product (public route for frontend)
 itemRouter.get("/:itemId/bundles", itemController.getBundlesForProduct);
 
-// PUT /api/items/:id
+// PUT /api/items/:itemId
 // Updates an existing item with an optional image upload (admin-only)
 itemRouter.put(
-  "/:id",
+  "/:itemId",
   verifyToken, // Ensure user is authenticated
   checkAdminRole, // Ensure user has admin role
   upload.single("image"), // Handle single file upload (field name: "image")
   async (req, res) => {
     try {
-      // Check if the item exists
-      const existingItems = await Item.findById(req.params.id);
+      // Check if the item exists by itemId or _id
+      let existingItems;
+      const paramId = req.params.itemId;
+      
+      // Try to find by itemId, productId, or _id if it looks like a MongoDB ObjectId
+      if (mongoose.Types.ObjectId.isValid(paramId)) {
+        existingItems = await Item.findOne({ 
+          $or: [
+            { itemId: paramId },
+            { productId: paramId },
+            { _id: paramId }
+          ]
+        });
+      } else {
+        existingItems = await Item.findOne({ 
+          $or: [
+            { itemId: paramId },
+            { productId: paramId }
+          ]
+        });
+      }
+      
       console.log("existingItems", existingItems); // Log existing item for debugging
       if (!existingItems) {
         return res
           .status(404)
-          .json(ApiResponse(null, "itmes not found", false, 404));
+          .json(ApiResponse(null, "items not found", false, 404));
       }
 
       // Get the associated subcategory and category
@@ -450,10 +488,8 @@ itemRouter.put(
       }
 
       // Call the controller to update the item
-      const updatedItem = await itemController.updateItem(req, res);
+      await itemController.updateItem(req, res);
 
-      // Send success response with the updated item
-      res.status(200).json(updatedItem);
     } catch (error) {
       // Send error response if update fails
       res
@@ -465,10 +501,10 @@ itemRouter.put(
   }
 );
 
-// DELETE /api/items/:id
-// Deletes an item by its ID (admin-only)
+// DELETE /api/items/:productId
+// Deletes an item by its productId (admin-only)
 itemRouter.delete(
-  "/:id",
+  "/:productId",
   verifyToken,
   checkAdminRole,
   itemController.deleteItem
@@ -488,35 +524,35 @@ itemRouter.post(
 );
 
 // PHASE 2: Update product with draft configuration (images, filters, categories)
-// PUT /api/items/:productId/draft-configuration
+// PUT /api/items/:itemId/draft-configuration
 itemRouter.put(
-  "/:productId/draft-configuration",
+  "/:itemId/draft-configuration",
   verifyToken,
   checkAdminRole,
   itemController.updateDraftConfiguration
 );
 
 // PHASE 3: Add review to product (consumer/admin side)
-// POST /api/items/:productId/reviews
+// POST /api/items/:itemId/reviews
 itemRouter.post(
-  "/:productId/reviews",
+  "/:itemId/reviews",
   verifyToken, // Both admin and regular users can add reviews
   itemController.addReview
 );
 
 // PHASE 4: Update also show in options (draft management)
-// PUT /api/items/:productId/also-show-options
+// PUT /api/items/:itemId/also-show-options
 itemRouter.put(
-  "/:productId/also-show-options",
+  "/:itemId/also-show-options",
   verifyToken,
   checkAdminRole,
   itemController.updateAlsoShowInOptions
 );
 
 // PHASE 5: Update product status (draft → schedule → live)
-// PUT /api/items/:productId/status
+// PUT /api/items/:itemId/status
 itemRouter.put(
-  "/:productId/status",
+  "/:itemId/status",
   verifyToken,
   checkAdminRole,
   itemController.updateProductStatus
@@ -524,7 +560,7 @@ itemRouter.put(
 
 // UTILITY ROUTES for the new flow
 
-// Get product by productId (supports both ObjectId and productId)
+// Get product by itemId (supports both ObjectId and itemId)
 // GET /api/items/product/:id
 itemRouter.get(
   "/product/:id",
@@ -541,18 +577,18 @@ itemRouter.get(
 );
 
 // Update product sizes only (Phase 1 update)
-// PUT /api/items/:productId/sizes
+// PUT /api/items/:itemId/sizes
 itemRouter.put(
-  "/:productId/sizes",
+  "/:itemId/sizes",
   verifyToken,
   checkAdminRole,
   itemController.updateProductSizes
 );
 
 // Toggle review settings (enable/disable reviews)
-// PUT /api/items/:productId/review-settings
+// PUT /api/items/:itemId/review-settings
 itemRouter.put(
-  "/:productId/review-settings",
+  "/:itemId/review-settings",
   verifyToken,
   checkAdminRole,
   itemController.updateReviewSettings
@@ -632,6 +668,7 @@ itemRouter.post(
 
       // Prepare basic item data for draft
       const itemData = {
+        itemId: productId, // Set itemId same as productId for consistency 
         productId,
         
         // Basic product information

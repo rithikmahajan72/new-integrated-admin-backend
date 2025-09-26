@@ -13,8 +13,7 @@ const orderSchema = new mongoose.Schema({
   }],
   item_quantities: [{
     item_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Item',
+      type: String, // Use itemId string instead of ObjectId
       required: true,
     },
     sku: {

@@ -207,12 +207,31 @@ const SettingsShippingCharges = () => {
   }, []);
 
   const handleDeleteShippingCharge = useCallback((id) => {
+    console.log('handleDeleteShippingCharge called with id:', id);
+    
+    // Validate that we have a proper ID
+    if (!id || id === 'undefined' || id === 'null') {
+      console.error('Invalid shipping charge ID provided:', id);
+      alert('Error: Cannot delete shipping charge - invalid ID. Please refresh the page and try again.');
+      return;
+    }
+    
     setEditingShippingId(id);
     setModals(prev => ({ ...prev, shippingChargeDeleteConfirm: true }));
   }, []);
 
   const handleConfirmDeleteShippingCharge = useCallback(async () => {
     try {
+      // Additional validation before making the API call
+      if (!editingShippingId || editingShippingId === 'undefined' || editingShippingId === 'null') {
+        console.error('Cannot delete shipping charge - invalid ID:', editingShippingId);
+        alert('Error: Cannot delete shipping charge - invalid ID. Please refresh the page and try again.');
+        setModals(prev => ({ ...prev, shippingChargeDeleteConfirm: false }));
+        setEditingShippingId(null);
+        return;
+      }
+      
+      console.log('Attempting to delete shipping charge with ID:', editingShippingId);
       await deleteCharge(editingShippingId);
       setModals(prev => ({ 
         ...prev, 
@@ -222,6 +241,7 @@ const SettingsShippingCharges = () => {
       setEditingShippingId(null);
     } catch (error) {
       console.error('Error deleting shipping charge:', error);
+      alert('Error deleting shipping charge. Please check the console for details.');
     }
   }, [editingShippingId, deleteCharge]);
 
@@ -402,7 +422,10 @@ const SettingsShippingCharges = () => {
           <div>• Error Message: {errors.fetchCharges || 'None'}</div>
           <div>• Auth Token: {localStorage.getItem('authToken') ? '✅ Present' : '❌ Missing'}</div>
           <div>• API Base URL: {import.meta.env.VITE_API_BASE_URL || 'Not Set'}</div>
-          <div>• Charges Data: {JSON.stringify(shippingCharges).substring(0, 100)}...</div>
+          <div>• Charges Data Structure: {shippingCharges?.length > 0 ? 
+            `First charge has ${shippingCharges[0]._id ? '_id' : 'no _id'}, ${shippingCharges[0].id ? 'id' : 'no id'}` : 
+            'No charges available'}</div>
+          <div>• Charges Data: {JSON.stringify(shippingCharges).substring(0, 200)}...</div>
         </div>
 
         {/* Existing Charges List */}
@@ -430,8 +453,19 @@ const SettingsShippingCharges = () => {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDeleteShippingCharge(charge._id || charge.id)}
+                    onClick={() => {
+                      const chargeId = charge._id || charge.id;
+                      console.log('Delete button clicked for charge:', { 
+                        charge, 
+                        _id: charge._id, 
+                        id: charge.id, 
+                        chargeId 
+                      });
+                      handleDeleteShippingCharge(chargeId);
+                    }}
                     className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                    disabled={!charge._id && !charge.id}
+                    title={!charge._id && !charge.id ? 'Cannot delete - no ID available' : 'Delete shipping charge'}
                   >
                     Delete
                   </button>

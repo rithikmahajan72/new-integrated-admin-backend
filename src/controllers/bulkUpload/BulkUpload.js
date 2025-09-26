@@ -47,14 +47,14 @@ exports.bulkUploadItems = async (req, res) => {
     // Process items sequentially
     console.log("Starting item processing");
     for (const itemData of itemsData) {
-      console.log(`Processing item with productId: ${itemData.productId || "unknown"}`);
+      console.log(`Processing item with itemId: ${itemData.itemId || "unknown"}`);
       let newItemId = null;
       let uploadedUrls = [];
       try {
         // Validate required fields
         console.log("Validating required fields");
-        if (!itemData.productId || (!itemData.productName && !itemData.name) || !itemData.subCategoryId || !itemData.categoryId) {
-          throw new Error("Missing required fields: productId, productName (or name), subCategoryId, categoryId");
+        if (!itemData.itemId || (!itemData.productName && !itemData.name) || !itemData.subCategoryId || !itemData.categoryId) {
+          throw new Error("Missing required fields: itemId, productName (or name), subCategoryId, categoryId");
         }
 
         // Validate filters format
@@ -70,11 +70,11 @@ exports.bulkUploadItems = async (req, res) => {
           }
         }
 
-        // Check for duplicate productId
-        console.log("Checking for duplicate productId");
-        const existingItem = await Item.findOne({ productId: itemData.productId });
+        // Check for duplicate itemId
+        console.log("Checking for duplicate itemId");
+        const existingItem = await Item.findOne({ itemId: itemData.itemId });
         if (existingItem) {
-          throw new Error(`Duplicate productId: ${itemData.productId}`);
+          throw new Error(`Duplicate itemId: ${itemData.itemId}`);
         }
 
         // Verify subCategoryId and categoryId
@@ -95,7 +95,8 @@ exports.bulkUploadItems = async (req, res) => {
         console.log("Creating new Item document");
         const newItem = new Item({
           _id: newItemId,
-          productId: itemData.productId,
+          itemId: itemData.itemId,
+          productId: itemData.itemId, // Add productId for compatibility with existing indexes
           
           // Use new fields or fall back to legacy fields
           productName: itemData.productName || itemData.name,
@@ -197,7 +198,7 @@ exports.bulkUploadItems = async (req, res) => {
           await newItem.save();
           console.log(`Saved Item document: ${newItemId}`);
         } catch (validationError) {
-          console.error(`Validation error for item ${itemData.productId}:`, validationError.message);
+          console.error(`Validation error for item ${itemData.itemId}:`, validationError.message);
           throw new Error(`Item validation failed: ${validationError.message}`);
         }
 
@@ -206,17 +207,17 @@ exports.bulkUploadItems = async (req, res) => {
         const itemImages = media.filter((img) => { // Changed from "images" to "media"
           const parsed = parseImageFilename(img.originalname);
           console.log(`Parsed filename ${img.originalname}:`, parsed);
-          const matches = parsed && parsed.productId.toUpperCase() === itemData.productId.toUpperCase() && parsed.isPrimary;
+          const matches = parsed && parsed.productId.toUpperCase() === itemData.itemId.toUpperCase() && parsed.isPrimary;
           if (!matches) {
-            console.log(`Image ${img.originalname} does not match productId ${itemData.productId} or is not primary`, parsed);
+            console.log(`Image ${img.originalname} does not match productId ${itemData.itemId} or is not primary`, parsed);
           }
           return matches;
         });
-        console.log(`Found ${itemImages.length} primary images for item ${itemData.productId}`, itemImages.map(img => img.originalname));
+        console.log(`Found ${itemImages.length} primary images for item ${itemData.itemId}`, itemImages.map(img => img.originalname));
 
         // Require at least one primary image
         if (itemImages.length === 0) {
-          throw new Error(`No primary image found for productId: ${itemData.productId}`);
+          throw new Error(`No primary image found for productId: ${itemData.itemId}`);
         }
 
         // Upload images in bulk
@@ -277,19 +278,19 @@ exports.bulkUploadItems = async (req, res) => {
         );
 
         results.successful.push({
-          productId: itemData.productId,
+          productId: itemData.itemId,
           itemId: newItemId,
           productName: itemData.productName || itemData.name,
           primaryImageUrl,
           totalImages: imagesArray.length,
           status: itemData.status || 'draft'
         });
-        console.log(`Successfully processed item ${itemData.productId}`);
+        console.log(`Successfully processed item ${itemData.itemId}`);
       } catch (error) {
-        console.error(`Error processing item ${itemData.productId || "unknown"}:`, error.message);
+        console.error(`Error processing item ${itemData.itemId || "unknown"}:`, error.message);
         // Cleanup uploaded images if any
         if (uploadedUrls.length > 0) {
-          console.log(`Cleaning up ${uploadedUrls.length} uploaded images for ${itemData.productId}`);
+          console.log(`Cleaning up ${uploadedUrls.length} uploaded images for ${itemData.itemId}`);
           await cleanupFailedUploads(uploadedUrls);
         }
         // Delete partially created item if it exists
@@ -298,7 +299,7 @@ exports.bulkUploadItems = async (req, res) => {
           await Item.deleteOne({ _id: newItemId });
         }
         results.failed.push({
-          productId: itemData.productId || "unknown",
+          productId: itemData.itemId || "unknown",
           error: error.message,
         });
       }
@@ -354,14 +355,14 @@ exports.bulkUploadItemDetails = async (req, res) => {
     const results = { successful: [], failed: [] };
 
     for (const itemData of itemDetailsData) {
-      console.log(`Processing item details for productId: ${itemData.productId}`);
+      console.log(`Processing item details for productId: ${itemData.itemId}`);
       let uploadedUrls = [];
 
       try {
         // Find the corresponding Item
-        const item = await Item.findOne({ productId: itemData.productId });
+        const item = await Item.findOne({ productId: itemData.itemId });
         if (!item) {
-          throw new Error(`Item not found for productId: ${itemData.productId}`);
+          throw new Error(`Item not found for productId: ${itemData.itemId}`);
         }
 
         // Prepare update data with enhanced details
@@ -420,7 +421,7 @@ exports.bulkUploadItemDetails = async (req, res) => {
         if (mediaFiles.length > 0) {
           // Filter media files for this product (if naming convention is followed)
           const itemMedia = mediaFiles.filter((media) => {
-            return media.originalname.toLowerCase().includes(itemData.productId.toLowerCase());
+            return media.originalname.toLowerCase().includes(itemData.itemId.toLowerCase());
           });
           
           if (itemMedia.length > 0) {
@@ -430,7 +431,7 @@ exports.bulkUploadItemDetails = async (req, res) => {
             const uploadResults = await bulkUploadFilesToS3(itemMedia, s3Folder);
             
             uploadedUrls = uploadResults.filter((result) => result.url).map((result) => result.url);
-            console.log(`Uploaded ${uploadedUrls.length} media files for ${itemData.productId}`);
+            console.log(`Uploaded ${uploadedUrls.length} media files for ${itemData.itemId}`);
             
             // Add uploaded images to the images array
             const newImages = uploadResults.map((result, index) => ({
@@ -446,27 +447,27 @@ exports.bulkUploadItemDetails = async (req, res) => {
         // Update the item
         if (Object.keys(updateData).length > 0) {
           await Item.updateOne({ _id: item._id }, { $set: updateData });
-          console.log(`Updated item ${itemData.productId} with detailed information`);
+          console.log(`Updated item ${itemData.itemId} with detailed information`);
         }
 
         results.successful.push({
-          productId: itemData.productId,
+          productId: itemData.itemId,
           itemId: item._id,
           updatedFields: Object.keys(updateData),
           mediaFilesUploaded: uploadedUrls.length
         });
 
       } catch (error) {
-        console.error(`Error processing item details for ${itemData.productId}:`, error.message);
+        console.error(`Error processing item details for ${itemData.itemId}:`, error.message);
         
         // Cleanup uploaded images if any
         if (uploadedUrls.length > 0) {
-          console.log(`Cleaning up ${uploadedUrls.length} uploaded images for ${itemData.productId}`);
+          console.log(`Cleaning up ${uploadedUrls.length} uploaded images for ${itemData.itemId}`);
           await cleanupFailedUploads(uploadedUrls);
         }
         
         results.failed.push({
-          productId: itemData.productId || "unknown",
+          productId: itemData.itemId || "unknown",
           error: error.message
         });
       }

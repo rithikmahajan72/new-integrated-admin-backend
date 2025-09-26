@@ -42,6 +42,9 @@ const ItemManagementEditPage = () => {
   const [uploadingImages, setUploadingImages] = useState([]);
   const [uploadingVideos, setUploadingVideos] = useState([]);
   
+  // Track active upload controllers to allow cancellation
+  const uploadControllersRef = useRef(new Map());
+  
   // Form data state
   const [formData, setFormData] = useState({
     productName: '',
@@ -178,13 +181,15 @@ const ItemManagementEditPage = () => {
     }
   }, [item]);
 
-  // Fetch item data when component mounts
+  // Fetch item data when component mounts (OPTIMIZED)
   useEffect(() => {
-    if (id) {
+    if (id && !loading) {
+      console.log('🔍 Fetching item with ID:', id);
+      
       dispatch(fetchItemById(id))
         .unwrap()
         .then((data) => {
-          // Item fetched successfully
+          console.log('✅ Item fetched successfully');
         })
         .catch((error) => {
           console.error('❌ Failed to fetch item:', error);
@@ -194,18 +199,24 @@ const ItemManagementEditPage = () => {
             setLocalError(`Failed to load item: ${error}`);
           }
         });
-      
-      // Fetch filters for the dropdown
-      dispatch(fetchFilters())
-        .unwrap()
-        .then((data) => {
-          // Filters fetched successfully
-        })
-        .catch((error) => {
-          console.error('❌ Failed to fetch filters:', error);
-        });
     }
-  }, [id, dispatch]);
+  }, [id, dispatch]); // Removed 'loading' from dependencies to prevent loops
+
+  // Fetch filters and categories separately (OPTIMIZED)
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        // Fetch filters
+        await dispatch(fetchFilters()).unwrap();
+        // Fetch categories
+        await loadCategories();
+      } catch (error) {
+        console.error('❌ Failed to fetch initial data:', error);
+      }
+    };
+
+    fetchInitialData();
+  }, []); // Only run once on mount
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -234,11 +245,6 @@ const ItemManagementEditPage = () => {
     }
   }, [item]);
 
-  // Load categories on component mount
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
   // Load subcategories when category is selected
   useEffect(() => {
     if (selectedCategory) {
@@ -248,6 +254,18 @@ const ItemManagementEditPage = () => {
       setSelectedSubCategory(null);
     }
   }, [selectedCategory]);
+
+  // Cleanup effect to cancel pending uploads on component unmount
+  useEffect(() => {
+    return () => {
+      // Cancel all pending uploads when component unmounts
+      uploadControllersRef.current.forEach((controller, tempId) => {
+        controller.abort();
+        console.log(`Cancelled upload with ID: ${tempId}`);
+      });
+      uploadControllersRef.current.clear();
+    };
+  }, []);
 
   // Load categories function
   const loadCategories = async () => {
@@ -569,33 +587,87 @@ const ItemManagementEditPage = () => {
     return filteredResults;
   };
 
-  // Image upload handlers
+  // Image upload handlers with enhanced loop prevention
   const handleImageUpload = async (files) => {
     if (!files || files.length === 0) return;
 
+    // Clear the input immediately to prevent accidental re-triggering
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+
+    // Prevent duplicate uploads by checking if we're already uploading
     const fileArray = Array.from(files);
-    const uploadPromises = fileArray.map(async (file) => {
+    const filesToUpload = fileArray.filter(file => {
       if (!file.type.startsWith('image/')) {
         console.error('Invalid file type:', file.type);
-        return null;
+        setLocalError(`Invalid file type: ${file.type}. Please upload images only.`);
+        return false;
       }
-
-      const tempId = Date.now() + Math.random();
       
-      // Add to uploading state
-      setUploadingImages(prev => [...prev, { id: tempId, filename: file.name }]);
+      // Check if file is already being uploaded (by name AND size)
+      const isAlreadyUploading = uploadingImages.some(img => 
+        img.filename === file.name && img.size === file.size
+      );
+      
+      // Also check if file already exists in images array
+      const alreadyExists = images.some(img => 
+        img.filename === file.name && img.size === file.size
+      );
+      
+      if (isAlreadyUploading) {
+        console.log(`File ${file.name} is already being uploaded, skipping...`);
+        return false;
+      }
+      
+      if (alreadyExists) {
+        console.log(`File ${file.name} already exists, skipping...`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (filesToUpload.length === 0) {
+      console.log('No valid files to upload');
+      return;
+    }
+
+    const uploadPromises = filesToUpload.map(async (file) => {
+      const tempId = Date.now() + Math.random();
+      const controller = new AbortController();
+      
+      // Store controller for potential cancellation
+      uploadControllersRef.current.set(tempId, controller);
+      
+      // Add to uploading state with file size for duplicate detection
+      setUploadingImages(prev => [...prev, { 
+        id: tempId, 
+        filename: file.name, 
+        size: file.size,
+        progress: 0
+      }]);
 
       try {
         const formData = new FormData();
         formData.append('image', file);
 
-        const response = await itemAPI.uploadImage(formData);
+        const response = await itemAPI.uploadImage(formData, {
+          signal: controller.signal,
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadingImages(prev => prev.map(img => 
+              img.id === tempId ? { ...img, progress: percentCompleted } : img
+            ));
+          }
+        });
         
         if (response.data?.success) {
           const imageData = {
             id: tempId,
             url: response.data.data.url || response.data.data.imageUrl,
             filename: file.name,
+            size: file.size,
             isExisting: false
           };
 
@@ -605,11 +677,16 @@ const ItemManagementEditPage = () => {
           throw new Error('Upload failed');
         }
       } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log(`Upload of ${file.name} was cancelled`);
+          return null;
+        }
         console.error('Error uploading image:', error);
         setLocalError(`Failed to upload ${file.name}: ${error.message}`);
         return null;
       } finally {
-        // Remove from uploading state
+        // Clean up controller and remove from uploading state
+        uploadControllersRef.current.delete(tempId);
         setUploadingImages(prev => prev.filter(img => img.id !== tempId));
       }
     });
@@ -621,23 +698,51 @@ const ItemManagementEditPage = () => {
   const handleVideoUpload = async (files) => {
     if (!files || files.length === 0) return;
 
+    // Prevent duplicate uploads by checking if we're already uploading
     const fileArray = Array.from(files);
-    const uploadPromises = fileArray.map(async (file) => {
+    const filesToUpload = fileArray.filter(file => {
       if (!file.type.startsWith('video/')) {
         console.error('Invalid file type:', file.type);
-        return null;
+        setLocalError(`Invalid file type: ${file.type}. Please upload videos only.`);
+        return false;
       }
-
-      const tempId = Date.now() + Math.random();
       
-      // Add to uploading state
-      setUploadingVideos(prev => [...prev, { id: tempId, filename: file.name }]);
+      // Check if file is already being uploaded
+      const isAlreadyUploading = uploadingVideos.some(vid => 
+        vid.filename === file.name && vid.size === file.size
+      );
+      
+      if (isAlreadyUploading) {
+        console.log(`File ${file.name} is already being uploaded, skipping...`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (filesToUpload.length === 0) return;
+
+    const uploadPromises = filesToUpload.map(async (file) => {
+      const tempId = Date.now() + Math.random();
+      const controller = new AbortController();
+      
+      // Store controller for potential cancellation
+      uploadControllersRef.current.set(tempId, controller);
+      
+      // Add to uploading state with file size for duplicate detection
+      setUploadingVideos(prev => [...prev, { 
+        id: tempId, 
+        filename: file.name, 
+        size: file.size 
+      }]);
 
       try {
         const formData = new FormData();
         formData.append('video', file);
 
-        const response = await itemAPI.uploadVideo(formData);
+        const response = await itemAPI.uploadVideo(formData, {
+          signal: controller.signal
+        });
         
         if (response.data?.success) {
           const videoData = {
@@ -653,16 +758,26 @@ const ItemManagementEditPage = () => {
           throw new Error('Upload failed');
         }
       } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log(`Upload of ${file.name} was cancelled`);
+          return null;
+        }
         console.error('Error uploading video:', error);
         setLocalError(`Failed to upload ${file.name}: ${error.message}`);
         return null;
       } finally {
-        // Remove from uploading state
+        // Clean up controller and remove from uploading state
+        uploadControllersRef.current.delete(tempId);
         setUploadingVideos(prev => prev.filter(vid => vid.id !== tempId));
       }
     });
 
     await Promise.all(uploadPromises);
+    
+    // Clear the input value to allow uploading the same files again
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
   };
 
   // Remove media handlers
@@ -759,20 +874,20 @@ const ItemManagementEditPage = () => {
         categoryId: formData.categoryId,
         subCategoryId: formData.subCategoryId,
         sizes: stockSizeOption === 'addSize' ? formData.sizes.map(size => ({
-          size: size.sizeName,
+          size: size.sizeName, // Map sizeName to size field expected by backend
           quantity: parseInt(size.quantity) || 0,
-          hsnCode: size.hsn,
+          hsnCode: size.hsn, // Map hsn to hsnCode
           sku: size.sku,
-          barcode: size.barcodeNo,
+          barcode: size.barcodeNo, // Map barcodeNo to barcode
           regularPrice: parseFloat(size.regularPrice) || 0,
           salePrice: parseFloat(size.salePrice) || 0,
-          fitWaistCm: parseFloat(size.waistCm) || 0,
-          inseamLengthCm: parseFloat(size.inseamCm) || 0,
+          fitWaistCm: parseFloat(size.waistCm) || 0, // Map waistCm to fitWaistCm
+          inseamLengthCm: parseFloat(size.inseamCm) || 0, // Map inseamCm to inseamLengthCm
           chestCm: parseFloat(size.chestCm) || 0,
           frontLengthCm: parseFloat(size.frontLengthCm) || 0,
           acrossShoulderCm: parseFloat(size.acrossShoulderCm) || 0,
-          toFitWaistIn: parseFloat(size.waistIn) || 0,
-          inseamLengthIn: parseFloat(size.inseamIn) || 0,
+          toFitWaistIn: parseFloat(size.waistIn) || 0, // Map waistIn to toFitWaistIn
+          inseamLengthIn: parseFloat(size.inseamIn) || 0, // Map inseamIn to inseamLengthIn
           chestIn: parseFloat(size.chestIn) || 0,
           frontLengthIn: parseFloat(size.frontLengthIn) || 0,
           acrossShoulderIn: parseFloat(size.acrossShoulderIn) || 0,
@@ -783,19 +898,19 @@ const ItemManagementEditPage = () => {
         })) : []
       };
 
-      // Validate we have the productId for the draft configuration
-      if (!item?.productId) {
-        setLocalError('❌ Product ID not found. Please reload the page and try again.');
+      // Validate we have the item ID for update
+      if (!id) {
+        setLocalError('❌ Item ID not found. Please reload the page and try again.');
         return;
       }
       
-      // First try the standard update endpoint with MongoDB _id
+      // Use the standard update endpoint for existing items
       let response;
       try {
         response = await itemAPI.updateItem(id, updateData);
       } catch (updateError) {
-        // If standard update fails, try the draft configuration endpoint with productId
-        response = await itemAPI.updateDraftConfiguration(item.productId, updateData);
+        console.error('Update failed:', updateError);
+        throw updateError;
       }
       
       if (response.data?.success) {
@@ -894,7 +1009,10 @@ const ItemManagementEditPage = () => {
         <div className="space-y-8">
           {/* Images Section */}
           <div>
-            <h2 className="text-2xl font-medium text-black mb-6">Images</h2>
+            <div className="mb-6">
+              <h2 className="text-2xl font-medium text-black mb-2">Images</h2>
+              <p className="text-sm text-gray-600">You can select multiple images at once. Hold Ctrl/Cmd to select multiple files.</p>
+            </div>
             
             {/* Image Grid */}
             <div className="grid grid-cols-5 gap-4 mb-6">
@@ -925,10 +1043,18 @@ const ItemManagementEditPage = () => {
                 <div key={`upload-${index}`} className="aspect-square">
                   <button
                     onClick={() => imageInputRef.current?.click()}
-                    className="w-full h-full bg-blue-600 text-white rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+                    disabled={uploadingImages.length > 0}
+                    className={`w-full h-full rounded-lg flex flex-col items-center justify-center gap-2 transition-colors ${
+                      uploadingImages.length > 0 
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
                     <Plus className="w-5 h-5" />
-                    <span className="text-sm">Upload Image</span>
+                    <span className="text-sm">
+                      {uploadingImages.length > 0 ? 'Uploading...' : 'Upload Images'}
+                    </span>
+                    <span className="text-xs opacity-80">(Multiple)</span>
                   </button>
                 </div>
               ))}
@@ -959,7 +1085,10 @@ const ItemManagementEditPage = () => {
 
           {/* Videos Section */}
           <div>
-            <h2 className="text-2xl font-medium text-black mb-6">Videos</h2>
+            <div className="mb-6">
+              <h2 className="text-2xl font-medium text-black mb-2">Videos</h2>
+              <p className="text-sm text-gray-600">You can select multiple videos at once. Hold Ctrl/Cmd to select multiple files.</p>
+            </div>
             
             {/* Video Grid */}
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -987,10 +1116,18 @@ const ItemManagementEditPage = () => {
                 <div key={`upload-video-${index}`} className="aspect-square">
                   <button
                     onClick={() => videoInputRef.current?.click()}
-                    className="w-full h-full bg-blue-600 text-white rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+                    disabled={uploadingVideos.length > 0}
+                    className={`w-full h-full rounded-lg flex flex-col items-center justify-center gap-2 transition-colors ${
+                      uploadingVideos.length > 0 
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
                     <Plus className="w-5 h-5" />
-                    <span className="text-sm">Upload Video</span>
+                    <span className="text-sm">
+                      {uploadingVideos.length > 0 ? 'Uploading...' : 'Upload Videos'}
+                    </span>
+                    <span className="text-xs opacity-80">(Multiple)</span>
                   </button>
                 </div>
               ))}

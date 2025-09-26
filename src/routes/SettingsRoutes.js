@@ -82,7 +82,26 @@ router.post("/shipping/charges", isAuthenticated, SettingsController.createShipp
 router.put("/shipping/charges/:chargeId", isAuthenticated, SettingsController.updateShippingCharge);
 
 // Delete shipping charge
-router.delete("/shipping/charges/:chargeId", isAuthenticated, SettingsController.deleteShippingCharge);
+router.delete("/shipping/charges/:chargeId", isAuthenticated, (req, res, next) => {
+  // Pre-validation middleware to check chargeId
+  const { chargeId } = req.params;
+  if (!chargeId || chargeId === 'undefined' || chargeId === 'null') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid or missing shipping charge ID in URL'
+    });
+  }
+  
+  // Check if chargeId is a valid MongoDB ObjectId format (24 hex characters)
+  if (!/^[0-9a-fA-F]{24}$/.test(chargeId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid shipping charge ID format'
+    });
+  }
+  
+  next();
+}, SettingsController.deleteShippingCharge);
 
 // Update general shipping settings
 router.put("/shipping/general", isAuthenticated, SettingsController.updateShippingSettings);

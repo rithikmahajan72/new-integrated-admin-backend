@@ -2,50 +2,80 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { itemAPI, productAPI, categoryAPI, subCategoryAPI } from '../../api/endpoints';
 import { apiCall } from '../../api/utils';
+import { monitoredRequest } from '../../utils/errorMonitor.js';
 
 const API_BASE_URL = 'http://localhost:8080/api';
+
+// Request deduplication cache
+const activeRequests = new Map();
 
 // Async thunks for item/product operations
 export const fetchItems = createAsyncThunk(
     'items/fetchItems',
     async (params = {}, { rejectWithValue }) => {
         try {
-            console.log('🔍 fetchItems called with params:', params);
-            const result = await apiCall(itemAPI.getAllItems, params);
-            console.log('🔍 apiCall result:', result);
+            const requestKey = `fetchItems-${JSON.stringify(params)}`;
             
-            if (result.success) {
-                const returnData = {
-                    items: result.data.items || result.data || [],
-                    pagination: result.data.pagination || null,
-                    filters: params,
-                    total: result.data.total || result.data.count || (result.data.items || result.data || []).length
-                };
-                console.log('🔍 fetchItems returning:', returnData);
-                return returnData;
-            } else {
-                console.error('🔍 fetchItems failed:', result.message);
-                return rejectWithValue(result.message);
-            }
+            return await monitoredRequest(requestKey, async () => {
+                console.log('🔍 fetchItems called with params:', params);
+                const result = await apiCall(itemAPI.getAllItems, params);
+                console.log('🔍 apiCall result:', result);
+                
+                if (result.success) {
+                    const returnData = {
+                        items: result.data.items || result.data || [],
+                        pagination: result.data.pagination || null,
+                        filters: params,
+                        total: result.data.total || result.data.count || (result.data.items || result.data || []).length
+                    };
+                    console.log('🔍 fetchItems returning:', returnData);
+                    return returnData;
+                } else {
+                    console.error('🔍 fetchItems failed:', result.message);
+                    return rejectWithValue(result.message);
+                }
+            }, {
+                method: 'GET',
+                url: '/items',
+                context: { params }
+            });
         } catch (error) {
             console.error('🔍 fetchItems error:', error);
-            return rejectWithValue(error.message || 'Failed to fetch items');
+            return rejectWithValue(error.userMessage || error.message || 'Failed to fetch items');
         }
     }
 );
 
 export const fetchItemById = createAsyncThunk(
     'items/fetchItemById',
-    async (itemId, { rejectWithValue }) => {
+    async (itemId, { rejectWithValue, getState }) => {
         try {
-            const result = await apiCall(itemAPI.getItemById, itemId);
-            if (result.success) {
-                return result.data;
-            } else {
-                return rejectWithValue(result.message);
-            }
+            const requestKey = `fetchItemById-${itemId}`;
+            
+            return await monitoredRequest(requestKey, async () => {
+                // Check if we already have this item in state and it's fresh
+                const currentState = getState();
+                const existingItem = currentState.items?.currentItem;
+                if (existingItem && (existingItem._id === itemId || existingItem.itemId === itemId)) {
+                    console.log('🔄 Using cached item data for:', itemId);
+                    return existingItem;
+                }
+                
+                console.log('🔍 Making fresh API call for item:', itemId);
+                const result = await apiCall(itemAPI.getItemById, itemId);
+                
+                if (result.success) {
+                    return result.data;
+                } else {
+                    throw new Error(result.message);
+                }
+            }, {
+                method: 'GET',
+                url: `/items/${itemId}`,
+                context: { itemId }
+            });
         } catch (error) {
-            return rejectWithValue(error.message || 'Failed to fetch item details');
+            return rejectWithValue(error.userMessage || error.message || 'Failed to fetch item details');
         }
     }
 );

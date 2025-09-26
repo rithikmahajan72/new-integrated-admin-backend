@@ -31,12 +31,13 @@ exports.createBasicProduct = async (req, res) => {
       return res.status(400).json(ApiResponse(null, "Product description is required", false, 400));
     }
 
-    // Generate unique productId
-    const productId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique itemId
+    const itemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Prepare basic item data (PHASE 1)
     const itemData = {
-      productId,
+      itemId,
+      productId: itemId, // Add productId field for compatibility with existing indexes
       
       // Basic product information
       productName,
@@ -103,7 +104,7 @@ exports.createBasicProduct = async (req, res) => {
  */
 exports.updateDraftConfiguration = async (req, res) => {
   try {
-    const { productId } = req.params;
+    const { itemId } = req.params;
     const {
       images = [],
       filters = [],
@@ -169,7 +170,9 @@ exports.updateDraftConfiguration = async (req, res) => {
     };
 
     const item = await Item.findOneAndUpdate(
-      { productId: productId },
+      mongoose.Types.ObjectId.isValid(itemId) ? 
+        { $or: [{ itemId: itemId }, { productId: itemId }, { _id: itemId }] } : 
+        { $or: [{ itemId: itemId }, { productId: itemId }] },
       { $set: updateData },
       { new: true }
     );
@@ -190,7 +193,7 @@ exports.updateDraftConfiguration = async (req, res) => {
  */
 exports.addReview = async (req, res) => {
   try {
-    const { productId } = req.params;
+    const { itemId } = req.params;
     const { userId, rating, reviewText } = req.body;
 
     // Validate required fields
@@ -202,7 +205,7 @@ exports.addReview = async (req, res) => {
       return res.status(400).json(ApiResponse(null, "Rating must be between 1 and 5", false, 400));
     }
 
-    const item = await Item.findOne({ productId: productId });
+    const item = await Item.findOne({ itemId: itemId });
     if (!item) {
       return res.status(404).json(ApiResponse(null, "Product not found", false, 404));
     }
@@ -244,10 +247,10 @@ exports.addReview = async (req, res) => {
  */
 exports.updateAlsoShowInOptions = async (req, res) => {
   try {
-    const { productId } = req.params;
+    const { itemId } = req.params;
     const { alsoShowInOptions } = req.body;
 
-    const item = await Item.findOne({ productId: productId });
+    const item = await Item.findOne({ itemId: itemId });
     if (!item) {
       return res.status(404).json(ApiResponse(null, "Product not found", false, 404));
     }
@@ -276,7 +279,7 @@ exports.updateAlsoShowInOptions = async (req, res) => {
     };
 
     const updatedItem = await Item.findOneAndUpdate(
-      { productId: productId },
+      { itemId: itemId },
       { $set: updateData },
       { new: true }
     );
@@ -293,7 +296,7 @@ exports.updateAlsoShowInOptions = async (req, res) => {
  */
 exports.updateProductStatus = async (req, res) => {
   try {
-    const { productId } = req.params;
+    const { itemId } = req.params; // Can be either ObjectId or itemId
     const { 
       status, 
       scheduledDate, 
@@ -303,12 +306,28 @@ exports.updateProductStatus = async (req, res) => {
     } = req.body;
 
     // Validate status
-    const validStatuses = ['draft', 'scheduled', 'published'];
+    const validStatuses = ['draft', 'published', 'scheduled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json(ApiResponse(null, `Invalid status. Must be one of: ${validStatuses.join(', ')}`, false, 400));
     }
 
-    const item = await Item.findOne({ productId: productId });
+    let item;
+    
+    // Try to find by ObjectId first
+    if (mongoose.Types.ObjectId.isValid(itemId)) {
+      item = await Item.findById(itemId);
+    }
+    
+    // If not found, try to find by itemId or productId
+    if (!item) {
+      item = await Item.findOne({ 
+        $or: [
+          { itemId: itemId },
+          { productId: itemId }
+        ]
+      });
+    }
+    
     if (!item) {
       return res.status(404).json(ApiResponse(null, "Product not found", false, 404));
     }
@@ -320,14 +339,39 @@ exports.updateProductStatus = async (req, res) => {
       if (!scheduledDate || !scheduledTime) {
         return res.status(400).json(ApiResponse(null, "Scheduled date and time are required for scheduled status", false, 400));
       }
+      
+      // Create publishAt date from scheduledDate and scheduledTime
+      const publishAtDate = new Date(`${scheduledDate}T${scheduledTime}:00.000Z`);
+      
+      // Validate that the scheduled time is in the future
+      if (publishAtDate <= new Date()) {
+        return res.status(400).json(ApiResponse(null, "Scheduled time must be in the future", false, 400));
+      }
+      
       updateData.scheduledDate = scheduledDate;
       updateData.scheduledTime = scheduledTime;
-      updateData.publishAt = publishAt ? new Date(publishAt) : null;
+      updateData.scheduledAt = new Date(); // When it was scheduled
+      updateData.publishAt = publishAtDate;
     }
 
     // Handle publishing
     if (status === 'published') {
       updateData.publishedAt = new Date();
+      // Clear scheduling fields when publishing
+      updateData.scheduledDate = null;
+      updateData.scheduledTime = null;
+      updateData.scheduledAt = null;
+      updateData.publishAt = null;
+    }
+
+    // Handle draft status
+    if (status === 'draft') {
+      // Clear all publishing and scheduling fields
+      updateData.publishedAt = null;
+      updateData.scheduledDate = null;
+      updateData.scheduledTime = null;
+      updateData.scheduledAt = null;
+      updateData.publishAt = null;
     }
 
     // Update publishing options
@@ -341,21 +385,109 @@ exports.updateProductStatus = async (req, res) => {
     };
 
     const updatedItem = await Item.findOneAndUpdate(
-      { productId: productId },
+      { $or: [{ _id: itemId }, { itemId: itemId }] },
       { $set: updateData },
       { new: true }
-    );
+    ).populate('categoryId', 'name')
+     .populate('subCategoryId', 'name');
 
     const statusMessage = {
       'draft': 'Product moved to draft',
-      'scheduled': 'Product scheduled successfully',
+      'scheduled': `Product scheduled for ${scheduledDate} at ${scheduledTime}`,
       'published': 'Product published successfully'
     };
 
     res.status(200).json(ApiResponse(updatedItem, statusMessage[status], true, 200));
   } catch (err) {
-    console.error(err);
+    console.error('updateProductStatus error:', err);
     res.status(500).json(ApiResponse(null, err.message, false, 500));
+  }
+};
+
+/**
+ * Auto-publish scheduled items that are due
+ */
+exports.publishScheduledItems = async () => {
+  try {
+    const now = new Date();
+    console.log('🕒 Checking for scheduled items to publish at:', now.toISOString());
+    
+    const scheduledItems = await Item.find({
+      status: 'scheduled',
+      publishAt: { $lte: now },
+      isActive: true,
+      isDeleted: false
+    });
+    
+    console.log(`🕒 Found ${scheduledItems.length} items to publish`);
+    
+    const publishPromises = scheduledItems.map(async (item) => {
+      try {
+        const updatedItem = await Item.findByIdAndUpdate(
+          item._id,
+          {
+            $set: {
+              status: 'published',
+              publishedAt: new Date(),
+              // Clear scheduling fields
+              scheduledDate: null,
+              scheduledTime: null,
+              scheduledAt: null,
+              publishAt: null
+            }
+          },
+          { new: true }
+        );
+        
+        console.log(`✅ Successfully published item: ${item.productName} (${item.itemId})`);
+        return updatedItem;
+      } catch (error) {
+        console.error(`❌ Failed to publish item: ${item.productName} (${item.itemId})`, error);
+        return null;
+      }
+    });
+    
+    const results = await Promise.allSettled(publishPromises);
+    const publishedCount = results.filter(result => result.status === 'fulfilled' && result.value !== null).length;
+    
+    console.log(`🎉 Successfully published ${publishedCount} out of ${scheduledItems.length} scheduled items`);
+    return { publishedCount, totalScheduled: scheduledItems.length };
+  } catch (error) {
+    console.error('❌ Error in publishScheduledItems:', error);
+    return { publishedCount: 0, totalScheduled: 0, error: error.message };
+  }
+};
+
+/**
+ * Get scheduled items summary
+ */
+exports.getScheduledItemsSummary = async (req, res) => {
+  try {
+    const now = new Date();
+    
+    const scheduledItems = await Item.find({
+      status: 'scheduled',
+      isActive: true,
+      isDeleted: false
+    })
+    .select('itemId productName scheduledDate scheduledTime publishAt')
+    .sort({ publishAt: 1 });
+    
+    const overdue = scheduledItems.filter(item => item.publishAt && item.publishAt <= now);
+    const upcoming = scheduledItems.filter(item => item.publishAt && item.publishAt > now);
+    
+    const summary = {
+      total: scheduledItems.length,
+      overdue: overdue.length,
+      upcoming: upcoming.length,
+      overdueItems: overdue,
+      upcomingItems: upcoming.slice(0, 10) // Limit to next 10
+    };
+    
+    res.status(200).json(ApiResponse(summary, "Scheduled items summary retrieved successfully", true, 200));
+  } catch (error) {
+    console.error('Error getting scheduled items summary:', error);
+    res.status(500).json(ApiResponse(null, error.message, false, 500));
   }
 };
 
@@ -442,8 +574,8 @@ exports.createItem = async (req, res, newItemId) => {
       });
     }
 
-    // Generate unique productId using the new format
-    const productId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique itemId using the new format
+    const itemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Parse and format filters if they exist
     let formattedFilters = [];
@@ -472,7 +604,8 @@ exports.createItem = async (req, res, newItemId) => {
     // Prepare item data with new structure
     const itemData = {
       _id: newItemId,
-      productId,
+      itemId,
+      productId: itemId, // Add productId for compatibility with existing indexes
       
       // Basic product information
       productName: productName,
@@ -733,7 +866,7 @@ exports.getItemsByFilter = async (req, res) => {
  * Get all items (with pagination)
  */
 exports.getAllItems = async (req, res) => {
-  console.log("qqqqqqqqqqqqqq")
+  // Debug log removed
   try {
     const { page = 1, limit = 100 } = req.query;
     const items = await Item.find()
@@ -754,18 +887,36 @@ exports.getAllItems = async (req, res) => {
 };
 
 /**
- * Get a single item by ID
+ * Get a single item by itemId
  */
 exports.getItemById = async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id).populate("subCategoryId");
-    if (!item) {
-      return res.status(404).json({ message: "Item not found" });
+    const { itemId } = req.params;
+    
+    let item;
+    
+    // Try to find by ObjectId first (for backward compatibility)
+    if (mongoose.Types.ObjectId.isValid(itemId)) {
+      item = await Item.findById(itemId)
+        .populate("subCategoryId")
+        .populate("categoryId");
     }
-    res.status(200).json(item);
+    
+    // If not found, try to find by itemId
+    if (!item) {
+      item = await Item.findOne({ itemId: itemId })
+        .populate("subCategoryId")
+        .populate("categoryId");
+    }
+    
+    if (!item) {
+      return res.status(404).json(ApiResponse(null, "Item not found", false, 404));
+    }
+    
+    res.status(200).json(ApiResponse(item, "Item fetched successfully", true, 200));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Error fetching item", error: err.message });
+    res.status(500).json(ApiResponse(null, "Error fetching item", false, 500, err.message));
   }
 };
 
@@ -955,9 +1106,9 @@ exports.getProductById = async (req, res) => {
       item = await Item.findById(id).populate('categoryId subCategoryId');
     }
     
-    // If not found, try to find by productId
+    // If not found, try to find by itemId
     if (!item) {
-      item = await Item.findOne({ productId: id }).populate('categoryId subCategoryId');
+      item = await Item.findOne({ itemId: id }).populate('categoryId subCategoryId');
     }
     
     if (!item) {
@@ -1014,7 +1165,7 @@ exports.getProductsByStatus = async (req, res) => {
  */
 exports.updateProductSizes = async (req, res) => {
   try {
-    const { productId } = req.params;
+    const { itemId } = req.params;
     const { sizes } = req.body;
     
     if (!sizes || !Array.isArray(sizes)) {
@@ -1049,7 +1200,7 @@ exports.updateProductSizes = async (req, res) => {
     }));
     
     const item = await Item.findOneAndUpdate(
-      { productId: productId },
+      { itemId: itemId },
       { $set: { sizes: formattedSizes } },
       { new: true }
     );
@@ -1070,7 +1221,7 @@ exports.updateProductSizes = async (req, res) => {
  */
 exports.updateReviewSettings = async (req, res) => {
   try {
-    const { productId } = req.params;
+    const { itemId } = req.params;
     const { isReviewDisplayEnabled, isReviewSubmissionEnabled } = req.body;
     
     const updateData = {};
@@ -1086,7 +1237,7 @@ exports.updateReviewSettings = async (req, res) => {
     }
     
     const item = await Item.findOneAndUpdate(
-      { productId: productId },
+      { itemId: itemId },
       { $set: updateData },
       { new: true }
     );
@@ -1103,12 +1254,25 @@ exports.updateReviewSettings = async (req, res) => {
 };
 
 /**
- * Delete an item
+ * Delete an item by itemId
  */
 exports.deleteItem = async (req, res) => {
   try {
-    console.log("params", req.params.id);
-    const item = await Item.findByIdAndDelete(req.params.id);
+    const { itemId } = req.params;
+    console.log("params", itemId);
+    
+    let item;
+    
+    // Try to find by ObjectId first (for backward compatibility)
+    if (mongoose.Types.ObjectId.isValid(itemId)) {
+      item = await Item.findByIdAndDelete(itemId);
+    }
+    
+    // If not found, try to find by itemId
+    if (!item) {
+      item = await Item.findOneAndDelete({ itemId: itemId });
+    }
+    
     if (!item) {
       return res.status(404).json({ message: "Item not found" });
     }
@@ -1282,7 +1446,7 @@ exports.createProductBundle = async (req, res) => {
     // Prepare main product data
     const mainProductData = {
       itemId: mainItem._id,
-      productId: mainItem.productId,
+      productId: mainItem.itemId,
       productName: mainItem.productName,
       categoryId: mainItem.categoryId._id,
       subCategoryId: mainItem.subCategoryId._id,
@@ -1300,7 +1464,7 @@ exports.createProductBundle = async (req, res) => {
       
       return {
         itemId: item._id,
-        productId: item.productId,
+        productId: item.itemId,
         productName: item.productName,
         categoryId: item.categoryId._id,
         subCategoryId: item.subCategoryId._id,
@@ -1509,7 +1673,7 @@ exports.updateProductBundle = async (req, res) => {
         
         return {
           itemId: item._id,
-          productId: item.productId,
+          productId: item.itemId,
           productName: item.productName,
           categoryId: item.categoryId._id,
           subCategoryId: item.subCategoryId._id,
@@ -1669,7 +1833,7 @@ exports.getItemsForBundling = async (req, res) => {
     // Format items for bundling UI
     const formattedItems = items.map(item => ({
       _id: item._id,
-      productId: item.productId,
+      productId: item.itemId,
       productName: item.productName,
       title: item.title,
       categoryId: item.categoryId._id,
@@ -1888,7 +2052,7 @@ exports.getItemsForArrangement = async (req, res) => {
 
     const formattedItems = items.map((item, index) => ({
       _id: item._id,
-      productId: item.productId,
+      productId: item.itemId,
       productName: item.productName,
       title: item.title || item.productName,
       description: item.description,

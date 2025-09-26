@@ -95,8 +95,8 @@ const ItemManagementSingleProductUpload = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await itemAPI.getProductById(id);
-      const productData = response.data;
+      const response = await itemAPI.getItemById(id); // Use getItemById instead of getProductById
+      const productData = response.data?.success ? response.data.data : response.data;
       
       // Populate form with existing data
       setFormData({
@@ -245,8 +245,8 @@ const ItemManagementSingleProductUpload = () => {
         response = await itemAPI.updateItem(id, productData);
         setSuccess('Product updated successfully!');
       } else {
-        // Create new product using the createItem endpoint (more flexible)
-        response = await itemAPI.createItem(productData);
+        // Create new product using the createBasicProduct endpoint for Phase 1
+        response = await itemAPI.createBasicProduct(productData);
         setSuccess('Product created successfully!');
       }
 

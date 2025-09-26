@@ -1,16 +1,32 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { filterAPI } from '../../api/endpoints';
+import { monitoredRequest } from '../../utils/errorMonitor.js';
 
 // Async thunks for filter operations
 export const fetchFilters = createAsyncThunk(
   'filters/fetchFilters',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      const response = await filterAPI.getAllFilters();
-      return response.data;
+      const requestKey = 'fetchFilters';
+      
+      return await monitoredRequest(requestKey, async () => {
+        // Check if we already have filters in state
+        const currentState = getState();
+        if (currentState.filters?.items?.length > 0) {
+          console.log('🔄 Using cached filters data');
+          return currentState.filters.items;
+        }
+        
+        console.log('🔍 Making fresh API call for filters');
+        const response = await filterAPI.getAllFilters();
+        return response.data;
+      }, {
+        method: 'GET',
+        url: '/filters'
+      });
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.message || 'Failed to fetch filters'
+        error.userMessage || error.response?.data?.message || 'Failed to fetch filters'
       );
     }
   }
