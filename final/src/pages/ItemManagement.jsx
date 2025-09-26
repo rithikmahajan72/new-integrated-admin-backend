@@ -164,32 +164,32 @@ const ProductStatus = ({ status }) => {
   );
 };
 
-// Enhanced detailed stock display component for list view
+// Detailed stock display component for list view
 const DetailedStockDisplay = ({ sizes, variants, stockSizeOption }) => {
-  const [showStockDetails, setShowStockDetails] = useState(false);
-  
   const stockItems = useMemo(() => {
     const items = [];
     
     if (stockSizeOption === 'sizes' && sizes?.length) {
       sizes.forEach(size => {
         const quantity = size.quantity || size.stock || 0;
-        items.push({
-          name: size.size || size.name,
-          quantity: quantity,
-          hasStock: quantity > 0
-        });
+        if (quantity > 0) {
+          items.push({
+            name: size.size || size.name,
+            quantity: quantity
+          });
+        }
       });
     } else if (stockSizeOption === 'variants' && variants?.length) {
       variants.forEach(variant => {
         if (variant.sizes?.length) {
           variant.sizes.forEach(size => {
             const quantity = size.quantity || size.stock || 0;
-            items.push({
-              name: `${variant.color} - ${size.size}`,
-              quantity: quantity,
-              hasStock: quantity > 0
-            });
+            if (quantity > 0) {
+              items.push({
+                name: `${variant.color} - ${size.size}`,
+                quantity: quantity
+              });
+            }
           });
         }
       });
@@ -199,117 +199,40 @@ const DetailedStockDisplay = ({ sizes, variants, stockSizeOption }) => {
   }, [sizes, variants, stockSizeOption]);
 
   const totalStock = stockItems.reduce((total, item) => total + item.quantity, 0);
-  const inStockItems = stockItems.filter(item => item.hasStock);
-  const outOfStockItems = stockItems.filter(item => !item.hasStock);
 
   if (stockItems.length === 0) {
     return (
       <div className="text-xs text-red-600 font-medium">
-        No sizes configured
+        Out of Stock
       </div>
     );
   }
 
   return (
-    <div className="relative">
-      <div className="space-y-1">
-        {/* Stock Summary */}
-        <div 
-          className={`font-medium text-xs cursor-pointer flex items-center gap-1 group ${
-            totalStock <= 5 ? 'text-yellow-600' : totalStock === 0 ? 'text-red-600' : 'text-green-600'
-          }`}
-          onClick={() => setShowStockDetails(!showStockDetails)}
-        >
-          <span>Total: {totalStock} units</span>
-          <ChevronDown className="w-3 h-3 group-hover:text-blue-500" />
-        </div>
-        
-        {/* Size count and status */}
-        <div className="text-xs space-y-0.5">
-          <div className="text-green-600">
-            ✓ {inStockItems.length} sizes in stock
-          </div>
-          {outOfStockItems.length > 0 && (
-            <div className="text-red-500">
-              ✗ {outOfStockItems.length} sizes out of stock
-            </div>
-          )}
-        </div>
+    <div className="text-xs">
+      <div className={`font-medium mb-1 ${
+        totalStock <= 5 ? 'text-yellow-600' : 'text-green-600'
+      }`}>
+        Total: {totalStock} units
       </div>
-
-      {/* Detailed Stock Breakdown */}
-      {showStockDetails && (
-        <div className="absolute top-8 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-64">
-          <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-            <span>Size-wise Stock:</span>
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-              {stockItems.length} sizes
-            </span>
+      <div className="space-y-1">
+        {stockItems.slice(0, 3).map((item, index) => (
+          <div key={index} className="flex justify-between text-gray-600">
+            <span className="truncate mr-2">{item.name}:</span>
+            <span className="font-medium">{item.quantity}</span>
           </div>
-          
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {/* In Stock Items */}
-            {inStockItems.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-green-700 mb-1">In Stock:</div>
-                {inStockItems.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center text-sm p-2 bg-green-50 rounded">
-                    <span className="text-gray-700 uppercase font-medium bg-white px-2 py-1 rounded text-xs">
-                      {item.name}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-700 font-medium">{item.quantity} units</span>
-                      {item.quantity <= 5 && (
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded">
-                          Low
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {/* Out of Stock Items */}
-            {outOfStockItems.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-red-700 mb-1">Out of Stock:</div>
-                {outOfStockItems.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center text-sm p-2 bg-red-50 rounded">
-                    <span className="text-gray-700 uppercase font-medium bg-white px-2 py-1 rounded text-xs">
-                      {item.name}
-                    </span>
-                    <span className="text-red-700 font-medium text-xs">0 units</span>
-                  </div>
-                ))}
-              </div>
-            )}
+        ))}
+        {stockItems.length > 3 && (
+          <div className="text-gray-500 italic">
+            +{stockItems.length - 3} more sizes
           </div>
-          
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowStockDetails(false);
-            }}
-            className="mt-3 w-full text-xs text-blue-600 hover:text-blue-800 border-t border-gray-200 pt-2"
-          >
-            Close Details
-          </button>
-        </div>
-      )}
-      
-      {/* Click outside to close */}
-      {showStockDetails && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setShowStockDetails(false)}
-        />
-      )}
+        )}
+      </div>
     </div>
   );
 };
 
-// Enhanced Price display component with better size-wise visibility
+// Price display component with detailed size-wise breakdown
 const PriceDisplay = ({ sizes, platformPricing, price, salePrice, discountPrice }) => {
   const [showDetails, setShowDetails] = useState(false);
   
@@ -365,62 +288,39 @@ const PriceDisplay = ({ sizes, platformPricing, price, salePrice, discountPrice 
 
   return (
     <div className="relative">
-      {/* Enhanced Summary View with better size indication */}
-      <div className="space-y-1">
-        <div 
-          className="flex items-center gap-2 cursor-pointer group"
-          onClick={() => priceInfo.details && setShowDetails(!showDetails)}
-        >
-          {priceInfo.summary.sale && (
-            <span className="text-green-600 font-medium">{priceInfo.summary.sale}</span>
-          )}
-          <span className={`${priceInfo.summary.sale ? 'line-through text-gray-500' : 'text-gray-900 font-medium'}`}>
-            {priceInfo.summary.regular}
-          </span>
-          {priceInfo.details && (
-            <ChevronDown className="w-3 h-3 text-blue-500 group-hover:text-blue-700" />
-          )}
-        </div>
-        
-        {/* Show size count and preview for size-based pricing */}
+      {/* Summary View */}
+      <div 
+        className="flex items-center gap-2 cursor-pointer group"
+        onClick={() => priceInfo.details && setShowDetails(!showDetails)}
+      >
+        {priceInfo.summary.sale && (
+          <span className="text-green-600 font-medium">{priceInfo.summary.sale}</span>
+        )}
+        <span className={`${priceInfo.summary.sale ? 'line-through text-gray-500' : 'text-gray-900 font-medium'}`}>
+          {priceInfo.summary.regular}
+        </span>
         {priceInfo.details && (
-          <div className="text-xs text-blue-600 space-y-0.5">
-            <div className="font-medium">{priceInfo.details.length} sizes available</div>
-            <div className="text-gray-500">
-              {priceInfo.details.slice(0, 3).map(p => p.size).join(', ')}
-              {priceInfo.details.length > 3 && ` +${priceInfo.details.length - 3} more`}
-            </div>
-          </div>
+          <span className="text-blue-500 text-xs group-hover:text-blue-700">
+            ({priceInfo.details.length} sizes)
+          </span>
         )}
       </div>
 
       {/* Detailed Size-wise Breakdown */}
       {showDetails && priceInfo.details && (
         <div className="absolute top-8 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-64">
-          <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-            <span>Size-wise Pricing:</span>
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-              {priceInfo.details.length} sizes
-            </span>
-          </div>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className="text-sm font-medium text-gray-700 mb-2">Size-wise Pricing:</div>
+          <div className="space-y-1">
             {priceInfo.details.map((sizePrice, index) => (
-              <div key={index} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
-                <span className="text-gray-700 uppercase font-medium bg-white px-2 py-1 rounded text-xs">
-                  {sizePrice.size}
-                </span>
+              <div key={index} className="flex justify-between items-center text-sm">
+                <span className="text-gray-600 uppercase font-medium">{sizePrice.size}</span>
                 <div className="flex items-center gap-2">
                   {sizePrice.sale > 0 && (
                     <span className="text-green-600 font-medium">₹{sizePrice.sale}</span>
                   )}
-                  <span className={`${sizePrice.sale > 0 ? 'line-through text-gray-400' : 'text-gray-900 font-medium'}`}>
+                  <span className={`${sizePrice.sale > 0 ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                     ₹{sizePrice.regular}
                   </span>
-                  {sizePrice.sale > 0 && (
-                    <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">
-                      {Math.round(((sizePrice.regular - sizePrice.sale) / sizePrice.regular) * 100)}% off
-                    </span>
-                  )}
                 </div>
               </div>
             ))}
@@ -430,9 +330,9 @@ const PriceDisplay = ({ sizes, platformPricing, price, salePrice, discountPrice 
               e.stopPropagation();
               setShowDetails(false);
             }}
-            className="mt-3 w-full text-xs text-blue-600 hover:text-blue-800 border-t border-gray-200 pt-2"
+            className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800"
           >
-            Close Details
+            Close
           </button>
         </div>
       )}
@@ -1326,10 +1226,10 @@ const ItemManagement = () => {
                           Category
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Price (Size-wise)
+                          Price
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Stock (Size-wise)
+                          Stock
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
